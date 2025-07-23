@@ -1,10 +1,14 @@
 using BlueSchoolSystem.Models;
+using BlueSchoolSystem.Models.ViewModel;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 using Microsoft.AspNetCore.Identity.UI;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using System.Threading.RateLimiting;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -13,28 +17,75 @@ builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlSer
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(name: "MyAllowOrigins", policy =>
-    {
-        //Thay bằng địa chỉ localhost khi khởi chạy bên frontend (VSCode)
-        policy.WithOrigins("http://127.0.0.1:5500", "http://localhost:5500")
-        .AllowAnyHeader()
-        .AllowAnyMethod();
-    });
+    options.AddPolicy("AllowAll",
+        policy => policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+
 });
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Events.OnRedirectToLogin = context =>
+    {
+        // Nếu là request API thì trả về 401 thay vì redirect
+        if (context.Request.Path.StartsWithSegments("/api") ||
+            context.Request.Headers["Accept"].ToString().Contains("application/json") ||
+            context.Request.Headers.ContainsKey("Authorization"))
+        {
+            context.Response.StatusCode = 401;
+            return Task.CompletedTask;
+        }
+
+        // Nếu không phải API, cho redirect như bình thường
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+});
+
+
 
 builder.Services.AddRateLimiter(options =>
 {
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-    options.RejectionStatusCode = 429; 
+    options.AddFixedWindowLimiter("LoginLimiter", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+
+    options.RejectionStatusCode = 429;
+
+});
+
+
+// Cấu hình JwtSettings
+var jwtSettingsSection = builder.Configuration.GetSection("JwtSettings");
+builder.Services.Configure<JwtSettings>(jwtSettingsSection);
+var jwtSettings = jwtSettingsSection.Get<JwtSettings>();
+
+// Cấu hình JWT Auth
+var key = Encoding.UTF8.GetBytes(jwtSettings.SecretKey);
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings.Issuer,
+        ValidAudience = jwtSettings.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(key)
+    };
 });
 
 
@@ -45,8 +96,8 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
 .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddRazorPages();
 
-
-
+builder.Services.AddAuthorization();
+builder.Services.AddControllers();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -63,18 +114,19 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseRateLimiter();
 
 app.UseHttpsRedirection();
-app.UseRouting();
 app.UseStaticFiles();
+app.UseRouting();
+app.UseCors("AllowAll");
 app.UseAuthentication();
-
 app.UseAuthorization();
+app.UseRateLimiter();
+
+app.MapControllers();
 
 app.MapStaticAssets();
 app.MapRazorPages();
-app.MapControllers();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}")

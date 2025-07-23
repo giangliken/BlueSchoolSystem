@@ -1,27 +1,35 @@
 ﻿using BlueSchoolSystem.Models;
+using BlueSchoolSystem.Models.ViewModel;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace BlueSchoolSystem.APIControllers
 {
-    [Route("api/[controller]")]
-
+    [Route("api")]
     [ApiController]
     public class AccountController : ControllerBase
     {
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly JwtSettings _jwtSettings;
 
-        public AccountController(SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager)
+        public AccountController(SignInManager<ApplicationUser> signInManager,
+                                 UserManager<ApplicationUser> userManager,
+                                 IOptions<JwtSettings> jwtOptions)
         {
             _signInManager = signInManager;
             _userManager = userManager;
+            _jwtSettings = jwtOptions.Value;
         }
 
-        [EnableRateLimiting("login-policy")]
+        [EnableRateLimiting("LoginLimiter")]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest model)
         {
@@ -36,19 +44,50 @@ namespace BlueSchoolSystem.APIControllers
 
             if (result.Succeeded)
             {
-                // Có thể trả token hoặc session nếu cần
+                var roles = await _userManager.GetRolesAsync(user);
+                var token = GenerateJwtToken(user, roles);
+
                 return Ok(new
                 {
                     message = "Đăng nhập thành công",
+                    token = token,
                     user = new
                     {
                         user.Email,
-                        Roles = await _userManager.GetRolesAsync(user)
+                        Roles = roles
                     }
                 });
             }
 
             return Unauthorized(new { message = "Mật khẩu không đúng" });
+        }
+
+        private string GenerateJwtToken(ApplicationUser user, IList<string> roles)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Name, user.UserName)
+            };
+
+            foreach (var role in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _jwtSettings.Issuer,
+                audience: _jwtSettings.Audience,
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(2),
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }

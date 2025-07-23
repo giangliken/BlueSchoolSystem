@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using BlueSchoolSystem.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using BlueSchoolSystem.Models;
 
 namespace BlueSchoolSystem.APIControllers
 {
@@ -15,14 +17,19 @@ namespace BlueSchoolSystem.APIControllers
             _context = context;
         }
 
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("usernames")]
         public async Task<IActionResult> GetAllUsernames()
         {
             var usernames = await _context.Users
                 .Select(u => u.UserName)
                 .ToListAsync();
-
-            return Ok(usernames);
+            var totalUsers = await _context.Users.CountAsync();
+            return Ok(new
+            {
+                Usernames = usernames,
+                Total = totalUsers
+            });
         }
     }
 }
