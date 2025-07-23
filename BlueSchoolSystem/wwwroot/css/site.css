@@ -1,31 +1,40 @@
-html {
-  font-size: 14px;
-}
-
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
-
 body {
-  margin-bottom: 60px;
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #f5f7fb;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    background-color: #002d72;
+    color: white;
+    overflow-y: auto;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+    .sidebar .nav-link {
+        color: white;
+        padding: 15px 20px;
+        transition: 0.2s;
+        text-decoration: none;
+    }
+
+        .sidebar .nav-link:hover {
+            background-color: #003f9e;
+            text-decoration: none;
+        }
+
+.main-content {
+    margin-left: 250px;
+    min-height: 100vh;
+}
+
+.topbar {
+    height: 60px;
+    background-color: white;
+    border-bottom: 1px solid #dee2e6;
+    padding: 10px 20px;
 }
