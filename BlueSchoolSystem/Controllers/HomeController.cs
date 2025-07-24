@@ -1,6 +1,7 @@
-using System.Diagnostics;
 using BlueSchoolSystem.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 
 namespace BlueSchoolSystem.Controllers
 {
@@ -13,7 +14,13 @@ namespace BlueSchoolSystem.Controllers
             _logger = logger;
         }
 
+        [Authorize]
         public IActionResult Index()
+        {
+            return View();
+        }
+
+        public IActionResult Add()
         {
             return View();
         }

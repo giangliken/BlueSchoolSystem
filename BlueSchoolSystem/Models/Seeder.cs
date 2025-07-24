@@ -12,7 +12,7 @@ namespace BlueSchoolSystem.Models
             var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-            // 🟡 Tạo role nếu chưa tồn tại
+            //Tạo role nếu chưa tồn tại
             foreach (var roleName in SD.AllRoles)
             {
                 if (!await roleManager.RoleExistsAsync(roleName))
@@ -21,7 +21,7 @@ namespace BlueSchoolSystem.Models
                 }
             }
 
-            // 🟢 Tạo tài khoản admin mặc định
+            // Tạo tài khoản admin mặc định
             string adminEmail = "giangliken@gmail.com";
             string adminPassword = "Admin@123";
 
@@ -30,7 +30,7 @@ namespace BlueSchoolSystem.Models
             {
                 var user = new ApplicationUser
                 {
-                    UserName = adminEmail,
+                    UserName = "admin",
                     Email = adminEmail,
                     EmailConfirmed = true
                 };

@@ -2,82 +2,116 @@
 @model LoginModel
 
 @{
-    ViewData["Title"] = "Log in";
+    ViewData["Title"] = "";
+    Layout = null;
 }
 
-<h1>@ViewData["Title"]</h1>
-<div class="row">
-    <div class="col-md-4">
-        <section>
-            <form id="account" method="post">
-                <h2>Use a local account to log in.</h2>
-                <hr />
-                <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
-                <div class="form-floating mb-3">
-                    <input asp-for="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
-                    <label asp-for="Input.Email" class="form-label">Email</label>
-                    <span asp-validation-for="Input.Email" class="text-danger"></span>
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>@ViewData["Title"]BLUESCHOOL SYSTEM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="~/css/login.css" />
+
+
+</head>
+
+
+<body class="d-flex justify-content-center align-items-center min-vh-100">
+
+    <div class="login-container text-center">
+        <div class="login-header mb-3">
+            <img src="/images/logo.png" alt="Logo">
+            <h5 class="mt-2">HỆ THỐNG QUẢN LÝ ĐÀO TẠO BLUESCHOOL</h5>
+            <p class="text-muted">Chào mừng trở lại, đăng nhập để tiếp tục truy cập</p>
+        </div>
+
+        <form method="post" id="account">
+            <!-- Google Login -->
+            <div class="mb-3">
+                <button type="button" class="btn btn-outline-danger w-100">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" class="me-2">
+                    Đăng nhập bằng Google
+                </button>
+            </div>
+
+            <div class="mb-2 text-muted">Hoặc, đăng nhập bằng phương thức khác</div>
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger" role="alert">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <div>@error.ErrorMessage</div>
+                    }
                 </div>
-                <div class="form-floating mb-3">
-                    <input asp-for="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
-                    <label asp-for="Input.Password" class="form-label">Password</label>
-                    <span asp-validation-for="Input.Password" class="text-danger"></span>
-                </div>
-                <div class="checkbox mb-3">
-                    <label asp-for="Input.RememberMe" class="form-label">
-                        <input class="form-check-input" asp-for="Input.RememberMe" />
-                        @Html.DisplayNameFor(m => m.Input.RememberMe)
-                    </label>
-                </div>
-                <div>
-                    <button id="login-submit" type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
-                </div>
-                <div>
-                    <p>
-                        <a id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
-                    </p>
-                    <p>
-                        <a asp-page="./Register" asp-route-returnUrl="@Model.ReturnUrl">Register as a new user</a>
-                    </p>
-                    <p>
-                        <a id="resend-confirmation" asp-page="./ResendEmailConfirmation">Resend email confirmation</a>
-                    </p>
-                </div>
-            </form>
-        </section>
-    </div>
-    <div class="col-md-6 col-md-offset-2">
-        <section>
-            <h3>Use another service to log in.</h3>
-            <hr />
-            @{
-                if ((Model.ExternalLogins?.Count ?? 0) == 0)
-                {
-                    <div>
-                        <p>
-                            There are no external authentication services configured. See this <a href="https://go.microsoft.com/fwlink/?LinkID=532715">article
-                            about setting up this ASP.NET application to support logging in via external services</a>.
-                        </p>
-                    </div>
-                }
-                else
-                {
-                    <form id="external-account" asp-page="./ExternalLogin" asp-route-returnUrl="@Model.ReturnUrl" method="post" class="form-horizontal">
-                        <div>
-                            <p>
-                                @foreach (var provider in Model.ExternalLogins!)
-                                {
-                                    <button type="submit" class="btn btn-primary" name="provider" value="@provider.Name" title="Log in using your @provider.DisplayName account">@provider.DisplayName</button>
-                                }
-                            </p>
-                        </div>
-                    </form>
-                }
             }
-        </section>
-    </div>
-</div>
+            <!-- Email -->
+            <div class="form-floating mb-3 text-start">
+                <input asp-for="Input.UserName" class="form-control" placeholder="UserName">
+                <label asp-for="Input.UserName">Tài khoản của bạn</label>
+            </div>
 
-@section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-}
+            <!-- Password -->
+            <div class="form-floating mb-3 text-start">
+                <input asp-for="Input.Password" type="password" class="form-control" placeholder="Mật khẩu">
+                <label asp-for="Input.Password">Mật khẩu của bạn</label>
+            </div>
+
+            <div class="mb-3 text-end">
+                <a href="ForgotPassword" class="text-decoration-none">Quên mật khẩu?</a>
+            </div>
+
+            <!-- Radio chọn loại tài khoản -->
+            <div class="text-start mb-3">
+                <label class="form-label">Loại tài khoản <span class="text-danger">*</span></label>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="accountType" id="student" checked>
+                    <label class="form-check-label" for="student">Sinh viên - Đại học</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="accountType" id="cyu">
+                    <label class="form-check-label" for="cyu">Giảng viên - Cán bộ</label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Đăng nhập</button>
+
+            <div class="text-center mt-3">
+                <small>Đăng nhập không được? <a href="#">Xem hướng dẫn tại đây</a></small>
+            </div>
+            
+        </form>
+    </div>
+   
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Fade Effect JS -->
+    <script>
+        // Fade-in khi trang load
+        window.addEventListener("DOMContentLoaded", () => {
+            document.body.classList.add("fade-in");
+        });
+
+        // Fade-out khi submit
+        document.getElementById("account").addEventListener("submit", function (e) {
+            e.preventDefault();
+            document.body.classList.remove("fade-in");
+            document.body.style.opacity = 0;
+
+            // Submit sau hiệu ứng
+            setTimeout(() => {
+                this.submit();
+            }, 400);
+        });
+    </script>
+</body>
+</html>

@@ -31,14 +31,15 @@ namespace BlueSchoolSystem.APIControllers
 
         [EnableRateLimiting("LoginLimiter")]
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequest model)
+        public async Task<IActionResult> Login([FromBody] Models.ViewModel.LoginRequest model)
         {
             if (!ModelState.IsValid)
                 return BadRequest("Invalid data.");
 
-            var user = await _userManager.FindByEmailAsync(model.Email);
+            //var user = await _userManager.FindByEmailAsync(model.Email);
+            var user = await _userManager.FindByNameAsync(model.UserName);
             if (user == null)
-                return Unauthorized(new { message = "Email không tồn tại" });
+                return Unauthorized(new { message = "Tên đăng nhập không tồn tại" });
 
             var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
 
@@ -49,12 +50,14 @@ namespace BlueSchoolSystem.APIControllers
 
                 return Ok(new
                 {
+                    result = true,
+                    code = 200,
                     message = "Đăng nhập thành công",
                     token = token,
                     user = new
                     {
-                        user.Email,
-                        Roles = roles
+                        user.UserName,
+                        Roles = roles,
                     }
                 });
             }
@@ -66,14 +69,17 @@ namespace BlueSchoolSystem.APIControllers
         {
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Name, user.UserName)
+                //new Claim(ClaimTypes.NameIdentifier, user.Id),
+                //new Claim(ClaimTypes.Email, user.Email),
+                //new Claim(ClaimTypes.Name, user.UserName)
+                new("userId", user.Id),
+                new("username", user.UserName),
+                new("email", user.Email),
             };
 
             foreach (var role in roles)
             {
-                claims.Add(new Claim(ClaimTypes.Role, role));
+                //claims.Add(new Claim(ClaimTypes.Role, role));
             }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
