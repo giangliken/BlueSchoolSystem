@@ -88,6 +88,8 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+builder.Services.AddSession();
+builder.Services.AddHttpClient();
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
@@ -99,7 +101,6 @@ builder.Services.AddRazorPages();
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 var app = builder.Build();
-
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -118,6 +119,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+app.UseSession();
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
