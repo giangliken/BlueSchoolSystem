@@ -11,9 +11,10 @@ namespace BlueSchoolSystem.Models
         public DateTime NgaySinh { get; set; } // Ngày sinh
         public bool GioiTinh { get; set; } // Giới tính
         public string DiaChi { get; set; } // Địa chỉ
-        public string MaLop { get; set; } // Mã lớp
-        public string MaKhoa { get; set; } // Mã khoa
-        public string MaNganh { get; set; } // Mã ngành
+
+        public int LopId { get; set; }
+        public Class? Lop { get; set; }
+
         public DateTime NgayNhapHoc { get; set; } // Ngày nhập học
         public DateTime NgayTotNghiep { get; set; } // Ngày tốt nghiệp
         public string TrangThai { get; set; } // Trạng thái (đang học, đã tốt nghiệp, bỏ học, v.v.)
