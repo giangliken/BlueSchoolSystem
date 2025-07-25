@@ -46,8 +46,10 @@ namespace BlueSchoolSystem.APIControllers
             if (result.Succeeded)
             {
                 var roles = await _userManager.GetRolesAsync(user);
+                var role = roles.FirstOrDefault() ?? "Unknown";
                 var token = GenerateJwtToken(user, roles);
-
+                
+                HttpContext.Session.SetString("access_token", token);
                 return Ok(new
                 {
                     result = true,
@@ -56,8 +58,9 @@ namespace BlueSchoolSystem.APIControllers
                     token = token,
                     user = new
                     {
-                        user.UserName,
-                        Roles = roles,
+                        username = user.UserName,
+                        role = role,
+                        
                     }
                 });
             }
@@ -79,7 +82,7 @@ namespace BlueSchoolSystem.APIControllers
 
             foreach (var role in roles)
             {
-                //claims.Add(new Claim(ClaimTypes.Role, role));
+                claims.Add(new Claim(ClaimTypes.Role, role));
             }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
