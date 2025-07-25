@@ -115,8 +115,31 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in.");
+
+                    // 🔥 Gọi API lấy token
+                    using var client = new HttpClient();
+                    var loginData = new
+                    {
+                        username = Input.UserName,
+                        password = Input.Password
+                    };
+
+                    var content = new StringContent(System.Text.Json.JsonSerializer.Serialize(loginData), System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await client.PostAsync("https://localhost:5001/api/login", content);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var responseContent = await response.Content.ReadAsStringAsync();
+                        using var jsonDoc = System.Text.Json.JsonDocument.Parse(responseContent);
+                        var token = jsonDoc.RootElement.GetProperty("token").GetString();
+
+                        // 💾 Lưu token vào session
+                        HttpContext.Session.SetString("access_token", token);
+                    }
+
                     return LocalRedirect(returnUrl);
                 }
+
                 if (result.RequiresTwoFactor)
                 {
                     return RedirectToPage("./LoginWith2fa", new { ReturnUrl = returnUrl, RememberMe = Input.RememberMe });
