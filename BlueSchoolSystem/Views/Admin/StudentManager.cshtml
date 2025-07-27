@@ -1,0 +1,121 @@
+﻿@model IEnumerable<BlueSchoolSystem.Models.SinhVien>
+
+@{
+    ViewData["Title"] = "StudentManager";
+   
+}
+
+<div class="modal fade" id="connectionModal" tabindex="-1" aria-labelledby="connectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="connectionModalLabel">
+                    <i class="fa-solid fa-circle-exclamation me-2"></i>Lỗi kết nối
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                Không thể kết nối tới máy chủ. Vui lòng kiểm tra mạng hoặc thử lại sau.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Đã hiểu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form asp-action="StudentManager" method="get" class="row mb-3">
+    <div class="col-md-4">
+        <input type="text" name="searchName" value="@ViewBag.SearchName" class="form-control" placeholder="Tìm theo tên sinh viên" />
+    </div>
+    <div class="col-md-4">
+        <input type="text" name="searchMSSV" value="@ViewBag.SearchMSSV" class="form-control" placeholder="Tìm theo MSSV" />
+    </div>
+    <div class="col-md-4">
+        <button type="submit" class="btn btn-info me-2">
+            <i class="fa-solid fa-magnifying-glass me-1"></i> Tìm kiếm
+        </button>
+        <a asp-action="StudentManager" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate-left me-1"></i> Reset
+        </a>
+    </div>
+</form>
+
+
+<p>
+    <a class="btn btn-primary" asp-action="AddStudent">
+        <i class="fa-solid fa-user-plus me-2"></i>Thêm sinh viên mới
+    </a>
+    <a class="btn btn-success" asp-action="Create">
+        <i class="fa-solid fa-file-import me-2"></i>Nhập danh sách sinh viên
+    </a>
+    <a class="btn btn-warning" asp-action="Create">
+        <i class="fa-solid fa-file-export me-2"></i>Xuất danh sách sinh viên
+    </a>
+</p>
+
+<table class="table table-hover table-striped table-bordered">
+    <thead class="table-dark">
+        <tr>
+            <th class="text-center">STT</th>
+            <th class="text-center">Mã số sinh viên</th>
+            <th class="text-center">Họ và tên đệm</th>
+            <th class="text-center">Tên</th>
+            <th class="text-center">Ngày sinh</th>
+            <th class="text-center">Giới tính</th>
+            <th class="text-center">Lớp</th>
+            <th class="text-center">Trạng thái</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr class="table-row" style="cursor:pointer;" onclick="window.location='@Url.Action("StudentDetails", "Admin", new { id = item.Id })'">
+                <td class="text-center">@item.Id</td>
+                <td class="text-center">@item.MSSV</td>
+                <td>@item.HoVaTenDem</td>
+                <td>@item.Ten</td>
+                <td class="text-center">@item.NgaySinh.ToString("dd/MM/yyyy")</td>
+                <td class="text-center">
+                    @(item.GioiTinh ? "Nam" : "Nữ")
+                </td>
+                <td class="text-center">@item.Lop?.TenLop</td>
+                <td class="text-center">@item.TrangThai</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <script>
+        async function checkServerConnection() {
+            try {
+                const response = await fetch('/api/test', { method: 'GET' });
+
+                if (!response.ok) {
+                    throw new Error("Bad response");
+                }
+
+                // Nếu kết nối lại được thì ẩn modal (nếu đang mở)
+                const modalEl = document.getElementById('connectionModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) {
+                    modal.hide();
+                }
+            } catch (error) {
+                console.error("🚨 Không thể kết nối đến máy chủ:", error);
+
+                // Hiển thị modal cảnh báo
+                const modalEl = document.getElementById('connectionModal');
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            }
+        }
+
+        // Gọi khi trang load và mỗi 15 giây sau đó
+        checkServerConnection();
+        setInterval(checkServerConnection, 10000);
+    </script>
+}
+
+
