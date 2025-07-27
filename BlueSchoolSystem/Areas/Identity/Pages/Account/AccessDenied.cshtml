@@ -1,10 +1,42 @@
 ﻿@page
 @model AccessDeniedModel
 @{
-    ViewData["Title"] = "Access denied";
+    ViewData["Title"] = "Access Denied";
 }
 
-<header>
-    <h1 class="text-danger">@ViewData["Title"]</h1>
-    <p class="text-danger">You do not have access to this resource.</p>
-</header>
+<style>
+    .access-denied-container {
+        min-height: 75vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        color: #dc3545;
+        padding: 2rem;
+    }
+
+    .access-denied-icon {
+        font-size: 5rem;
+    }
+
+    .access-denied-title {
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+
+    .access-denied-message {
+        font-size: 1.25rem;
+    }
+</style>
+
+<div class="access-denied-container">
+    <div class="access-denied-icon">
+        <i class="bi bi-shield-lock-fill"></i> <!-- Bootstrap Icons -->
+    </div>
+    <div class="access-denied-title">@ViewData["Title"]</div>
+    <div class="access-denied-message">
+        Bạn không có quyền truy cập vào tài nguyên này.
+    </div>
+    <a href="/" class="btn btn-outline-danger mt-4">Về trang chủ</a>
+</div>

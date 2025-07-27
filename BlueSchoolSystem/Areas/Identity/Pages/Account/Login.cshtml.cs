@@ -133,11 +133,26 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
                         using var jsonDoc = System.Text.Json.JsonDocument.Parse(responseContent);
                         var token = jsonDoc.RootElement.GetProperty("token").GetString();
 
-                        // 💾 Lưu token vào session
+                        // Lưu token vào session
                         HttpContext.Session.SetString("access_token", token);
                     }
 
-                    return LocalRedirect(returnUrl);
+                    var user = await _signInManager.UserManager.FindByNameAsync(Input.UserName);
+                    var roles = await _signInManager.UserManager.GetRolesAsync(user);
+                    var role = roles.FirstOrDefault(); // giả định mỗi user có 1 role
+
+                    if (role == "Admin")
+                    {
+                        return RedirectToAction("Index", "Admin");
+                    }
+                    else if (role == "Teacher")
+                    {
+                        return RedirectToAction("Index", "Teacher");
+                    }
+                    else
+                    {
+                        return RedirectToAction("Index", "Home");
+                    }
                 }
 
                 if (result.RequiresTwoFactor)
