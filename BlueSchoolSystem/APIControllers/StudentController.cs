@@ -29,15 +29,63 @@ namespace BlueSchoolSystem.APIControllers
         [HttpGet("laydanhsachsinhvien")]
         public async Task<IActionResult> GetAllStudents()
         {
-            var students = await _context.Students.ToListAsync();
+            var students = await _context.SinhViens
+                        .Include(sv => sv.Lop)
+                        .ToListAsync();
+            var tongsinhvien = await _context.SinhViens.CountAsync();
             return Ok(new
             {
                 result = true,
                 code = 200,
                 message = "Lấy dữ liệu thành công",
+                soluongsinhvien = tongsinhvien,
                 data = students
             });
         }
+
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpGet("timkiemsinhvien")]
+        public async Task<IActionResult> FilterStudents(string? keyword, string? maLop, bool? gioiTinh)
+        {
+            var query = _context.SinhViens
+                .Include(sv => sv.Lop)
+                .AsQueryable();
+
+            // Lọc theo keyword (tên hoặc MSSV)
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                query = query.Where(sv =>
+                    sv.MSSV.Contains(keyword) ||
+                    sv.HoVaTenDem.Contains(keyword) ||
+                    sv.Ten.Contains(keyword));
+            }
+
+            // Lọc theo mã lớp
+            if (!string.IsNullOrEmpty(maLop))
+            {
+                query = query.Where(sv => sv.Lop.MaLop == maLop);
+            }
+
+            // Lọc theo giới tính
+            if (gioiTinh.HasValue)
+            {
+                query = query.Where(sv => sv.GioiTinh == gioiTinh.Value);
+            }
+
+            var students = await query.ToListAsync();
+            var count = students.Count;
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lọc sinh viên thành công",
+                soluongsinhvien = count,
+                data = students
+            });
+        }
+
+
 
         //Thêm sinh viên
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -67,7 +115,7 @@ namespace BlueSchoolSystem.APIControllers
             student.UpdatedAt = DateTime.Now;
 
             // 3. Lưu vào DB
-            _context.Students.Add(student);
+            _context.SinhViens.Add(student);
             await _context.SaveChangesAsync();
 
             return Ok(new

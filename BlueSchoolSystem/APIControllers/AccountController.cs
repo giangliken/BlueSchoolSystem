@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -37,9 +38,17 @@ namespace BlueSchoolSystem.APIControllers
                 return BadRequest("Invalid data.");
 
             //var user = await _userManager.FindByEmailAsync(model.Email);
-            var user = await _userManager.FindByNameAsync(model.UserName);
+            var user = await _userManager.Users
+                .Include(u => u.Student)
+                .FirstOrDefaultAsync(u => u.UserName == model.UserName);
+
             if (user == null)
-                return Unauthorized(new { message = "Tên đăng nhập không tồn tại" });
+                return Unauthorized(new 
+                {   
+                    result = false,
+                    code = 401,
+                    message = "Tên đăng nhập không tồn tại" 
+                });
 
             var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
 
@@ -48,24 +57,58 @@ namespace BlueSchoolSystem.APIControllers
                 var roles = await _userManager.GetRolesAsync(user);
                 var role = roles.FirstOrDefault() ?? "Unknown";
                 var token = GenerateJwtToken(user, roles);
-                
                 HttpContext.Session.SetString("access_token", token);
-                return Ok(new
+
+                //Nếu người dùng đăng nhập bằng tài khoản Admin
+                if (role == SD.Role_Admin)
                 {
-                    result = true,
-                    code = 200,
-                    message = "Đăng nhập thành công",
-                    token = token,
-                    user = new
+                    return Ok(new
                     {
-                        username = user.UserName,
-                        role = role,
-                        
-                    }
-                });
+                        result = true,
+                        code = 200,
+                        message = "Đăng nhập thành công",
+                        token = token,
+                        user = new
+                        {
+                            username = user.UserName,
+                            role = role,
+                            email = user.Email,
+                        }
+                    });
+
+                }
+                
+                //Nếu người dùng đăng nhập bằng tài khoản sinh viên
+                if (role == SD.Role_Student)
+                {
+                    return Ok(new
+                    {
+                        result = true,
+                        code = 200,
+                        message = "Đăng nhập thành công",
+                        token = token,
+                        user = new
+                        {
+                            username = user.UserName,
+                            role = role,
+                            mssv = user.Student.MSSV,
+                            hoSv = user.Student.HoVaTenDem,
+                            tenSv = user.Student.Ten,
+                            email = user.Email,
+                            ngaySinh = user.Student.NgaySinh,
+                        }
+                    });
+                }
+
+                
             }
 
-            return Unauthorized(new { message = "Mật khẩu không đúng" });
+            return Unauthorized(new 
+            { 
+                result = false,
+                code = 401,
+                message = "Mật khẩu không đúng" 
+            });
         }
 
         private string GenerateJwtToken(ApplicationUser user, IList<string> roles)

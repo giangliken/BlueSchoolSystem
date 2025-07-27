@@ -38,7 +38,7 @@ namespace BlueSchoolSystem.APIControllers
         }
 
         [HttpPost("add")]
-        public async Task<IActionResult> AddStudent([FromBody] Student student)
+        public async Task<IActionResult> AddStudent([FromBody] SinhVien student)
         {
             if (!ModelState.IsValid)
             {
@@ -49,46 +49,13 @@ namespace BlueSchoolSystem.APIControllers
             student.CreatedAt = DateTime.Now;
             student.UpdatedAt = DateTime.Now;
 
-            _context.Students.Add(student);
+            _context.SinhViens.Add(student);
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Student added successfully!" });
         }
 
-        [HttpPost("create-student-with-user")]
-        public async Task<IActionResult> CreateStudentWithUser([FromBody] CreateStudentWithUserRequest request)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            // 1. Tạo user
-            var user = new ApplicationUser
-            {
-                UserName = request.UserName,
-                Email = request.Email
-            };
-
-            var result = await _userManager.CreateAsync(user, request.Password);
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
-
-            // 2. Gán UserId vào student
-            var student = request.Student;
-            student.UserId = user.Id;
-            student.CreatedAt = DateTime.Now;
-            student.UpdatedAt = DateTime.Now;
-
-            // 3. Lưu vào DB
-            _context.Students.Add(student);
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "Tạo sinh viên và tài khoản thành công!",
-                studentId = student.Id,
-                userId = user.Id
-            });
-        }
+        
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("me")]
@@ -113,14 +80,21 @@ namespace BlueSchoolSystem.APIControllers
                 user.Id,
                 user.UserName,
                 user.Email,
-                user.Student.MSSV,
-                ho_dem = $"{user.Student.HoVaTenDem}",
-                ten = $"{user.Student.Ten}",
-                user.Student.MaLop,
-                user.Student.MaKhoa,
-                user.Student.MaNganh,
-                user.Student.TrangThai
+                //user.Student.MSSV,
+                //ho_dem = $"{user.Student.HoVaTenDem}",
+                //ten = $"{user.Student.Ten}",
+                //user.Student.MaLop,
+                //user.Student.MaKhoa,
+                //user.Student.MaNganh,
+                //user.Student.TrangThai
             });
+        }
+
+
+        [HttpGet]
+        public IActionResult Ping()
+        {
+            return Ok(new { message = "Server is alive" });
         }
 
     }
