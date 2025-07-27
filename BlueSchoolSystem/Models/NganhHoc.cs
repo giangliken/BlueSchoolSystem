@@ -2,7 +2,7 @@
 
 namespace BlueSchoolSystem.Models
 {
-    public class Major
+    public class NganhHoc
     {
 
         public int Id { get; set; } // Primary Key, có thể là Id tự động tăng
@@ -11,7 +11,7 @@ namespace BlueSchoolSystem.Models
 
         // FK về Khoa (nếu muốn mở rộng)
         public int KhoaId { get; set; }
-        public Faculty? Khoa { get; set; }
+        public Khoa? Khoa { get; set; }
 
     }
 }

@@ -1,8 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace BlueSchoolSystem.Models
 {
-    public class Class
+    public class LopHoc
     {
         public int Id { get; set; }
 
@@ -17,8 +18,10 @@ namespace BlueSchoolSystem.Models
         public string? MoTa { get; set; }  
 
         public int NganhId { get; set; }  
-        public Major? Nganh { get; set; }  
+        public NganhHoc? Nganh { get; set; }
+        
+        [JsonIgnore]
 
-        public ICollection<Student> Students { get; set; } = new List<Student>();
+        public ICollection<SinhVien> Students { get; set; } = new List<SinhVien>();
     }
 }

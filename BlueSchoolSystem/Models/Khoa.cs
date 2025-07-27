@@ -2,7 +2,7 @@
 
 namespace BlueSchoolSystem.Models
 {
-    public class Faculty
+    public class Khoa
     {
         public int Id { get; set; } // ID của khoa
 
