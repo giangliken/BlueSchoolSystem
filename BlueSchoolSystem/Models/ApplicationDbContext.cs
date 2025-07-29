@@ -9,6 +9,9 @@ namespace BlueSchoolSystem.Models
         { 
         }
 
+        //bảng lưu trữ hoạt động người dùng
+        public DbSet<ActivityLog> ActivityLogs { get; set; }
+
         public DbSet<SinhVien> SinhViens { get; set; } // Bảng sinh viên
         public DbSet<LopHoc> LopHocs { get; set; } // Bảng lớp học
         public DbSet<Khoa> Khoas { get; set; } // Bảng khoa
