@@ -22,11 +22,13 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
     {
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ILogger<LoginModel> _logger;
+        private readonly IActivityLogService _activityLogService;
 
-        public LoginModel(SignInManager<ApplicationUser> signInManager, ILogger<LoginModel> logger)
+        public LoginModel(SignInManager<ApplicationUser> signInManager, ILogger<LoginModel> logger, IActivityLogService activityLogService)
         {
             _signInManager = signInManager;
             _logger = logger;
+            _activityLogService = activityLogService;
         }
 
         /// <summary>
@@ -115,8 +117,15 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in.");
-
-                    // 🔥 Gọi API lấy token
+                    await _activityLogService.LogAsync(
+                        userId: _signInManager.UserManager.GetUserId(User),
+                        userName: Input.UserName,
+                        actionType: "Login",
+                        tableName: "Users",
+                        objectId: Input.UserName,
+                        description: $"Người dùng {Input.UserName} đã đăng nhập vào hệ thống"
+                    );
+                    //Gọi API lấy token
                     using var client = new HttpClient();
                     var loginData = new
                     {
