@@ -4,6 +4,7 @@ namespace BlueSchoolSystem.Models
 {
     public class ApplicationUser: IdentityUser
     {
-        public virtual SinhVien Student { get; set; }
+        public virtual SinhVien SinhViens { get; set; }
+        public virtual GiangVien GiangViens { get; set; }
     }
 }

@@ -8,6 +8,7 @@ namespace BlueSchoolSystem.Models
         public string MSSV { get; set; } // Mã số sinh viên
         public string HoVaTenDem { get; set; } // Họ và tên đệm
         public string Ten { get; set; } // Tên
+        public string CCCD { get; set; } // Số căn cước công dân
         public DateTime NgaySinh { get; set; } // Ngày sinh
         public bool GioiTinh { get; set; } // Giới tính
         public string DiaChi { get; set; } // Địa chỉ
