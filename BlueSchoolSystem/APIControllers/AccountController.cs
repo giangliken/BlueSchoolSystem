@@ -1,5 +1,6 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using BlueSchoolSystem.Repository;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages.Manage;
+using NuGet.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -20,14 +23,20 @@ namespace BlueSchoolSystem.APIControllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly JwtSettings _jwtSettings;
-
-        public AccountController(SignInManager<ApplicationUser> signInManager,
-                                 UserManager<ApplicationUser> userManager,
-                                 IOptions<JwtSettings> jwtOptions)
+        private readonly IEmailSender _emailSender;
+        private readonly ApplicationDbContext _context;
+        public AccountController(
+            SignInManager<ApplicationUser> signInManager,
+            UserManager<ApplicationUser> userManager,
+            IOptions<JwtSettings> jwtSettings,
+            IEmailSender emailSender,
+            ApplicationDbContext context)
         {
             _signInManager = signInManager;
             _userManager = userManager;
-            _jwtSettings = jwtOptions.Value;
+            _jwtSettings = jwtSettings.Value;
+            _emailSender = emailSender;
+            _context = context;
         }
 
         [EnableRateLimiting("LoginLimiter")]
@@ -39,7 +48,7 @@ namespace BlueSchoolSystem.APIControllers
 
             //var user = await _userManager.FindByEmailAsync(model.Email);
             var user = await _userManager.Users
-                .Include(u => u.Student)
+                .Include(u => u.SinhViens)
                 .FirstOrDefaultAsync(u => u.UserName == model.UserName);
 
             if (user == null)
@@ -91,11 +100,11 @@ namespace BlueSchoolSystem.APIControllers
                         {
                             username = user.UserName,
                             role = role,
-                            mssv = user.Student.MSSV,
-                            hoSv = user.Student.HoVaTenDem,
-                            tenSv = user.Student.Ten,
+                            mssv = user.SinhViens.MSSV,
+                            hoSv = user.SinhViens.HoVaTenDem,
+                            tenSv = user.SinhViens.Ten,
                             email = user.Email,
-                            ngaySinh = user.Student.NgaySinh,
+                            ngaySinh = user.SinhViens.NgaySinh,
                         }
                     });
                 }
@@ -141,5 +150,165 @@ namespace BlueSchoolSystem.APIControllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+        //Gửi OTP khôi phục mật khẩu
+        [HttpPost("gui-otp")]
+        public async Task<IActionResult> SendOTP([FromBody] SendOTPRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest("Invalid data.");
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Email này chưa liên kết với bất kì tài khoản nào trên hệ thống"
+                });
+            }
+            //Kiểm tra xem đã có mã OTP chưa
+            var existingOTP = await GetOTPByEmailAsync(request.Email);
+            if (existingOTP != null)
+            {
+                //Nếu mã OTP đã tồn tại, kiểm tra xem nó có hết hạn không
+                if (!IsOTPExpired(existingOTP.ExpireAt))
+                {
+                    return BadRequest(new
+                    {
+                        result = false,
+                        code = 400,
+                        message = $"Bạn đã gửi mã OTP trước đó. Bạn có thể gửi mã sau {existingOTP.ExpireAt}"
+                    });
+                }
+                //Nếu mã OTP đã hết hạn, xóa nó
+                _context.PasswordResetOTPs.Remove(existingOTP);
+                await _context.SaveChangesAsync();
+            }
+            var otpCode = GenerateOTP();
+            if (string.IsNullOrEmpty(otpCode))
+            {
+                return StatusCode(500, new
+                {
+                    result = false,
+                    code = 500,
+                    message = "Không thể tạo mã OTP"
+                });
+            }
+            //Lưu mã OTP vào cơ sở dữ liệu
+            await _context.PasswordResetOTPs.AddAsync(new PasswordResetOTP
+            {
+                Email = request.Email,
+                OTPCode = otpCode,
+                ExpireAt = DateTime.Now.AddMinutes(30)
+            });
+
+            _context.SaveChanges();
+
+            //Gửi mã OTP qua email
+            await _emailSender.SendEmailAsync(
+                request.Email, 
+                "Mã OTP khôi phục mật khẩu", 
+                $"Mã OTP của bạn là: {otpCode}"
+            );
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Mã OTP đã được gửi đến email của bạn"
+            });
+        }
+
+
+        //Hàm tạo mã OTP
+        public string GenerateOTP()
+        {
+            Random random = new Random();
+            int otp = random.Next(100000, 999999); // từ 100000 -> 999999
+            return otp.ToString();
+        }
+
+        //Hàm kiểm tra thời gian hết hạn của mã OTP
+        private bool IsOTPExpired(DateTime expireAt)
+        {
+            return DateTime.Now > expireAt;
+        }
+
+        //Hàm lấy ra mã OTP từ cơ sở dữ liệu
+        private async Task<PasswordResetOTP> GetOTPByEmailAsync(string email)
+        {
+            return await _context.PasswordResetOTPs
+                .Where(otp => otp.Email == email)
+                .OrderByDescending(otp => otp.ExpireAt) // mới nhất
+                .FirstOrDefaultAsync();
+        }
+
+
+        //hàm kiểm tra mã OTP
+        [HttpPost("xac-nhan-otp")]
+        public async Task<IActionResult> XacNhanOTP([FromBody] XacNhanOTPRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new
+                {
+                    result = false,
+                    code = 400,
+                    message = "Dữ liệu không hợp lệ"
+                });
+
+            // Tìm mã OTP mới nhất của email này
+            var existingOTP = await GetOTPByEmailAsync(request.Email);
+            if (existingOTP == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy mã OTP cho email này"
+                });
+            }
+
+            // Kiểm tra hết hạn
+            if (IsOTPExpired(existingOTP.ExpireAt))
+            {
+                return BadRequest(new
+                {
+                    result = false,
+                    code = 400,
+                    message = "Mã OTP đã hết hạn"
+                });
+            }
+
+            // Kiểm tra khớp mã OTP
+            if (existingOTP.OTPCode != request.OTPCode)
+            {
+                return BadRequest(new
+                {
+                    result = false,
+                    code = 400,
+                    message = "Mã OTP không đúng"
+                });
+            }
+
+            // Nếu đúng OTP → có thể xóa OTP và cấp ResetToken
+
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user == null)
+                return NotFound(new { result = false, code = 404, message = "Không tìm thấy user" });
+
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            _context.PasswordResetOTPs.Remove(existingOTP);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                resetToken,
+                message = "Xác thực OTP thành công. Bạn có thể đổi mật khẩu."
+            });
+        }
+
     }
 }

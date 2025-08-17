@@ -67,7 +67,7 @@ namespace BlueSchoolSystem.APIControllers
                 return Unauthorized();
 
             var user = await _userManager.Users
-                .Include(u => u.Student)
+                .Include(u => u.SinhViens)
                 .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user == null)
