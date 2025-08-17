@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace BlueSchoolSystem.Migrations
 {
     /// <inheritdoc />
-    public partial class Tao_bang_sinh_vien1 : Migration
+    public partial class D : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -48,6 +48,21 @@ namespace BlueSchoolSystem.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Khoas",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MaKhoa = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    TenKhoa = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    MoTa = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Khoas", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -157,7 +172,50 @@ namespace BlueSchoolSystem.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Students",
+                name: "NganhHocs",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MaNganh = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TenNganh = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    KhoaId = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_NganhHocs", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_NganhHocs_Khoas_KhoaId",
+                        column: x => x.KhoaId,
+                        principalTable: "Khoas",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "LopHocs",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MaLop = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    TenLop = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    MoTa = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    NganhId = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LopHocs", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_LopHocs_NganhHocs_NganhId",
+                        column: x => x.NganhId,
+                        principalTable: "NganhHocs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SinhViens",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -168,25 +226,28 @@ namespace BlueSchoolSystem.Migrations
                     NgaySinh = table.Column<DateTime>(type: "datetime2", nullable: false),
                     GioiTinh = table.Column<bool>(type: "bit", nullable: false),
                     DiaChi = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    MaLop = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    MaKhoa = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    MaNganh = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LopId = table.Column<int>(type: "int", nullable: false),
                     NgayNhapHoc = table.Column<DateTime>(type: "datetime2", nullable: false),
                     NgayTotNghiep = table.Column<DateTime>(type: "datetime2", nullable: false),
                     TrangThai = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    GhiChu = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    AvatarUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    GhiChu = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AvatarUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Students", x => x.Id);
+                    table.PrimaryKey("PK_SinhViens", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Students_AspNetUsers_UserId",
+                        name: "FK_SinhViens_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_SinhViens_LopHocs_LopId",
+                        column: x => x.LopId,
+                        principalTable: "LopHocs",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -231,9 +292,26 @@ namespace BlueSchoolSystem.Migrations
                 filter: "[NormalizedUserName] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Students_UserId",
-                table: "Students",
-                column: "UserId");
+                name: "IX_LopHocs_NganhId",
+                table: "LopHocs",
+                column: "NganhId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NganhHocs_KhoaId",
+                table: "NganhHocs",
+                column: "KhoaId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SinhViens_LopId",
+                table: "SinhViens",
+                column: "LopId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SinhViens_UserId",
+                table: "SinhViens",
+                column: "UserId",
+                unique: true,
+                filter: "[UserId] IS NOT NULL");
         }
 
         /// <inheritdoc />
@@ -255,13 +333,22 @@ namespace BlueSchoolSystem.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
-                name: "Students");
+                name: "SinhViens");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
+
+            migrationBuilder.DropTable(
+                name: "LopHocs");
+
+            migrationBuilder.DropTable(
+                name: "NganhHocs");
+
+            migrationBuilder.DropTable(
+                name: "Khoas");
         }
     }
 }

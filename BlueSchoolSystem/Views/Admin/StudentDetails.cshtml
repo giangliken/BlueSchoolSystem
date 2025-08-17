@@ -18,23 +18,32 @@
                     <div class="text-center mb-4">
                         @if (!string.IsNullOrEmpty(Model.AvatarUrl))
                         {
-                            <img src="@Model.AvatarUrl" class="rounded-circle border" style="max-width: 120px;" />
+                            <img src="@Model.AvatarUrl"
+                                 class="rounded-circle border"
+                                 style="width: 150px; height: 150px; object-fit: cover; border: 2px solid #ccc;" />
                         }
                         else
                         {
-                            <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
+                            <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center"
+                                 style="width: 150px; height: 150px; border: 2px solid #ccc;">
                                 <span>Avatar</span>
                             </div>
                         }
+                        <h5>Ảnh đại diện</h5>
                     </div>
+
 
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item"><strong>MSSV:</strong> @Model.MSSV</li>
                         <li class="list-group-item"><strong>Họ tên:</strong> @Model.HoVaTenDem @Model.Ten</li>
                         <li class="list-group-item"><strong>Giới tính:</strong> @(Model.GioiTinh ? "Nam" : "Nữ")</li>
                         <li class="list-group-item"><strong>Ngày sinh:</strong> @Model.NgaySinh.ToString("dd/MM/yyyy")</li>
+                        <li class="list-group-item"><strong>Số điện thoại:</strong> @Model.User?.PhoneNumber</li>
+                        <li class="list-group-item"><strong>Email:</strong> @Model.User?.Email</li>
                         <li class="list-group-item"><strong>Địa chỉ:</strong> @Model.DiaChi</li>
                         <li class="list-group-item"><strong>Lớp:</strong> @Model.Lop?.TenLop</li>
+                        <li class="list-group-item"><strong>Ngành học:</strong> @Model.Lop?.Nganh?.TenNganh</li>
+                        <li class="list-group-item"><strong>Khoa/Viện:</strong> @Model.Lop?.Nganh?.Khoa?.TenKhoa</li>
                         <li class="list-group-item"><strong>Ngày nhập học:</strong> @Model.NgayNhapHoc.ToString("dd/MM/yyyy")</li>
                         <li class="list-group-item"><strong>Ngày tốt nghiệp:</strong> @Model.NgayTotNghiep.ToString("dd/MM/yyyy")</li>
                         <li class="list-group-item"><strong>Trạng thái:</strong> @Model.TrangThai</li>
@@ -47,10 +56,10 @@
 
                 <div class="card-footer bg-light text-center">
                     <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning me-2">
-                        <i class="bi bi-pencil-square"></i> Sửa
+                        <i class="fa-solid fa-pen-to-square me-2"></i>Sửa
                     </a>
                     <a asp-action="StudentManager" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left-circle"></i> Quay lại
+                        <i class="fa-solid fa-arrow-left me-2"></i>Quay lại
                     </a>
                 </div>
             </div>

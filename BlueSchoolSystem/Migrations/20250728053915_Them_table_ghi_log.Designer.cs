@@ -4,6 +4,7 @@ using BlueSchoolSystem.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlueSchoolSystem.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250728053915_Them_table_ghi_log")]
+    partial class Them_table_ghi_log
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -127,72 +130,6 @@ namespace BlueSchoolSystem.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("BlueSchoolSystem.Models.GiangVien", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AvatarUrl")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CCCD")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DiaChi")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("GhiChu")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("GioiTinh")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("HoVaTenDem")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("KhoaId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("MaGiangVien")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("NgaySinh")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Ten")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TrangThai")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("KhoaId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("GiangViens");
-                });
-
             modelBuilder.Entity("BlueSchoolSystem.Models.Khoa", b =>
                 {
                     b.Property<int>("Id")
@@ -250,81 +187,6 @@ namespace BlueSchoolSystem.Migrations
                     b.ToTable("LopHocs");
                 });
 
-            modelBuilder.Entity("BlueSchoolSystem.Models.LopHocPhan", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("GiangVienId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("MaLopHocPhan")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("MoTa")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("MonHocId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SoTinChi")
-                        .HasColumnType("int");
-
-                    b.Property<string>("TenLopHocPhan")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GiangVienId");
-
-                    b.HasIndex("MonHocId");
-
-                    b.ToTable("LopHocPhan");
-                });
-
-            modelBuilder.Entity("BlueSchoolSystem.Models.MonHoc", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("GiangVienId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("MaMonHoc")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("MoTa")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("SoTinChi")
-                        .HasColumnType("int");
-
-                    b.Property<string>("TenMonHoc")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GiangVienId");
-
-                    b.ToTable("MonHoc");
-                });
-
             modelBuilder.Entity("BlueSchoolSystem.Models.NganhHoc", b =>
                 {
                     b.Property<int>("Id")
@@ -351,30 +213,6 @@ namespace BlueSchoolSystem.Migrations
                     b.ToTable("NganhHocs");
                 });
 
-            modelBuilder.Entity("BlueSchoolSystem.Models.PasswordResetOTP", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("ExpireAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("OTPCode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PasswordResetOTPs");
-                });
-
             modelBuilder.Entity("BlueSchoolSystem.Models.SinhVien", b =>
                 {
                     b.Property<int>("Id")
@@ -384,10 +222,6 @@ namespace BlueSchoolSystem.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("AvatarUrl")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CCCD")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -581,25 +415,6 @@ namespace BlueSchoolSystem.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("BlueSchoolSystem.Models.GiangVien", b =>
-                {
-                    b.HasOne("BlueSchoolSystem.Models.Khoa", "Khoa")
-                        .WithMany()
-                        .HasForeignKey("KhoaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("BlueSchoolSystem.Models.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Khoa");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("BlueSchoolSystem.Models.LopHoc", b =>
                 {
                     b.HasOne("BlueSchoolSystem.Models.NganhHoc", "Nganh")
@@ -609,32 +424,6 @@ namespace BlueSchoolSystem.Migrations
                         .IsRequired();
 
                     b.Navigation("Nganh");
-                });
-
-            modelBuilder.Entity("BlueSchoolSystem.Models.LopHocPhan", b =>
-                {
-                    b.HasOne("BlueSchoolSystem.Models.GiangVien", "GiangVien")
-                        .WithMany("SubjectClasses")
-                        .HasForeignKey("GiangVienId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("BlueSchoolSystem.Models.MonHoc", "MonHoc")
-                        .WithMany()
-                        .HasForeignKey("MonHocId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("GiangVien");
-
-                    b.Navigation("MonHoc");
-                });
-
-            modelBuilder.Entity("BlueSchoolSystem.Models.MonHoc", b =>
-                {
-                    b.HasOne("BlueSchoolSystem.Models.GiangVien", null)
-                        .WithMany("Subjects")
-                        .HasForeignKey("GiangVienId");
                 });
 
             modelBuilder.Entity("BlueSchoolSystem.Models.NganhHoc", b =>
@@ -720,13 +509,6 @@ namespace BlueSchoolSystem.Migrations
                 {
                     b.Navigation("Student")
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("BlueSchoolSystem.Models.GiangVien", b =>
-                {
-                    b.Navigation("SubjectClasses");
-
-                    b.Navigation("Subjects");
                 });
 
             modelBuilder.Entity("BlueSchoolSystem.Models.LopHoc", b =>

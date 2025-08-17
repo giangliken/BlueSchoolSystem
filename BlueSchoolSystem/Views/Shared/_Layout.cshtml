@@ -45,17 +45,65 @@
                         </a>
 
                     </li>
+                    @* <li>
+                        <a href="/Admin/StaffManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/StaffManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fas fa-home me-2"></i> Quản lí giảng viên/cán bộ
+                        </a>
+
+                    </li> *@
                     <li>
                         <a href="/Admin/StudentManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/StudentManager") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-users me-2"></i>Quản lý sinh viên
                         </a>
 
                     </li>
+                    @* <li>
+                        <a href="/Admin/StudentManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/StudentManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-users me-2"></i>Quản lý lớp học
+                        </a>
 
+                    </li>
                     <li>
-                        <a href="/Admin/ActivityLog" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/ActivityLog") ? "active text-white bg-primary" : "text-white")">
+                        <a href="/Admin/StudentManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/StudentManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-users me-2"></i>Khoa viện
+                        </a>
+
+                    </li>
+                    <li>
+                        <a href="/Admin/StudentManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/StudentManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-users me-2"></i>Tài khoản người dùng
+                        </a>
+
+                    </li> *@
+                    
+                    <li>
+                        <a href="/Admin/ActivityLogs" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/ActivityLogs") ? "active text-white bg-primary" : "text-white")">
                             <i class="fas fa-clipboard-list me-2"></i>Nhật ký hệ thống
                         </a>
+                    </li>
+                </ul>
+
+            </div>
+        } else if(User.Identity.IsAuthenticated && (User.IsInRole("Student")))
+        {
+            <div class="sidebar d-flex flex-column p-3 text-bg-dark" style="width: 280px;">
+                <a href="/Admin/Index" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+                    <i class="fas fa-shop me-2 fs-4"></i>
+                    <span class="fs-4">BLUESCHOOL EMS</span>
+                </a>
+                <hr>
+
+                <ul class="nav nav-pills flex-column mb-auto">
+                    <li>
+                        <a href="/Student/index" class="nav-link @(Context.Request.Path.StartsWithSegments("/Student/index") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fas fa-home me-2"></i> Trang chủ
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Student/StudentManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Student/StudentManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-users me-2"></i>Xem thời khóa biểu
+                        </a>
+
                     </li>
                 </ul>
 

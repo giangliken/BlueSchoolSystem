@@ -1,44 +1,24 @@
-﻿@model List<BlueSchoolSystem.Models.ActivityLog>
+﻿@model IEnumerable<BlueSchoolSystem.Models.ActivityLog>
 
-@{
-    ViewData["Title"] = "Nhật ký hoạt động";
-}
+<h2 class="mb-4 text-primary">
+    <i class="fas fa-clipboard-list me-2"></i> Nhật ký hoạt động
+</h2>
 
-<h2>@ViewData["Title"]</h2>
+<div class="table-responsive shadow rounded" id="logs-table">
+    @await Html.PartialAsync("_ActivityLogsTable", Model)
+</div>
 
-@if (ViewBag.Error != null)
-{
-    <div class="alert alert-danger">@ViewBag.Error</div>
-}
-else if (Model.Count == 0)
-{
-    <p>Không có hoạt động nào được ghi nhận.</p>
-}
-else
-{
-    <table class="table table-bordered table-hover">
-        <thead>
-            <tr>
-                <th>Thời gian</th>
-                <th>Người dùng</th>
-                <th>Hành động</th>
-                <th>Bảng</th>
-                <th>ID đối tượng</th>
-                <th>Mô tả</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var log in Model)
-            {
-                <tr>
-                    <td>@log.Timestamp.ToString("dd/MM/yyyy HH:mm:ss")</td>
-                    <td>@log.UserName (@log.UserId)</td>
-                    <td>@log.ActionType</td>
-                    <td>@log.TableName</td>
-                    <td>@log.ObjectId</td>
-                    <td>@log.Description</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+<script>
+    async function reloadLogs() {
+        try {
+            const response = await fetch('@Url.Action("GetActivityLogsTable", "Admin")');
+            const html = await response.text();
+            document.getElementById('logs-table').innerHTML = html;
+        } catch (err) {
+            console.error("Không thể tải lại nhật ký:", err);
+        }
+    }
+
+    // Auto reload mỗi 10 giây
+    setInterval(reloadLogs, 10000);
+</script>

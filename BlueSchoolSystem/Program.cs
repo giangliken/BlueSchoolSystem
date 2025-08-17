@@ -2,6 +2,7 @@ using BlueSchoolSystem;
 using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
 using BlueSchoolSystem.Repository;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI;
@@ -18,8 +19,28 @@ builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlSer
 // Add services to the container.
 
 builder.Services.AddScoped<IActivityLogService, EFActivityLogService>();
+builder.Services.AddScoped<IEmailSender, EmailSender>();
 
 
+// 1. Đăng ký dịch vụ localization
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+// 2. Cấu hình ngôn ngữ mặc định
+builder.Services.Configure<RequestLocalizationOptions>(opts =>
+{
+    var supportedCultures = new[] { "vi-VN", "en-US" };
+    opts.SetDefaultCulture("vi-VN")
+        .AddSupportedCultures(supportedCultures)
+        .AddSupportedUICultures(supportedCultures);
+});
+
+// 3. Đăng ký Razor Pages, bật DataAnnotations localization
+builder.Services.AddRazorPages()
+       .AddDataAnnotationsLocalization();
+
+
+
+builder.Services.Configure<ApiSettings>(builder.Configuration.GetSection("ApiSettings"));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddCors(options =>
 {
@@ -29,6 +50,27 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod()
             .AllowAnyHeader());
 
+});
+
+// Add Google authentication
+builder.Services.AddAuthentication(options =>
+{
+    //options.DefaultScheme = "Cookies";
+    //options.DefaultChallengeScheme = "Google";
+    options.DefaultScheme = IdentityConstants.ApplicationScheme; // hoặc "Cookies" nếu bạn dùng cookie
+    options.DefaultChallengeScheme = IdentityConstants.ApplicationScheme;
+})
+.AddCookie("Cookies")
+.AddGoogle(options =>
+{
+    options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "";
+    options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "";
+    options.SaveTokens = true;
+
+    options.Scope.Add("profile");
+    options.Scope.Add("email");
+    options.ClaimActions.MapJsonKey("picture", "picture");
+    options.ClaimActions.MapJsonKey("locale", "locale");
 });
 
 builder.Services.ConfigureApplicationCookie(options =>
@@ -137,7 +179,7 @@ app.MapStaticAssets();
 app.MapRazorPages();
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
+    pattern: "{controller=Home}/{action=Login}/{id?}")
     .WithStaticAssets();
 
 app.Run();

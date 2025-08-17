@@ -23,7 +23,16 @@
     width: 300px;
 }
 
-.form-check-input:checked {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+.btn-google-custom {
+    background-color: #fff !important;
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    transition: 0.3s;
 }
+
+/*    .btn-google-custom:hover {
+        background-color: #fff !important;
+        color: #000 !important;
+        border-color: 1px solid #000 !important;
+    }*/
+

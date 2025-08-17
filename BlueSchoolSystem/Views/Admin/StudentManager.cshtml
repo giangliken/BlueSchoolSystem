@@ -54,6 +54,7 @@
     </a>
 </p>
 
+<div class="mb-3"><b>Tổng số:</b> @Model.Count() dòng</div>
 <table class="table table-hover table-striped table-bordered">
     <thead class="table-dark">
         <tr>
@@ -115,6 +116,7 @@
         // Gọi khi trang load và mỗi 15 giây sau đó
         checkServerConnection();
         setInterval(checkServerConnection, 10000);
+
     </script>
 }
 
