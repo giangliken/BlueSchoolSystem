@@ -25,6 +25,13 @@ namespace BlueSchoolSystem.Controllers
         }
 
 
+
+        //Giao diện đăng nhập
+        public IActionResult Login()
+        {
+            return Redirect("/Identity/Account/Login");
+        }
+
         public IActionResult Privacy()
         {
             return View();

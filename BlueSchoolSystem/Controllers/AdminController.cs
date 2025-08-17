@@ -45,11 +45,13 @@ namespace BlueSchoolSystem.Controllers
             // Nếu có tìm kiếm thì gọi API lọc
             if (!string.IsNullOrEmpty(searchName) || !string.IsNullOrEmpty(searchMSSV))
             {
+                // Gộp lại thành 1 từ khóa tìm kiếm
+                var keyword = string.Join(" ", new[] { searchMSSV, searchName }
+                    .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
+
                 var queryParams = new List<string>();
-                if (!string.IsNullOrEmpty(searchName))
-                    queryParams.Add($"keyword={searchName}");
-                if (!string.IsNullOrEmpty(searchMSSV))
-                    queryParams.Add($"mssv={searchMSSV}");
+                if (!string.IsNullOrEmpty(keyword))
+                    queryParams.Add($"keyword={Uri.EscapeDataString(keyword)}");
 
                 var queryString = "?" + string.Join("&", queryParams);
                 response = await client.GetAsync("api/timkiemsinhvien" + queryString);
@@ -88,13 +90,22 @@ namespace BlueSchoolSystem.Controllers
             return View(students ?? new List<SinhVien>());
         }
 
+        //Thêm sinh viên theo cách thủ công
+        public async Task<IActionResult> AddStudent()
+        {
+            return View();
+        }
 
+
+        //Xem thông tin chi tiết sinh viên
         public async Task<IActionResult> StudentDetails(int? id)
         {
             if (id == null) return NotFound();
 
             var sinhVien = await _context.SinhViens
                 .Include(s => s.Lop)
+                    .ThenInclude(l => l.Nganh)
+                        .ThenInclude(n => n.Khoa)
                 .Include(s => s.User)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
@@ -102,6 +113,49 @@ namespace BlueSchoolSystem.Controllers
 
             return View(sinhVien);
         }
+
+        public async Task<IActionResult> ActivityLogs()
+        {
+            var logs = await GetLogsFromApi();
+            return View(logs);
+        }
+
+        public async Task<IActionResult> GetActivityLogsTable()
+        {
+            var logs = await GetLogsFromApi();
+            return PartialView("_ActivityLogsTable", logs);
+        }
+
+        // Helper private để tái sử dụng
+        private async Task<List<ActivityLog>> GetLogsFromApi()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.GetAsync("api/xemnhatky");
+            if (!response.IsSuccessStatusCode) return new List<ActivityLog>();
+
+            var jsonString = await response.Content.ReadAsStringAsync();
+
+            using var doc = JsonDocument.Parse(jsonString);
+            var root = doc.RootElement;
+
+            var resultArray = root.GetProperty("data").GetProperty("result");
+
+            var logs = JsonSerializer.Deserialize<List<ActivityLog>>(resultArray, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            return logs ?? new List<ActivityLog>();
+        }
+
 
 
     }
