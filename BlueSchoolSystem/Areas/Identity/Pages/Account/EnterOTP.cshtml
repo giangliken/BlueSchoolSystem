@@ -1,0 +1,81 @@
+﻿@page
+@model EnterOTPModel
+@{
+    ViewData["Title"] = "Nhập mã OTP";
+}
+
+<div class="container mt-5" style="max-width: 400px;">
+    <div class="card shadow-lg border-0 rounded-3">
+        <div class="card-body p-4">
+            <h4 class="card-title text-center mb-4">@ViewData["Title"]</h4>
+
+
+            <form method="post">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 " role="alert"></div>
+                <input type="hidden" asp-for="Email" />
+                <div class="align-content-center">
+                    @if (!string.IsNullOrWhiteSpace(Model.Email))
+                    {
+                        <div class="alert alert-info py-2 mb-3">
+                            Một mã OTP 6 số đã được hệ thống gửi về Email: <strong>@Model.Email</strong>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-danger py-2 mb-3">
+                            Không tìm thấy email. Vui lòng quay lại bước trước.
+                        </div>
+                    }
+                </div>
+                <div class="mb-3">
+                    <input asp-for="OTP" class="form-control text-center fs-5"
+                           maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                           placeholder="Nhập mã 6 số" />
+                    <span asp-validation-for="OTP" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mb-3">
+                    <i class="bi bi-check-circle"></i> Xác nhận
+                </button>
+            </form>
+
+            <div class="text-center">
+                <small class="text-muted">Chưa nhận được mã?</small>
+                <br />
+                <button type="button" class="btn btn-link p-0" id="btnResendOTP">Gửi lại mã</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.getElementById("btnResendOTP").addEventListener("click", function () {
+            // Lấy email từ query string
+            const params = new URLSearchParams(window.location.search);
+            const email = params.get("email");
+
+            if (!email) {
+                alert("Không tìm thấy email để gửi lại OTP.");
+                return;
+            }
+
+            // Gọi API gửi lại OTP
+            fetch('/api/gui-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    alert(data.message || "Mã OTP đã được gửi lại!");
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Có lỗi xảy ra khi gửi lại mã OTP.");
+                });
+        });
+    </script>
+}
+

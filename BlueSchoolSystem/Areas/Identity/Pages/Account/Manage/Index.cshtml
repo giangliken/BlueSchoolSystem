@@ -1,30 +1,134 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Profile";
+    ViewData["Title"] = "Hồ sơ cá nhân";
     ViewData["ActivePage"] = ManageNavPages.Index;
 }
 
 <h3>@ViewData["Title"]</h3>
 <partial name="_StatusMessage" for="StatusMessage" />
 <div class="row">
-    <div class="col-md-6">
-        <form id="profile-form" method="post">
-            <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
-            <div class="form-floating mb-3">
-                <input asp-for="Username" class="form-control" placeholder="Please choose your username." disabled />
-                <label asp-for="Username" class="form-label"></label>
+    <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
+    <div class="row">
+        <form id="profile-form" method="post" enctype="multipart/form-data">
+            <div class="row">
+                <div class="col-md-6">
+
+                    @{
+                        var usernameLabel = User.IsInRole("Admin")
+                        ? "Username"
+                        : User.IsInRole("Teacher") ? "Tên giảng viên" : "MSSV";
+                    }
+                    <div class="form-floating mb-3">
+                        <input asp-for="Username" class="form-control bg-white" placeholder=" " readonly />
+                        <label class="fw-bold">@usernameLabel</label>
+                    </div>
+
+                    <div class="form-floating mb-3">
+                        <input class="form-control" value="@Model.FullName" readonly />
+                        <label class="fw-bold">Họ và tên</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" value="04/07/2004" readonly />
+                        <label class="fw-bold">Ngày sinh</label>
+                    </div>
+                    @if (User.IsInRole("Student"))
+                    {
+                        <div class="form-floating mb-3">
+                            <input class="form-control" value="22DTHG1" readonly />
+                            <label class="fw-bold">Lớp</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input class="form-control" value="Công nghệ thông tin" readonly />
+                            <label class="fw-bold">Ngành học</label>
+                        </div>
+
+                    }
+                    @if (!User.IsInRole("Admin"))
+                    {
+                        <div class="form-floating mb-3">
+                            <input class="form-control" value="Công nghệ thông tin" readonly />
+                            <label class="fw-bold">Khoa/Viện</label>
+                        </div>
+                    }
+
+                    <div class="position-relative form-floating mb-3">
+                        <input asp-for="Input.PhoneNumber" class="form-control" placeholder="Số điện thoại" readonly id="phoneInput" />
+                        <label class="fw-bold" asp-for="Input.PhoneNumber">Số điện thoại</label>
+                        <button type="button"
+                                class="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
+                                onclick="enableEdit('phoneInput')"
+                                style="z-index: 10;">
+                            <i class="fa-solid fa-pen text-secondary"></i>
+                        </button>
+                        <span asp-validation-for="Input.PhoneNumber" class="text-danger"></span>
+                    </div>
+
+
+                    <div class="position-relative form-floating mb-3">
+                        <input asp-for="Input.Email" class="form-control" placeholder="Email" readonly id="emailInput" />
+                        <label class="fw-bold" asp-for="Input.Email">Email</label>
+
+                        @if (Model.IsEmailConfirmed)
+                        {
+                            <span class="position-absolute top-50 end-0 translate-middle-y pe-5 text-success">✓</span>
+                        }
+
+                        <button type="button"
+                                class="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
+                                onclick="enableEdit('emailInput')"
+                                style="z-index: 10;">
+                            <i class="fa-solid fa-pen text-secondary"></i>
+                        </button>
+
+                        <span asp-validation-for="Input.Email" class="text-danger"></span>
+                    </div>
+
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex flex-column align-items-center">
+                        <img id="avatar-preview"
+                             src="@(string.IsNullOrEmpty(Model.Input.AvatarUrl) ? Url.Content("~/images/default-avatar.png") : Url.Content(Model.Input.AvatarUrl))"
+                             alt="Ảnh đại diện"
+                             class="rounded-circle mb-3"
+                             style="width: 150px; height: 150px; object-fit: cover; border: 2px solid #ccc;" />
+                        <input asp-for="Input.AvatarImage" type="file" class="form-control" accept="image/*" onchange="previewImage(event)" />
+                        <small class="text-muted mt-2">Chọn ảnh đại diện mới</small>
+                    </div>
+                </div>
             </div>
-            <div class="form-floating mb-3">
-                <input asp-for="Input.PhoneNumber" class="form-control" placeholder="Please enter your phone number."/>
-                <label asp-for="Input.PhoneNumber" class="form-label"></label>
-                <span asp-validation-for="Input.PhoneNumber" class="text-danger"></span>
-            </div>
-            <button id="update-profile-button" type="submit" class="w-100 btn btn-lg btn-primary">Save</button>
+            <button id="update-profile-button" type="submit" class="w-100 btn btn-lg btn-primary mb-3">Lưu thông tin</button>
         </form>
     </div>
+    
 </div>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        function enableEdit(inputId) {
+            const input = document.getElementById(inputId);
+            if (input.hasAttribute('readonly')) {
+                input.removeAttribute('readonly');
+                input.focus();
+            }
+        }
+    </script>
+    <script>
+        function previewImage(event) {
+            const input = event.target;
+            const reader = new FileReader();
+
+            reader.onload = function () {
+                const preview = document.getElementById('avatar-preview');
+                preview.src = reader.result;
+            }
+
+            if (input.files && input.files[0]) {
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
 }
+
+

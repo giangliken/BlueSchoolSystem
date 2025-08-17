@@ -1,53 +1,89 @@
 ﻿@page
 @model ExternalLoginsModel
 @{
-    ViewData["Title"] = "Manage your external logins";
+    ViewData["Title"] = "Quản lí phương thức đăng nhập";
     ViewData["ActivePage"] = ManageNavPages.ExternalLogins;
 }
 
 <partial name="_StatusMessage" for="StatusMessage" />
 @if (Model.CurrentLogins?.Count > 0)
 {
-    <h3>Registered Logins</h3>
-    <table class="table">
+    <h3>Các phương thức đăng nhập đã liên kết</h3>
+    <table class="table table-hover align-middle">
+        <thead class="table-light">
+            @* <tr>
+                <th>Nhà cung cấp</th>
+                <th>Hành động</th>
+            </tr> *@
+        </thead>
         <tbody>
             @foreach (var login in Model.CurrentLogins)
             {
                 <tr>
-                    <td id="@($"login-provider-{login.LoginProvider}")">@login.ProviderDisplayName</td>
+                    <td id="@($"login-provider-{login.LoginProvider}")" class="fw-bold">
+                        @if (login.LoginProvider == "Google")
+                        {
+                            <i class="fab fa-google" style="font-size:1.2rem; color: blue;"></i>
+                            <span class="ms-2">@login.ProviderDisplayName</span>
+                        }
+                        else
+                        {
+                            @login.ProviderDisplayName
+                        }
+                    </td>
                     <td>
                         @if (Model.ShowRemoveButton)
                         {
-                            <form id="@($"remove-login-{login.LoginProvider}")" asp-page-handler="RemoveLogin" method="post">
-                                <div>
-                                    <input asp-for="@login.LoginProvider" name="LoginProvider" type="hidden" />
-                                    <input asp-for="@login.ProviderKey" name="ProviderKey" type="hidden" />
-                                    <button type="submit" class="btn btn-primary" title="Remove this @login.ProviderDisplayName login from your account">Remove</button>
-                                </div>
+                            <form id="@($"remove-login-{login.LoginProvider}")"
+                                  asp-page-handler="RemoveLogin"
+                                  method="post"
+                                  class="d-inline">
+                                <input asp-for="@login.LoginProvider" name="LoginProvider" type="hidden" />
+                                <input asp-for="@login.ProviderKey" name="ProviderKey" type="hidden" />
+                                <button type="submit"
+                                        class="btn btn-danger btn-sm"
+                                        title="Hủy liên kết @login.ProviderDisplayName khỏi tài khoản">
+                                    <i class="bi bi-x-circle"></i> Hủy liên kết
+                                </button>
                             </form>
                         }
                         else
                         {
-                            @: &nbsp;
+                            <span class="text-secondary">Không thể xóa</span>
                         }
                     </td>
                 </tr>
             }
         </tbody>
     </table>
+
 }
 @if (Model.OtherLogins?.Count > 0)
 {
-    <h4>Add another service to log in.</h4>
+    <h4>Thêm phương thức đăng nhập khác</h4>
     <hr />
     <form id="link-login-form" asp-page-handler="LinkLogin" method="post" class="form-horizontal">
         <div id="socialLoginList">
-            <p>
+            <div class="d-flex flex-wrap gap-2">
                 @foreach (var provider in Model.OtherLogins)
                 {
-                    <button id="@($"link-login-button-{provider.Name}")" type="submit" class="btn btn-primary" name="provider" value="@provider.Name" title="Log in using your @provider.DisplayName account">@provider.DisplayName</button>
+                    <button id="@($"link-login-button-{provider.Name}")"
+                            type="submit"
+                            class="btn btn-outline-primary d-flex align-items-center gap-2"
+                            name="provider"
+                            value="@provider.Name"
+                            title="Đăng nhập bằng @provider.DisplayName">
+
+                        @if (provider.Name == "Google")
+                        {
+                            <i class="fab fa-google"></i>
+                        }
+
+                        @provider.DisplayName
+                    </button>
                 }
-            </p>
+            </div>
         </div>
     </form>
+
 }
