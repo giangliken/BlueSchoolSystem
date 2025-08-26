@@ -9,9 +9,13 @@ using Microsoft.AspNetCore.Identity.UI;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using OfficeOpenXml;
 using System.Text;
 using System.Threading.RateLimiting;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
+
+ExcelPackage.License.SetNonCommercialOrganization("BlueSchoolSystem - NonCommercial Org");
+
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -149,6 +153,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 var app = builder.Build();
+
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
