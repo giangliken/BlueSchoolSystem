@@ -98,7 +98,8 @@ namespace BlueSchoolSystem.APIControllers
             var user = new ApplicationUser
             {
                 UserName = request.UserName,
-                Email = request.Email
+                Email = request.Email,
+                PhoneNumber = request.PhoneNumber,
             };
 
             var result = await _userManager.CreateAsync(user, request.Password);

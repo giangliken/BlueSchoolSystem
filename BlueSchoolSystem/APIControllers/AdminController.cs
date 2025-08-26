@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using BlueSchoolSystem.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlueSchoolSystem.APIControllers
 {
@@ -13,6 +15,28 @@ namespace BlueSchoolSystem.APIControllers
         public AdminController(IActivityLogService activityLogService)
         {
             _activityLogService = activityLogService;
+        }
+
+        //Ghi log hệ thống
+        [HttpPost("ghilog")]
+        public async Task<IActionResult> Create([FromBody] ActivityLog act)
+        {
+            await _activityLogService.LogAsync(
+                userId: act.UserId,
+                userName: act.UserName,
+                device: act.Device,
+                ipAddress: act.IpAddress,
+                actionType: act.ActionType,
+                tableName: act.TableName,
+                objectId: act.ObjectId,
+                description: act.Description
+            );
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Ghi log thành công"
+            });
         }
 
         //Xem nhật ký hệ thống
