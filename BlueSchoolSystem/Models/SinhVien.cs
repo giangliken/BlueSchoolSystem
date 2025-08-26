@@ -13,7 +13,7 @@ namespace BlueSchoolSystem.Models
         public bool GioiTinh { get; set; } // Giới tính
         public string DiaChi { get; set; } // Địa chỉ
 
-        public int LopId { get; set; }
+        public int? LopId { get; set; }
         public LopHoc? Lop { get; set; }
 
         public DateTime NgayNhapHoc { get; set; } // Ngày nhập học

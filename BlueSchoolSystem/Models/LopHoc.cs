@@ -17,11 +17,14 @@ namespace BlueSchoolSystem.Models
 
         public string? MoTa { get; set; }  
 
-        public int NganhId { get; set; }  
+        public int? NganhId { get; set; }  
         public NganhHoc? Nganh { get; set; }
         
         [JsonIgnore]
 
         public ICollection<SinhVien> Students { get; set; } = new List<SinhVien>();
+
+        public ICollection<CHITIETLOPHOC> ChiTietLopHocs { get; set; } = new List<CHITIETLOPHOC>();
+
     }
 }
