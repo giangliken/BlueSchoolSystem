@@ -42,15 +42,33 @@
                         <input asp-for="NgaySinh" type="date" class="form-control" />
                         <span asp-validation-for="NgaySinh" class="text-danger"></span>
                     </div>
-                    <div class="col-md-6 mt-4">
-                        <div class="form-check">
-                            <input class="form-check-input" asp-for="GioiTinh" />
-                            <label class="form-check-label" asp-for="GioiTinh">
-                                @Html.DisplayNameFor(model => model.GioiTinh)
-                            </label>
+                  
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold mb-3">Giới tính(*)</label>
+                        <div class="d-flex align-items-center gap-4">
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="radio" asp-for="GioiTinh" value="true" id="Nam" />
+                                <label class="form-check-label" for="Nam">Nam</label>
+                            </div>
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="radio" asp-for="GioiTinh" value="false" id="Nu" />
+                                <label class="form-check-label" for="Nu">Nữ</label>
+                            </div>
                         </div>
+                        <span asp-validation-for="GioiTinh" class="text-danger"></span>
                     </div>
 
+
+                    <div class="col-md-6">
+                        <label asp-for="User.PhoneNumber" class="form-label fw-semibold">Số điện thoại(*)</label>
+                        <input asp-for="User.PhoneNumber" class="form-control" />
+                        <span asp-validation-for="User.PhoneNumber" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="User.Email" class="form-label fw-semibold">Email(*)</label>
+                        <input asp-for="User.Email" class="form-control" />
+                        <span asp-validation-for="User.Email" class="text-danger"></span>
+                    </div>
                     <div class="col-md-6">
                         <label asp-for="DiaChi" class="form-label fw-semibold">Địa chỉ(*)</label>
                         <input asp-for="DiaChi" class="form-control" />
@@ -115,8 +133,9 @@
             </form>
         </div>
     </div>
-</div>
+    <p class="mt-3">*Lưu ý: Việc thêm mới sinh viên phải được sự đồng ý của hội đồng trường, trường hợp tự ý thêm sinh viên người thêm sẽ bị truy cứu trách nhiệm sau này!</p>
 
+</div>
 @section Scripts {
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");

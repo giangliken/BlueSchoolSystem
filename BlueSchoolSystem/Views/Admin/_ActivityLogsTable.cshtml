@@ -1,10 +1,16 @@
 ﻿@model IEnumerable<BlueSchoolSystem.Models.ActivityLog>
 
-<table class="table table-bordered table-hover align-middle text-center">
+<div>
+    <p><b>Tổng số: </b>@Model.Count() hành động được ghi nhận</p>
+</div>
+
+<div>
+    <table class="table table-bordered table-hover align-middle text-center">
     <thead class="table-dark">
         <tr>
             <th scope="col">Thời gian</th>
             <th scope="col">Người dùng</th>
+            <th scope="col">IP / Device</th>
             <th scope="col">Phạm vi</th>
             <th scope="col">Hành động</th>
             <th scope="col">Chi tiết</th>
@@ -15,15 +21,25 @@
         {
             var (rowClass, icon) = log.ActionType switch
             {
-                "Add" => ("table-success", "fa-upload"),
+                "Add" => ("table-success", "fa-plus"),
                 "Update" => ("table-warning", "fa-pen-to-square"),
                 "Delete" => ("table-danger", "fa-trash"),
+                "Login" => ("table-primary", "fa-right-to-bracket"),
+                    "Logout" => ("table-danger", "fa-sign-out-alt"),
                 _ => ("", "fa-info-circle")
             };
 
             <tr class="@rowClass">
-                <td>@log.Timestamp.ToString("dd/MM/yyyy HH:mm:ss")</td>
-                <td>@log.UserName</td>
+                <td style="width: 180px;">@log.Timestamp.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                <td style="width: 150px;">@log.UserName</td>
+                <td>
+                    @log.IpAddress /
+                    @if (log.Device == "Web Browser")
+                    {
+                        <i class="fas fa-globe me-1 text-primary"></i>
+                    }
+                </td>
+                
                 <td>@log.TableName</td>
                 <td><i class="fas @icon me-1"></i> @log.ActionType</td>
                 <td class="text-start">@log.Description</td>
@@ -31,3 +47,4 @@
         }
     </tbody>
 </table>
+</div>

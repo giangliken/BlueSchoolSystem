@@ -41,16 +41,26 @@
                         <li class="list-group-item"><strong>Số điện thoại:</strong> @Model.User?.PhoneNumber</li>
                         <li class="list-group-item"><strong>Email:</strong> @Model.User?.Email</li>
                         <li class="list-group-item"><strong>Địa chỉ:</strong> @Model.DiaChi</li>
-                        <li class="list-group-item"><strong>Lớp:</strong> @Model.Lop?.TenLop</li>
-                        <li class="list-group-item"><strong>Ngành học:</strong> @Model.Lop?.Nganh?.TenNganh</li>
-                        <li class="list-group-item"><strong>Khoa/Viện:</strong> @Model.Lop?.Nganh?.Khoa?.TenKhoa</li>
+                        <li class="list-group-item">
+                            <strong>Lớp:</strong>
+                            @(Model.Lop != null ? Model.Lop.TenLop : "Chưa xếp")
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Ngành học:</strong>
+                            @(Model.Lop?.Nganh?.TenNganh ?? "Chưa đăng ký ngành")
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Khoa/Viện:</strong>
+                            @(Model.Lop?.Nganh?.Khoa?.TenKhoa ?? "Chưa thuộc khoa viện nào")
+                        </li>
+
                         <li class="list-group-item"><strong>Ngày nhập học:</strong> @Model.NgayNhapHoc.ToString("dd/MM/yyyy")</li>
                         <li class="list-group-item"><strong>Ngày tốt nghiệp:</strong> @Model.NgayTotNghiep.ToString("dd/MM/yyyy")</li>
                         <li class="list-group-item"><strong>Trạng thái:</strong> @Model.TrangThai</li>
                         <li class="list-group-item"><strong>Ghi chú:</strong> @Model.GhiChu</li>
                         <li class="list-group-item"><strong>Tài khoản:</strong> @Model.User?.UserName</li>
-                        <li class="list-group-item"><strong>Ngày tạo:</strong> @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</li>
-                        <li class="list-group-item"><strong>Cập nhật gần nhất:</strong> @Model.UpdatedAt.ToString("dd/MM/yyyy HH:mm")</li>
+                        <li class="list-group-item"><strong>Ngày tạo:</strong> @Model.CreatedAt.ToString("HH:mm dd/MM/yyyy")</li>
+                        <li class="list-group-item"><strong>Cập nhật gần nhất:</strong> @Model.UpdatedAt.ToString("HH:mm dd/MM/yyyy")</li>
                     </ul>
                 </div>
 

@@ -1,5 +1,189 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
-@{
-}
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Dashboard</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- FullCalendar CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+    <!-- FullCalendar JS -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    <!-- FullCalendar Ngôn ngữ (bao gồm tiếng Việt) -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/locales-all.global.min.js"></script>
+    <style>
+        .fc .fc-daygrid-day-number,
+        .fc .fc-daygrid-day-number:hover,
+        .fc .fc-col-header-cell a,
+        .fc .fc-col-header-cell a:hover {
+            text-decoration: none !important;
+        }
+
+        /* Tuỳ chọn: Custom màu header */
+        .fc .fc-col-header-cell a {
+            color: #1976d2; 
+            font-weight: bold;
+        }
+    </style>
+
+</head>
+<body>
+    <div class="row g-4">
+        <!-- Cột trái -->
+        <div class="col-lg-6">
+            <div class="row g-3">
+                <div class="col-4">
+                    <div class="card shadow h-100">
+                        <div class="card-body d-flex align-items-center">
+                            <i class="fa-solid fa-user fa-2x text-info me-3"></i>
+                            <div>
+                                <div class="fw-semibold fs-6">Giảng Viên</div>
+                                <div class="text-muted small">561</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card shadow h-100">
+                        <div class="card-body d-flex align-items-center">
+                            <i class="fa-solid fa-users fa-2x text-success me-3"></i>
+                            <div>
+                                <div class="fw-semibold fs-6">Sinh Viên</div>
+                                <div class="text-muted small">10.8603</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card shadow h-100">
+                        <div class="card-body d-flex align-items-center">
+                            <i class="fa-solid fa-chart-bar fa-2x text-warning me-3"></i>
+                            <div>
+                                <div class="fw-semibold fs-6">Khoa Viện</div>
+                                <div class="text-muted small">11</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card shadow h-100 mt-2">
+                        <div class="card-body d-flex align-items-center">
+                            <i class="fa-solid fa-chart-pie fa-2x text-primary me-3"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold fs-5 mb-2">Biểu đồ</div>
+                                <div class="text-muted small mb-3">Thống kê dữ liệu</div>
+                                <canvas id="myChart" height="120"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <!-- Cột phải -->
+        <div class="col-lg-6">
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="card shadow h-100">
+                        <div class="card-body">
+                            <div id="calendar"></div>
+                        </div>
+                    </div>
+
+                    
+
+
+                </div>
+                <div class="col-12 mb-3">
+                    <div class="card shadow h-100">
+                        <div class="card-body">
+                            <div class="fw-bold fs-5 mb-2">
+                                <i class="fa-solid fa-bolt fa-2x text-warning me-2"></i>
+                                Sự kiện
+                            </div>
+                            <div class="text-muted small mb-3">Sự kiện sắp tới</div>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex align-items-start">
+                                    <i class="fa-solid fa-calendar-days text-primary me-3 mt-1"></i>
+                                    <div>
+                                        <div class="fw-semibold">27/08/2025 - Khoa luật</div>
+                                        <div class="text-muted small">Họp ban lãnh đạo khoa luật, 7h30</div>
+                                    </div>
+                                </li>
+                                <li class="list-group-item d-flex align-items-start">
+                                    <i class="fa-solid fa-book text-success me-3 mt-1"></i>
+                                    <div>
+                                        <div class="fw-semibold">30/08/2025 - Khoa CNTT</div>
+                                        <div class="text-muted small">Họp ban lãnh đạo khoa CNTT, 7h30</div>
+                                    </div>
+                                </li>
+                                <li class="list-group-item d-flex align-items-start">
+                                    <i class="fa-solid fa-bullhorn text-danger me-3 mt-1"></i>
+                                    <div>
+                                        <div class="fw-semibold">05/09/2025 - Seminar khoa CNTT</div>
+                                        <div class="text-muted small">Sảnh E1, 8h00</div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          var calendarEl = document.getElementById('calendar');
+          var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'vi', 
+            height: 420,
+            headerToolbar: {
+              left: 'title',
+              center: '',
+              right: 'today prev,next' 
+            },
+            buttonText: {
+            today: 'Hôm nay' 
+        },
+            events: [
+              { title: 'Họp khoa', start: '2025-08-27' },
+              { title: 'Họp khoa', start: '2025-08-30' }
+            ]
+          });
+          calendar.render();
+              // Biểu đồ Chart.js
+        var ctx = document.getElementById('myChart').getContext('2d');
+        var myChart = new Chart(ctx, {
+            type: 'bar', // Có thể đổi 'line', 'pie',...
+            data: {
+                labels: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'],
+                datasets: [{
+                    label: 'Số lượng sinh viên',
+                    data: [12, 19, 3, 5, 2, 3, 10],
+                    borderWidth: 1,
+                    backgroundColor: 'rgba(30, 144, 255, 0.5)',
+                    borderColor: 'rgba(30, 144, 255, 1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        });
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,171 @@
+﻿@{
+    ViewData["Title"] = "Nhập danh sách sinh viên từ Excel";
+}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+    /* PHƯƠNG ÁN A: chỉ cuộn ngang bên trong container (mặc định) */
+    .table-responsive.preview-wrapper {
+        overflow-x: auto; /* cho cuộn ngang */
+        overflow-y: visible; /* không ép cuộn dọc ở wrapper */
+        -webkit-overflow-scrolling: touch;
+    }
+    /* đảm bảo bảng có chiều rộng tối thiểu lớn hơn container để xuất hiện thanh cuộn ngang */
+    #previewTable {
+        min-width: 1200px; /* điều chỉnh theo tổng chiều rộng các cột */
+        table-layout: auto;
+    }
+
+        #previewTable th,
+        #previewTable td {
+            white-space: nowrap; /* không xuống dòng trong ô */
+            vertical-align: middle;
+        }
+
+    /* PHƯƠNG ÁN B: nếu bạn muốn cuộn cả ngang và dọc trong wrapper (giới hạn chiều cao) */
+    /* Bỏ comment lớp .table-scroll trên wrapper để bật */
+    .table-responsive.table-scroll {
+        max-height: 60vh; /* giới hạn chiều cao, thay đổi theo nhu cầu */
+        overflow: auto; /* cuộn ngang + dọc bên trong wrapper */
+    }
+
+    /* Nếu muốn ellipsis (cắt hiển thị) thay vì mở rộng cột, bật phần này và điều chỉnh max-width*/
+    /*
+        #previewTable {
+            table-layout: fixed;
+            width: 100%;
+        }
+        #previewTable th,
+        #previewTable td {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px; // chỉnh theo từng cột nếu cần
+        }
+        */
+</style>
+
+<h3 class="card-title mb-3">
+    <i class="fa-solid fa-file-import me-2"></i> Nhập danh sách sinh viên từ Excel
+</h3>
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>
+        @Html.Raw(TempData["Success"])
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="container mt-4">
+    <div class="card shadow-lg border-0 rounded-3">
+        <div class="card-body">
+            <hr />
+            <form id="excelForm" enctype="multipart/form-data" method="post">
+                <div class="mb-3">
+                    <input type="file" id="excelFile" name="excelFile" class="form-control" accept=".xlsx,.xls" required />
+                </div>
+                <button type="button" class="btn btn-info" onclick="previewExcel()">
+                    <i class="fa-solid fa-eye me-2"></i> Xem trước
+                </button>
+                <button type="submit" class="btn btn-success">
+                    <i class="fa-solid fa-upload me-2"></i> Upload & Import
+                </button>
+            </form>
+            <div class="mt-3 text-info">
+                <b>Lưu ý:</b> File Excel phải đúng format mẫu, dòng đầu là tiêu đề cột (MSSV, Họ và tên đệm, Tên, Ngày sinh, Giới tính, …).
+            </div>
+            <!-- Chú ý: thêm lớp table-scroll nếu muốn cuộn dọc + ngang trong wrapper -->
+            <div class="table-responsive preview-wrapper">
+                <div id="totalRecords" class="mt-2 fw-bold text-primary"></div>
+
+                <table id="previewTable" class="table table-hover table-striped table-bordered mt-3">
+                    <thead class="table-dark text-nowrap">
+                        <tr>
+                            <th class="text-center">Mã số sinh viên</th>
+                            <th class="text-center">CCCD</th>
+                            <th class="text-center">Họ và tên đệm</th>
+                            <th class="text-center">Tên</th>
+                            <th class="text-center">Ngày sinh</th>
+                            <th class="text-center">Giới tính</th>
+                            <th class="text-center">Số điện thoại</th>
+                            <th class="text-center">Email</th>
+                            <th class="text-center">Địa chỉ</th>
+                            <th class="text-center">Ngày nhập học</th>
+                            <th class="text-center">Ngày tốt nghiệp dự kiến</th>
+                            <th class="text-center">Trạng thái</th>
+                            <th class="text-center">Ghi chú</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dữ liệu sẽ được render ở đây -->
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // Convert Excel serial date về dạng dd/MM/yyyy
+    function excelDateToJSDate(serial) {
+        var utc_days = Math.floor(serial - 25569);
+        var utc_value = utc_days * 86400; // số giây
+        var date_info = new Date(utc_value * 1000);
+        // Format dạng dd/MM/yyyy cho chuẩn VN
+        return date_info.getDate().toString().padStart(2, '0') + '/' +
+               (date_info.getMonth() + 1).toString().padStart(2, '0') + '/' +
+               date_info.getFullYear();
+    }
+
+        function previewExcel() {
+        var fileInput = document.getElementById('excelFile');
+        var tableBody = document.querySelector('#previewTable tbody');
+        tableBody.innerHTML = '';
+        document.getElementById('totalRecords').textContent = ''; // Reset
+
+        if (fileInput.files.length === 0) {
+            alert('Vui lòng chọn file Excel!');
+            return;
+        }
+
+        var file = fileInput.files[0];
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var data = new Uint8Array(e.target.result);
+            var workbook = XLSX.read(data, { type: 'array' });
+            var sheet = workbook.Sheets[workbook.SheetNames[0]];
+            var json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+            let totalRecords = 0; // Đếm bản ghi
+
+            for (var i = 1; i < json.length; i++) {
+                var row = json[i];
+                var tr = document.createElement('tr');
+                for (var j = 0; j < 13; j++) {
+                    var td = document.createElement('td');
+                    var cell = row[j] ? String(row[j]) : '';
+                    // ...convert ngày như trước...
+                    if ((j === 4 || j === 9 || j === 10) && !isNaN(cell) && cell !== "") {
+                        var serial = Number(cell);
+                        if (serial > 20000 && serial < 90000) {
+                            cell = excelDateToJSDate(serial);
+                        }
+                    }
+                    cell = cell.replace(/\r?\n|\r/g, ' ');
+                    cell = cell.replace(/\s+/g, ' ').trim();
+                    td.classList.add('text-center', 'text-nowrap');
+                    td.textContent = cell;
+                    if (cell.length > 0) td.setAttribute('title', cell);
+                    tr.appendChild(td);
+                }
+                tableBody.appendChild(tr);
+                totalRecords++;
+            }
+            document.getElementById('totalRecords').textContent = `Tổng số bản ghi: ${totalRecords}`;
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+</script>
