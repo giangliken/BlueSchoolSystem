@@ -19,12 +19,14 @@ namespace BlueSchoolSystem.Repository
             return Task.FromResult(logs);
         }
 
-        public async Task LogAsync(string userId, string userName, string actionType, string tableName, string objectId, string description)
+        public async Task LogAsync(string userId, string userName, string device, string ipAddress, string actionType, string tableName, string objectId, string description)
         {
             var log = new ActivityLog
             {
                 UserId = userId,
                 UserName = userName,
+                Device = device,
+                IpAddress = ipAddress,
                 ActionType = actionType,
                 TableName = tableName,
                 ObjectId = objectId,
