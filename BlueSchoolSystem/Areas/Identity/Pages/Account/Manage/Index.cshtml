@@ -17,7 +17,7 @@
                     @{
                         var usernameLabel = User.IsInRole("Admin")
                         ? "Username"
-                        : User.IsInRole("Teacher") ? "Tên giảng viên" : "MSSV";
+                        : User.IsInRole("Teacher") ? "MSNV" : "MSSV";
                     }
                     <div class="form-floating mb-3">
                         <input asp-for="Username" class="form-control bg-white" placeholder=" " readonly />
@@ -28,18 +28,22 @@
                         <input class="form-control" value="@Model.FullName" readonly />
                         <label class="fw-bold">Họ và tên</label>
                     </div>
-                    <div class="form-floating mb-3">
-                        <input class="form-control" value="04/07/2004" readonly />
-                        <label class="fw-bold">Ngày sinh</label>
-                    </div>
+                    @if (!User.IsInRole("Admin"))
+                    {
+                        <div class="form-floating mb-3">
+                            <input class="form-control" value="@Model.NgaySinh" readonly />
+                            <label class="fw-bold">Ngày sinh</label>
+                        </div>
+                    }
+                   
                     @if (User.IsInRole("Student"))
                     {
                         <div class="form-floating mb-3">
-                            <input class="form-control" value="22DTHG1" readonly />
+                            <input class="form-control" value="@Model.Lop" readonly />
                             <label class="fw-bold">Lớp</label>
                         </div>
                         <div class="form-floating mb-3">
-                            <input class="form-control" value="Công nghệ thông tin" readonly />
+                            <input class="form-control" value="@Model.NganhHoc" readonly />
                             <label class="fw-bold">Ngành học</label>
                         </div>
 
@@ -47,23 +51,25 @@
                     @if (!User.IsInRole("Admin"))
                     {
                         <div class="form-floating mb-3">
-                            <input class="form-control" value="Công nghệ thông tin" readonly />
+                            <input class="form-control" value="@Model.KhoaVien" readonly />
                             <label class="fw-bold">Khoa/Viện</label>
                         </div>
                     }
-
-                    <div class="position-relative form-floating mb-3">
-                        <input asp-for="Input.PhoneNumber" class="form-control" placeholder="Số điện thoại" readonly id="phoneInput" />
-                        <label class="fw-bold" asp-for="Input.PhoneNumber">Số điện thoại</label>
-                        <button type="button"
-                                class="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
-                                onclick="enableEdit('phoneInput')"
-                                style="z-index: 10;">
-                            <i class="fa-solid fa-pen text-secondary"></i>
-                        </button>
-                        <span asp-validation-for="Input.PhoneNumber" class="text-danger"></span>
-                    </div>
-
+                    @if (!User.IsInRole("Admin"))
+                    {
+                        <div class="position-relative form-floating mb-3">
+                            <input asp-for="Input.PhoneNumber" class="form-control" placeholder="Số điện thoại" readonly id="phoneInput" />
+                            <label class="fw-bold" asp-for="Input.PhoneNumber">Số điện thoại</label>
+                            <button type="button"
+                                    class="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
+                                    onclick="enableEdit('phoneInput')"
+                                    style="z-index: 10;">
+                                <i class="fa-solid fa-pen text-secondary"></i>
+                            </button>
+                            <span asp-validation-for="Input.PhoneNumber" class="text-danger"></span>
+                        </div>
+                    }
+                    
 
                     <div class="position-relative form-floating mb-3">
                         <input asp-for="Input.Email" class="form-control" placeholder="Email" readonly id="emailInput" />
@@ -93,7 +99,7 @@
                              class="rounded-circle mb-3"
                              style="width: 150px; height: 150px; object-fit: cover; border: 2px solid #ccc;" />
                         <input asp-for="Input.AvatarImage" type="file" class="form-control" accept="image/*" onchange="previewImage(event)" />
-                        <small class="text-muted mt-2">Chọn ảnh đại diện mới</small>
+                        <small class="text-muted mt-2 mb-3">Chọn ảnh đại diện mới</small>
                     </div>
                 </div>
             </div>

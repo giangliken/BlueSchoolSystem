@@ -117,14 +117,29 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in.");
-                    await _activityLogService.LogAsync(
-                        userId: _signInManager.UserManager.GetUserId(User),
-                        userName: Input.UserName,
-                        actionType: "Login",
-                        tableName: "Users",
-                        objectId: Input.UserName,
-                        description: $"Người dùng {Input.UserName} đã đăng nhập vào hệ thống"
-                    );
+                    string ipAddress = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                    if (string.IsNullOrEmpty(ipAddress))
+                    {
+                        ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+                    }
+
+                    //Ghi log
+                    var log = new
+                    {
+                        UserId = _signInManager.UserManager.GetUserId(User),
+                        UserName = Input.UserName,
+                        Device = "Web Browser",
+                        IpAddress = ipAddress,
+                        ActionType = "Login",
+                        TableName = "Users",
+                        ObjectId = Input.UserName,
+                        Description = $"Người dùng {Input.UserName} đã đăng nhập vào hệ thống"
+
+                    };
+                    var httpClient = new HttpClient();
+                    var Logresponse = await httpClient.PostAsJsonAsync("https://localhost:5001/api/ghilog", log);
+                    // response.IsSuccessStatusCode == true nếu ghi log thành công
+
                     //Gọi API lấy token
                     using var client = new HttpClient();
                     var loginData = new

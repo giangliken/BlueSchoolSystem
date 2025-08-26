@@ -41,7 +41,10 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account.Manage
         /// </summary>
         public string Username { get; set; }
         public string FullName { get; set; }
-
+        public string NgaySinh { get; set; }
+        public string Lop { get; set; }
+        public string NganhHoc { get; set; }
+        public string KhoaVien { get; set; }
         public bool IsEmailConfirmed { get; set; }
 
 
@@ -96,6 +99,10 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account.Manage
             if (user.SinhViens != null)
             {
                 FullName = user.SinhViens.HoVaTenDem + " " + user.SinhViens.Ten;
+                NgaySinh = user.SinhViens.NgaySinh.ToString("dd/MM/yyyy");
+                Lop = user.SinhViens.Lop?.TenLop ?? "Chưa đăng ký lớp";
+                NganhHoc = user.SinhViens.Lop?.Nganh?.TenNganh ?? "Chưa đăng ký ngành học";
+                KhoaVien = user.SinhViens.Lop?.Nganh?.Khoa?.TenKhoa ?? "Chưa thuộc khoa viện nào";
                 avatarUrl = user.SinhViens.AvatarUrl;
 
             }
@@ -144,7 +151,6 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account.Manage
                 await LoadAsync(user);
                 return Page();
             }
-
             var phoneNumber = await _userManager.GetPhoneNumberAsync(user);
             if (Input.PhoneNumber != phoneNumber)
             {
@@ -189,13 +195,20 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account.Manage
                     _context.Update(user.GiangViens);
                 }
 
-                await _context.SaveChangesAsync(); // Lưu vô database nha bro
+                await _context.SaveChangesAsync();
             }
-
-
 
             await _signInManager.RefreshSignInAsync(user);
             StatusMessage = "Thông tin cá nhân đã được cập nhật.";
+            if (user.SinhViens != null)
+            {
+                user.SinhViens.UpdatedAt = DateTime.Now;
+            }
+            else if (user.GiangViens != null)
+            {
+                user.GiangViens.UpdatedAt = DateTime.Now;
+            }
+            await _context.SaveChangesAsync();
             return RedirectToPage();
         }
 
