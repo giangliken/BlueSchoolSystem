@@ -1,9 +1,14 @@
 ﻿using BlueSchoolSystem.Models;
+using BlueSchoolSystem.Models.ViewModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using OfficeOpenXml;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace BlueSchoolSystem.Controllers
 {
@@ -67,7 +72,7 @@ namespace BlueSchoolSystem.Controllers
                 ViewBag.Error = "Không thể lấy danh sách sinh viên.";
                 return View(new List<SinhVien>());
             }
-
+             
             var body = await response.Content.ReadAsStringAsync();
             using var document = JsonDocument.Parse(body);
             var root = document.RootElement;
@@ -93,8 +98,158 @@ namespace BlueSchoolSystem.Controllers
         //Thêm sinh viên theo cách thủ công
         public async Task<IActionResult> AddStudent()
         {
+            var model = new SinhVien
+            {
+                GioiTinh = true,
+                User = new ApplicationUser()
+            };
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddStudent(SinhVien model)
+        {
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values.SelectMany(v => v.Errors);
+                // Đặt breakpoint hoặc log ra đây để biết trường nào lỗi
+                return View(model);
+            }
+
+
+            // Map dữ liệu sang API request (CreateStudentWithUserRequest)
+            var apiRequest = new CreateStudentWithUserRequest
+            {
+                UserName = model.MSSV,
+                Email = model.User.Email,
+                PhoneNumber = model.User.PhoneNumber,
+                Password = "Abc@123", 
+                Student = model 
+            };
+
+            var apiUrl = "https://localhost:5001/api/taomoisinhvien";
+
+            var httpClient = new HttpClient();
+
+            // Nếu API cần token thì thêm:
+            var token = HttpContext.Session.GetString("access_token");
+
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var json = JsonConvert.SerializeObject(apiRequest);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync(apiUrl, content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Thành công, redirect sang list
+                TempData["Success"] = "Thêm sinh viên thành công!";
+                return RedirectToAction("StudentManager");
+            }
+            else
+            {
+                // Lấy lỗi trả về từ API
+                var apiError = await response.Content.ReadAsStringAsync();
+                ModelState.AddModelError("", "Có lỗi khi thêm sinh viên: " + apiError);
+                return View(model);
+            }
+        }
+
+        //Nhập danh sach sinh viên từ file Excel
+        [HttpGet]
+        public IActionResult ImportStudentListFromExcel()
+        {
             return View();
         }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportStudentListFromExcel(IFormFile excelFile)
+        {
+            if (excelFile == null || excelFile.Length == 0)
+            {
+                TempData["Error"] = "Vui lòng chọn file Excel.";
+                return View();
+            }
+
+            var students = new List<SinhVien>();
+
+            using (var stream = new MemoryStream())
+            {
+                await excelFile.CopyToAsync(stream);
+                using (var package = new ExcelPackage(stream))
+                {
+                    var worksheet = package.Workbook.Worksheets[0];
+                    int rowCount = worksheet.Dimension.Rows;
+
+                    for (int row = 2; row <= rowCount; row++)
+                    {
+                        var sv = new SinhVien
+                        {
+                            MSSV = worksheet.Cells[row, 1].Text.Trim(),
+                            CCCD = worksheet.Cells[row, 2].Text.Trim(),
+                            HoVaTenDem = worksheet.Cells[row, 3].Text.Trim(),
+                            Ten = worksheet.Cells[row, 4].Text.Trim(),
+                            NgaySinh = ParseExcelDate(worksheet.Cells[row, 5].Value),
+                            GioiTinh = worksheet.Cells[row, 6].Text.Trim().ToLower() == "nam",
+                            DiaChi = worksheet.Cells[row, 9].Text.Trim(),
+                            NgayNhapHoc = ParseExcelDate(worksheet.Cells[row, 10].Value),
+                            NgayTotNghiep = ParseExcelDate(worksheet.Cells[row, 11].Value),
+                            TrangThai = worksheet.Cells[row, 12].Text.Trim(),
+                            GhiChu = worksheet.Cells[row, 13].Text.Trim(),
+                            User = new ApplicationUser
+                            {
+                                Email = worksheet.Cells[row, 8].Text.Trim(),
+                                PhoneNumber = worksheet.Cells[row, 7].Text.Trim(),
+                                UserName = worksheet.Cells[row, 1].Text.Trim()
+                            }
+                        };
+                        students.Add(sv);
+                    }
+                }
+            }
+
+            // Gửi từng sinh viên qua API
+            var apiUrl = "https://localhost:5001/api/taomoisinhvien";
+            var httpClient = new HttpClient();
+            var token = HttpContext.Session.GetString("access_token");
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            int successCount = 0;
+            foreach (var sv in students)
+            {
+                var apiRequest = new CreateStudentWithUserRequest
+                {
+                    UserName = sv.MSSV,
+                    Email = sv.User.Email,
+                    PhoneNumber = sv.User.PhoneNumber,
+                    Password = "Abc@123",
+                    Student = sv
+                };
+
+                var json = JsonConvert.SerializeObject(apiRequest);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync(apiUrl, content);
+                if (response.IsSuccessStatusCode) successCount++;
+            }
+
+            TempData["Success"] = $"Nhập thành công {successCount}/{students.Count} sinh viên!";
+            return RedirectToAction("StudentManager");
+        }
+
+        private DateTime ParseExcelDate(object val)
+        {
+            if (val == null) return DateTime.MinValue;
+            if (val is double d)
+                return DateTime.FromOADate(d);
+            if (DateTime.TryParse(val.ToString(), out var dt))
+                return dt;
+            return DateTime.MinValue;
+        }
+
+
 
 
         //Xem thông tin chi tiết sinh viên
@@ -112,6 +267,88 @@ namespace BlueSchoolSystem.Controllers
             if (sinhVien == null) return NotFound();
 
             return View(sinhVien);
+        }
+
+        //Trang quản lí khoa viện
+        public async Task<IActionResult> FacultyManager()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            HttpResponseMessage response;
+            response = await client.GetAsync("api/laydanhsachkhoa");
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không thể lấy danh sách khoa viện.";
+                return View(new List<Khoa>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("data", out var dataElement))
+            {
+                ViewBag.Error = "Không tìm thấy dữ liệu khoa viện.";
+                return View(new List<Khoa>());
+            }
+
+            var khoas = JsonSerializer.Deserialize<List<Khoa>>(dataElement.ToString(), new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+           
+
+            return View(khoas ?? new List<Khoa>());
+
+        }
+
+        //Trang quản lí lớp học
+
+        public async Task<IActionResult> ClassManager()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            HttpResponseMessage response;
+            response = await client.GetAsync("api/laydanhsachlophoc");
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không thể lấy danh sách lớp học.";
+                return View(new List<LopHocViewModel>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("data", out var dataElement))
+            {
+                ViewBag.Error = "Không tìm thấy dữ liệu lớp học.";
+                return View(new List<LopHocViewModel>());
+            }
+
+            var lophocs = JsonSerializer.Deserialize<List<LopHocViewModel>>(dataElement.ToString(), new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+
+
+            return View(lophocs ?? new List<LopHocViewModel>());
         }
 
         public async Task<IActionResult> ActivityLogs()
