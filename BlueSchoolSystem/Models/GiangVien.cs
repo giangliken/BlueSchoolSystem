@@ -21,7 +21,7 @@
         public ICollection<MonHoc>? MonHocs { get; set; } // Các môn giảng dạy
         public ICollection<LopHocPhan>? LopHocPhans { get; set; } // Các lớp học phần
 
-        public string UserId { get; set; } // ID của người dùng liên kết với giảng viên
+        public string? UserId { get; set; } // ID của người dùng liên kết với giảng viên
 
         public ApplicationUser? User { get; set; } // Liên kết với ApplicationUser để quản lý thông tin người dùng
         public DateTime CreatedAt { get; set; } // Ngày tạo bản ghi
