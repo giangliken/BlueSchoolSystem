@@ -96,8 +96,10 @@
                     <!-- Học vụ -->
                     @{
                         bool isHocVuActive =
-                        Context.Request.Path.StartsWithSegments("/Home/D")
-                        || Context.Request.Path.StartsWithSegments("/Module/abc")
+                        Context.Request.Path.StartsWithSegments("/Home/ThoiKhoaBieu")
+                        || Context.Request.Path.StartsWithSegments("/Home/LichThi")
+                        || Context.Request.Path.StartsWithSegments("/Home/XemDiem")
+                        || Context.Request.Path.StartsWithSegments("/Home/LopHocPhan")
                         || Context.Request.Path.StartsWithSegments("/Module/xyz");
                     }
 
@@ -114,28 +116,28 @@
                         <div class="collapse @(isHocVuActive ? "show" : "")" id="hocvuMenu">
                             <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ms-4">
                                 <li>
-                                    <a href="/Home/index" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/TKB") ? "active text-white bg-primary" : "text-white")">
+                                    <a href="/Home/ThoiKhoaBieu" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/ThoiKhoaBieu") ? "active text-white bg-primary" : "text-white")">
                                         <i class="fa-solid fa-calendar-days me-2"></i>Thời khóa biểu
                                     </a>
 
                                 </li>
                                 <!-- Lịch thi -->
                                 <li>
-                                    <a href="/Home/index" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/TKB") ? "active text-white bg-primary" : "text-white")">
+                                    <a href="/Home/LichThi" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/LichThi") ? "active text-white bg-primary" : "text-white")">
                                         <i class="fa-solid fa-hourglass-start me-2"></i>Lịch thi
                                     </a>
 
                                 </li>
                                 <!-- Xem điểm -->
                                 <li>
-                                    <a href="/Home/index" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/TKB") ? "active text-white bg-primary" : "text-white")">
+                                    <a href="/Home/XemDiem" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/XemDiem") ? "active text-white bg-primary" : "text-white")">
                                         <i class="fa-solid fa-calendar-check me-2"></i>Xem điểm
                                     </a>
 
                                 </li>
                                 <!-- Lớp học phần -->
                                 <li>
-                                    <a href="/Home/index" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/TKB") ? "active text-white bg-primary" : "text-white")">
+                                    <a href="/Home/LopHocPhan" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/LopHocPhan") ? "active text-white bg-primary" : "text-white")">
                                         <i class="fa-solid fa-users-rectangle me-2"></i>Lớp học phần
                                     </a>
 
@@ -145,7 +147,7 @@
                     </li>
                     <!-- Đăng ký học phần -->
                     <li>
-                        <a href="/Home/index" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/TKB") ? "active text-white bg-primary" : "text-white")">
+                        <a href="/Home/DangKyLopHP" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/DangKyLopHP") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-graduation-cap me-2"></i>Đăng ký học phần
                         </a>
 
@@ -153,48 +155,76 @@
                     
                     <!-- Học phí -->
                     <li class="mb-1">
-                        <a href="/Home/index" class="nav-link text-white d-flex align-items-center">
+                        <a href="/Home/HocPhi" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/HocPhi") ? "active text-white bg-primary" : "text-white")">
                             <i class="fas fa-money-bill me-2"></i> Học phí
                         </a>
                     </li>
 
                     <!-- Yêu cầu - Trợ giúp -->
+                    @{
+                        bool isTroGiupActive =
+                        Context.Request.Path.StartsWithSegments("/Home/XacNhanOnline")
+                        || Context.Request.Path.StartsWithSegments("/Home/NopDon");
+                    }
                     <li>
+                        @* <a class="nav-link text-white d-flex justify-content-between align-items-center"
+                           data-bs-toggle="collapse"
+                           href="#bieumaunopdon"
+                           role="button"
+                           aria-expanded="@(isHocVuActive.ToString().ToLower())"
+                           aria-controls="hocvuMenu">
+                            <span><i class="fas fa-book me-2"></i> Học vụ</span>
+                            <i class="fas fa-chevron-down small"></i>
+                        </a> *@
                         <a class="nav-link text-white d-flex justify-content-between align-items-center"
-                           data-bs-toggle="collapse" href="#bieumaunopdon" role="button" aria-expanded="false" aria-controls="trogiupMenu">
+                           data-bs-toggle="collapse" 
+                           href="#bieumaunopdon" 
+                           role="button"
+                           aria-expanded="@(isTroGiupActive.ToString().ToLower())"
+                           aria-controls="bieumaunopdon">
                             <span><i class="fa-brands fa-wpforms me-2"></i> Biểu mẫu - Nộp đơn</span>
                             <i class="fas fa-chevron-down small"></i>
                         </a>
-                        <div class="collapse" id="bieumaunopdon">
+                        <div class="collapse @(isTroGiupActive ? "show" : "")" id="bieumaunopdon">
                             <ul class="list-unstyled ms-4">
                                 <li>
-                                    <a href="/Home/index" class="nav-link text-white">
+                                    <a href="/Home/XacNhanOnline" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/XacNhanOnline") ? "active text-white bg-primary" : "text-white")">
                                         <i class="fa-solid fa-square-check me-2"></i>Xác nhận online
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="/Home/index" class="nav-link text-white">
+                                    <a href="/Home/NopDon" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/NopDon") ? "active text-white bg-primary" : "text-white")">
                                         <i class="fa-solid fa-envelopes-bulk me-2"></i>Nộp đơn
                                     </a>
                                 </li>
                             </ul>
                         </div>
                     </li>
+                    <!-- Hỏi đáp -->
+                    @{
+                        bool isHoiDapActive =
+                        Context.Request.Path.StartsWithSegments("/Home/TaoCauHoiMoi")
+                        || Context.Request.Path.StartsWithSegments("/Home/CauHoiDaGui");
+                    }
                     <li>
                         <a class="nav-link text-white d-flex justify-content-between align-items-center"
-                           data-bs-toggle="collapse" href="#hoidapMenu" role="button" aria-expanded="false" aria-controls="trogiupMenu">
+                           data-bs-toggle="collapse" 
+                           href="#hoidapMenu" 
+                           role="button"
+                           aria-expanded="@(isHoiDapActive.ToString().ToLower())"
+                           aria-controls="hoidapMenu">
                             <span><i class="fa-solid fa-circle-question me-2"></i> Hỏi - Đáp</span>
                             <i class="fas fa-chevron-down small"></i>
                         </a>
-                        <div class="collapse" id="hoidapMenu">
+                        <div class="collapse @(isHoiDapActive ? "show" : "")" id="hoidapMenu">
                             <ul class="list-unstyled ms-4">
                                 <li>
-                                    <a href="/Home/index" class="nav-link text-white">
+                                    <a href="/Home/TaoCauHoiMoi" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/TaoCauHoiMoi") ? "active text-white bg-primary" : "text-white")">
                                         <i class="fa-solid fa-plus me-2"></i>Tạo câu hỏi mới
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="/Home/index" class="nav-link text-white">
+                                    <a href="/Home/CauHoiDaGui" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/CauHoiDaGui") ? "active text-white bg-primary" : "text-white")">
                                         <i class="fa-solid fa-folder-plus me-2"></i>Câu hỏi đã gửi
                                     </a>
                                 </li>
@@ -202,16 +232,24 @@
                         </div>
                     </li>
                     <!-- Đánh giá rèn luyện -->
+                    @{
+                        bool isDanhGiaActive =
+                        Context.Request.Path.StartsWithSegments("/Home/DanhGiaDiemRenLuyenCaNhan");
+                    }
                     <li>
                         <a class="nav-link text-white d-flex justify-content-between align-items-center"
-                           data-bs-toggle="collapse" href="#danhgiaMenu" role="button" aria-expanded="false" aria-controls="danhgiaMenu">
+                           data-bs-toggle="collapse" 
+                           href="#danhgiaMenu" 
+                           role="button"
+                           aria-expanded="@(isDanhGiaActive.ToString().ToLower())"
+                           aria-controls="danhgiaMenu">
                             <span><i class="fas fa-scale-balanced me-2"></i> Đánh giá rèn luyện</span>
                             <i class="fas fa-chevron-down small"></i>
                         </a>
-                        <div class="collapse" id="danhgiaMenu">
+                        <div class="collapse @(isDanhGiaActive ? "show" : "")" id="danhgiaMenu">
                             <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ms-4">
                                 <li>
-                                    <a href="/Home/index" class="nav-link text-white">
+                                    <a href="/Home/DanhGiaDiemRenLuyenCaNhan" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/DanhGiaDiemRenLuyenCaNhan") ? "active text-white bg-primary" : "text-white")">
                                         <i class="fa-solid fa-pager me-2"></i>Điểm cá nhân
                                     </a>
                                 </li>
