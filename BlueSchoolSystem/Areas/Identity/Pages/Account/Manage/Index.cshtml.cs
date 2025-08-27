@@ -108,7 +108,9 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account.Manage
             }
             else if (user.GiangViens != null)
             {
-                FullName = user.GiangViens.HoVaTenDem + " " + user.SinhViens.Ten;
+                FullName = user.GiangViens.HoVaTenDem + " " + user.GiangViens.Ten;
+                NgaySinh = user.GiangViens.NgaySinh.ToString("dd/MM/yyyy");
+                KhoaVien = await GetTenKhoaGiangVienAsync(user.Id) ?? "Chưa thuộc khoa nào";
                 avatarUrl = user.GiangViens.AvatarUrl;
             }
             else if (await _userManager.IsInRoleAsync(user, SD.Role_Admin))
@@ -242,6 +244,20 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account.Manage
                 .Include(u => u.GiangViens)
                 .FirstOrDefaultAsync(u => u.Id == userId);
         }
+
+        public async Task<string?> GetTenKhoaGiangVienAsync(string userId)
+        {
+            var tenKhoa = await _context.GiangViens
+                .Where(gv => gv.UserId == userId)
+                .Join(_context.Khoas,
+                      gv => gv.KhoaId,
+                      k => k.Id,
+                      (gv, k) => k.TenKhoa)
+                .FirstOrDefaultAsync();
+
+            return tenKhoa;
+        }
+
 
     }
 }
