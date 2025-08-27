@@ -1,6 +1,6 @@
 ﻿namespace BlueSchoolSystem.Models
 {
-    public class CHITIETLOPHOC
+    public class ChiTietLopHoc
     {
         public int Id { get; set; }
         public int LopHocId { get; set; } // ID của lớp học

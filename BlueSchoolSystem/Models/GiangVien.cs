@@ -18,8 +18,8 @@
         public int KhoaId { get; set; }
         public Khoa? Khoa { get; set; }
 
-        public ICollection<MonHoc>? Subjects { get; set; } // Các môn giảng dạy
-        public ICollection<LopHocPhan>? SubjectClasses { get; set; } // Các lớp học phần
+        public ICollection<MonHoc>? MonHocs { get; set; } // Các môn giảng dạy
+        public ICollection<LopHocPhan>? LopHocPhans { get; set; } // Các lớp học phần
 
         public string UserId { get; set; } // ID của người dùng liên kết với giảng viên
 

@@ -23,7 +23,7 @@ namespace BlueSchoolSystem.Models
             }
 
             // Tạo tài khoản admin mặc định
-            string adminEmail = "giangliken@gmail.com";
+            string adminEmail = "admin@gmail.com";
             string adminPassword = "Admin@123";
 
             var adminUser = await userManager.FindByEmailAsync(adminEmail);

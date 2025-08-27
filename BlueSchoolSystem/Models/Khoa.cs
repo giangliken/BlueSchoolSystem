@@ -14,5 +14,8 @@ namespace BlueSchoolSystem.Models
         public string TenKhoa { get; set; } // Tên khoa
         public string? MoTa { get; set; } // Mô tả về khoa
 
+        public ICollection<ChiTietKhoaVien> ChiTietKhoaViens { get; set; } = new List<ChiTietKhoaVien>();
+
+
     }
 }

@@ -24,7 +24,7 @@ namespace BlueSchoolSystem.Models
 
         public ICollection<SinhVien> Students { get; set; } = new List<SinhVien>();
 
-        public ICollection<CHITIETLOPHOC> ChiTietLopHocs { get; set; } = new List<CHITIETLOPHOC>();
+        public ICollection<ChiTietLopHoc> ChiTietLopHocs { get; set; } = new List<ChiTietLopHoc>();
 
     }
 }
