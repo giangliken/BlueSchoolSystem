@@ -39,7 +39,8 @@
         @{
             foreach (var item in Model)
             {
-                <tr>
+                <tr style="cursor:pointer"
+                    onclick="window.location='@Url.Action("ClassDetails", "Admin", new { id = item.Id })'">
                     <td style="width: 60px;" class="text-center">@item.Id</td>
                     <td style="width: 60px;" class="text-start">@item.MaLop</td>
                     <td style="width: 150x;" class="text-start">@item.TenLop</td>

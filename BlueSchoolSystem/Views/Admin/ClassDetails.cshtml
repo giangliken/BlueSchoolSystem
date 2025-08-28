@@ -1,0 +1,151 @@
+﻿@model BlueSchoolSystem.Models.LopHoc
+
+@{
+    ViewData["Title"] = "Class Details";
+}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-person-badge me-2"></i>Thông tin lớp học</h4>
+                </div>
+
+                <div class="card-body"
+
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span><strong>Mã lớp:</strong> @Model.MaLop</span>
+                            <span><strong>Ngành:</strong> @Model.Nganh?.TenNganh</span>
+                            <span><strong>Khoa/Viện:</strong> @Model.Nganh?.Khoa?.TenKhoa</span>
+                        </li>
+
+                       <li class="list-group-item">
+                            <span><strong>Trợ lí học tập: </strong></span>
+                            @{
+                                    var troLi = Model.ChiTietLopHocs?.FirstOrDefault(ct => ct.GiangVien != null);
+                            }
+                            @if (troLi?.GiangVien != null)
+                            {
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <strong>Mã GV:</strong> @troLi.GiangVien.MaGiangVien
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Họ tên GV:</strong> @(troLi.GiangVien.HoVaTenDem + " " + troLi.GiangVien.Ten)
+                                        </div>
+                                    </div>
+                            }
+                            else
+                            {
+                                    <span>Chưa có</span>
+                            }
+                        </li>
+                       <li class="list-group-item">
+                            <span><strong>Lớp trưởng: </strong></span>
+                            @{
+                                    var lopTruong = Model.ChiTietLopHocs?.FirstOrDefault(ct => ct.LopTruong != null);
+                            }
+                            @if (lopTruong?.LopTruong != null)
+                            {
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <strong>MSSV:</strong> @lopTruong.LopTruong.MSSV
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Họ tên lớp trưởng:</strong> @(lopTruong.LopTruong.HoVaTenDem + " " + lopTruong.LopTruong.Ten)
+                                        </div>
+                                    </div>
+                            }
+                            else
+                            {
+                                    <span>Chưa có</span>
+                            }
+                        </li>
+                       <li class="list-group-item">
+                            <span><strong>Lớp phó: </strong></span>
+                            @{
+                                    var lopPho = Model.ChiTietLopHocs?.FirstOrDefault(ct => ct.LopPho != null);
+                            }
+                            @if (lopPho?.LopPho != null)
+                            {
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <strong>MSSV:</strong> @lopPho.LopPho.MSSV
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Họ tên lớp phó:</strong> @(lopPho.LopPho.HoVaTenDem + " " + lopPho.LopPho.Ten)
+                                        </div>
+                                    </div>
+                            }
+                            else
+                            {
+                                    <span>Chưa có</span>
+                            }
+                        </li>
+                       <li class="list-group-item">
+                            <span><strong>Bí thư: </strong></span>
+                            @{
+                                    var biThu = Model.ChiTietLopHocs?.FirstOrDefault(ct => ct.BiThu != null);
+                            }
+                            @if (biThu?.BiThu != null)
+                            {
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                                <strong>MSSV:</strong> @biThu.BiThu.MSSV
+                                        </div>
+                                        <div class="col-md-6">
+                                                    <strong>Họ tên bí thư:</strong> @(biThu.BiThu.HoVaTenDem + " " + biThu.BiThu.Ten)
+                                        </div>
+                                    </div>
+                            }
+                            else
+                            {
+                                    <span>Chưa có</span>
+                            }
+                        </li>
+
+
+                        @* <li class="list-group-item"><strong>Giới tính:</strong> @(Model.GioiTinh ? "Nam" : "Nữ")</li>
+                        <li class="list-group-item"><strong>Ngày sinh:</strong> @Model.NgaySinh.ToString("dd/MM/yyyy")</li>
+                        <li class="list-group-item"><strong>Số điện thoại:</strong> @Model.User?.PhoneNumber</li>
+                        <li class="list-group-item"><strong>Email:</strong> @Model.User?.Email</li>
+                        <li class="list-group-item"><strong>Địa chỉ:</strong> @Model.DiaChi</li>
+                        <li class="list-group-item">
+                            <strong>Lớp:</strong>
+                            @(Model.Lop != null ? Model.Lop.TenLop : "Chưa xếp")
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Ngành học:</strong>
+                            @(Model.Lop?.Nganh?.TenNganh ?? "Chưa đăng ký ngành")
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Khoa/Viện:</strong>
+                            @(Model.Lop?.Nganh?.Khoa?.TenKhoa ?? "Chưa thuộc khoa viện nào")
+                        </li>
+
+                        <li class="list-group-item"><strong>Ngày nhập học:</strong> @Model.NgayNhapHoc.ToString("dd/MM/yyyy")</li>
+                        <li class="list-group-item"><strong>Ngày tốt nghiệp:</strong> @Model.NgayTotNghiep.ToString("dd/MM/yyyy")</li>
+                        <li class="list-group-item"><strong>Trạng thái:</strong> @Model.TrangThai</li>
+                        <li class="list-group-item"><strong>Ghi chú:</strong> @Model.GhiChu</li>
+                        <li class="list-group-item"><strong>Tài khoản:</strong> @Model.User?.UserName</li>
+                        <li class="list-group-item"><strong>Ngày tạo:</strong> @Model.CreatedAt.ToString("HH:mm dd/MM/yyyy")</li>
+                        <li class="list-group-item"><strong>Cập nhật gần nhất:</strong> @Model.UpdatedAt.ToString("HH:mm dd/MM/yyyy")</li> *@
+                    </ul>
+                </div>
+
+                <div class="card-footer bg-light text-center">
+                    <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning me-2">
+                        <i class="fa-solid fa-pen-to-square me-2"></i>Sửa
+                    </a>
+                    <a asp-action="ClassManager" class="btn btn-secondary">
+                        <i class="fa-solid fa-arrow-left me-2"></i>Quay lại
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
