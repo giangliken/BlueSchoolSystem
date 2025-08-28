@@ -16,7 +16,6 @@ namespace BlueSchoolSystem.Models
         public DbSet<LopHoc> LopHocs { get; set; } // Bảng lớp học
         public DbSet<ChiTietLopHoc> ChiTietLopHocs { get; set; } // Bảng chi tiết lớp học
         public DbSet<Khoa> Khoas { get; set; } // Bảng khoa
-
         public DbSet<ChiTietKhoaVien> ChiTietKhoaViens { get; set; } // Bảng chi tiết khoa viện
         public DbSet<NganhHoc> NganhHocs { get; set; } // Bảng ngành học
         public DbSet<MonHoc> MonHocs { get; set; } // Bảng môn học
