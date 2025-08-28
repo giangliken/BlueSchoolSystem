@@ -311,7 +311,6 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Trang quản lí lớp học
-
         public async Task<IActionResult> ClassManager()
         {
             var client = _httpClientFactory.CreateClient();
@@ -350,6 +349,31 @@ namespace BlueSchoolSystem.Controllers
 
             return View(lophocs ?? new List<LopHocViewModel>());
         }
+
+        //Chi tiết lớp học
+        public async Task<IActionResult> ClassDetails(int? id)
+        {
+            if (id == null) return NotFound();
+
+            var lopHoc = await _context.LopHocs
+            .Include(lh => lh.Nganh)
+                .ThenInclude(n => n.Khoa)
+            .Include(lh => lh.ChiTietLopHocs)
+                .ThenInclude(ct => ct.GiangVien)
+            .Include(lh => lh.ChiTietLopHocs)
+                .ThenInclude(ct => ct.LopTruong)
+            .Include(lh => lh.ChiTietLopHocs)
+                .ThenInclude(ct => ct.LopPho)
+            .Include(lh => lh.ChiTietLopHocs)
+                .ThenInclude(ct => ct.BiThu)
+            .FirstOrDefaultAsync(lh => lh.Id == id);
+
+
+            if (lopHoc == null) return NotFound();
+
+            return View(lopHoc);
+        }
+
 
         public async Task<IActionResult> ActivityLogs()
         {
