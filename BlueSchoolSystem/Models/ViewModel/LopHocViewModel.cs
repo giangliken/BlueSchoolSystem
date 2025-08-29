@@ -13,6 +13,9 @@ namespace BlueSchoolSystem.Models.ViewModel
         public int? NganhId { get; set; }
         public string Nganh { get; set; }
 
+        public int? KhoaId { get; set; }
+        public string Khoa { get; set; }
+
         public int SiSo { get; set; }
 
         public ICollection<SinhVien> Students { get; set; } = new List<SinhVien>();
