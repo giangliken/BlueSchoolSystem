@@ -8,10 +8,10 @@ namespace BlueSchoolSystem.APIControllers
 {
     [Route("api")]
     [ApiController]
-    public class MajorController : ControllerBase
+    public class APIMajorController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        public MajorController(ApplicationDbContext context)
+        public APIMajorController(ApplicationDbContext context)
         {
             _context = context;
         }

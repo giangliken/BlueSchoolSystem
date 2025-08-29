@@ -9,10 +9,10 @@ namespace BlueSchoolSystem.APIControllers
 {
     [Route("api")]
     [ApiController]
-    public class AdminController : ControllerBase
+    public class APIAdminController : ControllerBase
     {
         private readonly IActivityLogService _activityLogService;
-        public AdminController(IActivityLogService activityLogService)
+        public APIAdminController(IActivityLogService activityLogService)
         {
             _activityLogService = activityLogService;
         }

@@ -10,13 +10,13 @@ namespace BlueSchoolSystem.APIControllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class TestController : ControllerBase
+    public class APITestController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
 
 
-        public TestController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public APITestController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
         {
             _context = context;
             _userManager = userManager;

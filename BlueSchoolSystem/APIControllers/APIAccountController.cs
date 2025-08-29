@@ -18,14 +18,14 @@ namespace BlueSchoolSystem.APIControllers
 {
     [Route("api")]
     [ApiController]
-    public class AccountController : ControllerBase
+    public class APIAccountController : ControllerBase
     {
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly JwtSettings _jwtSettings;
         private readonly IEmailSender _emailSender;
         private readonly ApplicationDbContext _context;
-        public AccountController(
+        public APIAccountController(
             SignInManager<ApplicationUser> signInManager,
             UserManager<ApplicationUser> userManager,
             IOptions<JwtSettings> jwtSettings,

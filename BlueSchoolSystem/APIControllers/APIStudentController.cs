@@ -12,13 +12,13 @@ namespace BlueSchoolSystem.APIControllers
 {
     [Route("api/")]
     [ApiController]
-    public class StudentController : ControllerBase
+    public class APIStudentController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
 
 
-        public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public APIStudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
         {
             _context = context;
             _userManager = userManager;
@@ -39,6 +39,35 @@ namespace BlueSchoolSystem.APIControllers
                 code = 200,
                 message = "Lấy dữ liệu thành công",
                 soluongsinhvien = tongsinhvien,
+                data = students
+            });
+        }
+
+        //Lấy danh sách sinh viên dựa vào mã lớp
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpGet("laysinhvientheomalop/{maLop}")]
+        public async Task<IActionResult> GetStudentsByClassCode(string maLop)
+        {
+            var students = await _context.SinhViens
+                .Include(sv => sv.Lop)
+                .Where(sv => sv.Lop.MaLop == maLop)
+                .ToListAsync();
+            if (students == null || !students.Any())
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy sinh viên nào trong lớp này"
+                });
+            }
+            var count = students.Count;
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy dữ liệu thành công",
+                soluongsinhvien = count,
                 data = students
             });
         }
@@ -126,6 +155,7 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+        //Sửa thông tin sinh viên
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPut("suathongtinsinhvien/{id}")]
         public async Task<IActionResult> UpdateStudent(int id, [FromBody] UpdateStudentRequest request)
@@ -159,7 +189,56 @@ namespace BlueSchoolSystem.APIControllers
             return Ok(new { message = "Cập nhật thông tin sinh viên thành công!" });
         }
 
+        //Lấy danh sách thời khóa biểu theo mã số sinh viên
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
+        [HttpGet("thoikhoabieusinhvien/{mssv}")]
+        public async Task<IActionResult> GetThoiKhoaBieuByMSSV(string mssv)
+        {
+            var tkb = await (from dk in _context.ChiTietLopHocPhans
+                             join lhp in _context.LopHocPhans on dk.LopHocPhanId equals lhp.Id
+                             join sv in _context.SinhViens on dk.SinhVienId equals sv.Id
+                             where sv.MSSV == mssv
+                             orderby lhp.Thu, lhp.GioBatDau
+                             select new
+                             {
+                                 sv.MSSV,
+                                 sv.Ten,
+                                 dk.SinhVienId,
+                                 LopHocPhanId = lhp.Id,
+                                 lhp.MaLopHocPhan,
+                                 lhp.TenLopHocPhan,
+                                 lhp.MoTa,
+                                 lhp.MonHocId,
+                                 lhp.GiangVienId,
+                                 lhp.PhongHocId,
+                                 lhp.Thu,
+                                 lhp.GioBatDau,
+                                 lhp.GioKetThuc,
+                                 lhp.NgayBatDau,
+                                 lhp.NgayKetThuc,
+                                 lhp.SiSo,
+                                 lhp.TrangThai
+                             }).ToListAsync();
 
+            if (!tkb.Any())
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy thời khóa biểu cho MSSV này"
+                });
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy thời khóa biểu thành công",
+                soluong = tkb.Count,
+                data = tkb
+            });
+        }
 
     }
 }
