@@ -30,11 +30,21 @@ namespace BlueSchoolSystem.Controllers
         //Giao diện trang chủ của Admin
         public IActionResult Index()
         {
+            var sinhVienCount = _context.SinhViens.Count();
+
+            var khoaVienCount = _context.Khoas.Count();
+
+            var giangVienCount = _context.GiangViens.Count();
+
+            ViewBag.sinhVienCount = sinhVienCount;
+            ViewBag.khoaVienCount = khoaVienCount;
+            ViewBag.giangVienCount = giangVienCount;
+
             return View();
         }
 
         //Trang quản lý sinh viên
-        public async Task<IActionResult> StudentManager(string? searchName, string? searchMSSV)
+        public async Task<IActionResult> StudentManager(string? keyword)
         {
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
@@ -48,22 +58,12 @@ namespace BlueSchoolSystem.Controllers
             HttpResponseMessage response;
 
             // Nếu có tìm kiếm thì gọi API lọc
-            if (!string.IsNullOrEmpty(searchName) || !string.IsNullOrEmpty(searchMSSV))
+            if (!string.IsNullOrEmpty(keyword))
             {
-                // Gộp lại thành 1 từ khóa tìm kiếm
-                var keyword = string.Join(" ", new[] { searchMSSV, searchName }
-                    .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
-
-                var queryParams = new List<string>();
-                if (!string.IsNullOrEmpty(keyword))
-                    queryParams.Add($"keyword={Uri.EscapeDataString(keyword)}");
-
-                var queryString = "?" + string.Join("&", queryParams);
-                response = await client.GetAsync("api/timkiemsinhvien" + queryString);
+                response = await client.GetAsync("api/timkiemsinhvien?keyword=" + Uri.EscapeDataString(keyword));
             }
             else
             {
-                // Ngược lại, gọi API lấy toàn bộ sinh viên
                 response = await client.GetAsync("api/laydanhsachsinhvien");
             }
 
@@ -89,8 +89,7 @@ namespace BlueSchoolSystem.Controllers
             });
 
             // Truyền lại input
-            ViewBag.SearchName = searchName;
-            ViewBag.SearchMSSV = searchMSSV;
+            ViewBag.Keyword = keyword;
 
             return View(students ?? new List<SinhVien>());
         }
@@ -360,16 +359,23 @@ namespace BlueSchoolSystem.Controllers
                 .ThenInclude(n => n.Khoa)
             .Include(lh => lh.ChiTietLopHocs)
                 .ThenInclude(ct => ct.GiangVien)
+                    .ThenInclude(gv => gv.User)
             .Include(lh => lh.ChiTietLopHocs)
                 .ThenInclude(ct => ct.LopTruong)
+                    .ThenInclude(sv => sv.User)
             .Include(lh => lh.ChiTietLopHocs)
                 .ThenInclude(ct => ct.LopPho)
+                    .ThenInclude(sv => sv.User)
             .Include(lh => lh.ChiTietLopHocs)
                 .ThenInclude(ct => ct.BiThu)
+                    .ThenInclude(sv => sv.User)
+
             .FirstOrDefaultAsync(lh => lh.Id == id);
 
 
             if (lopHoc == null) return NotFound();
+            
+
 
             return View(lopHoc);
         }
