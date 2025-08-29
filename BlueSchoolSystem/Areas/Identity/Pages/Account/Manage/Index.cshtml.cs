@@ -93,14 +93,13 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account.Manage
             var email = await _userManager.GetEmailAsync(user);
             Username = userName;
             IsEmailConfirmed = await _userManager.IsEmailConfirmedAsync(user);
-
             string avatarUrl = null;
 
             if (user.SinhViens != null)
             {
                 FullName = user.SinhViens.HoVaTenDem + " " + user.SinhViens.Ten;
                 NgaySinh = user.SinhViens.NgaySinh.ToString("dd/MM/yyyy");
-                Lop = user.SinhViens.Lop?.TenLop ?? "Chưa đăng ký lớp";
+                Lop = user.SinhViens?.Lop?.TenLop ?? "Chưa đăng ký lớp";
                 NganhHoc = user.SinhViens.Lop?.Nganh?.TenNganh ?? "Chưa đăng ký ngành học";
                 KhoaVien = user.SinhViens.Lop?.Nganh?.Khoa?.TenKhoa ?? "Chưa thuộc khoa viện nào";
                 avatarUrl = user.SinhViens.AvatarUrl;
@@ -110,7 +109,7 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account.Manage
             {
                 FullName = user.GiangViens.HoVaTenDem + " " + user.GiangViens.Ten;
                 NgaySinh = user.GiangViens.NgaySinh.ToString("dd/MM/yyyy");
-                KhoaVien = await GetTenKhoaGiangVienAsync(user.Id) ?? "Chưa thuộc khoa nào";
+                KhoaVien = user.GiangViens.Khoa.TenKhoa;
                 avatarUrl = user.GiangViens.AvatarUrl;
             }
             else if (await _userManager.IsInRoleAsync(user, SD.Role_Admin))
@@ -241,23 +240,13 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account.Manage
             var userId = _userManager.GetUserId(User);
             return _userManager.Users
                 .Include(u => u.SinhViens)
+                    .ThenInclude(sv => sv.Lop)
+                        .ThenInclude(l => l.Nganh)
+                            .ThenInclude(n => n.Khoa)
                 .Include(u => u.GiangViens)
+                    .ThenInclude(gv => gv.Khoa)
                 .FirstOrDefaultAsync(u => u.Id == userId);
         }
-
-        public async Task<string?> GetTenKhoaGiangVienAsync(string userId)
-        {
-            var tenKhoa = await _context.GiangViens
-                .Where(gv => gv.UserId == userId)
-                .Join(_context.Khoas,
-                      gv => gv.KhoaId,
-                      k => k.Id,
-                      (gv, k) => k.TenKhoa)
-                .FirstOrDefaultAsync();
-
-            return tenKhoa;
-        }
-
 
     }
 }
