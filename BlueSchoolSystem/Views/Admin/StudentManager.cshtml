@@ -5,25 +5,6 @@
    
 }
 
-<div class="modal fade" id="connectionModal" tabindex="-1" aria-labelledby="connectionModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-danger">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="connectionModalLabel">
-                    <i class="fa-solid fa-circle-exclamation me-2"></i>Lỗi kết nối
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
-            </div>
-            <div class="modal-body">
-                Không thể kết nối tới máy chủ. Vui lòng kiểm tra mạng hoặc thử lại sau.
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Đã hiểu</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <form asp-action="StudentManager" method="get" class="row mb-3">
     <div class="col-md-4">
         <input type="text" name="keyword" value="@ViewBag.Keyword" class="form-control" placeholder="Tìm kiếm theo họ tên/ mã số sinh viên ..." />
@@ -100,36 +81,7 @@
 </table>
 
 @section Scripts {
-    <script>
-        async function checkServerConnection() {
-            try {
-                const response = await fetch('/api/test', { method: 'GET' });
-
-                if (!response.ok) {
-                    throw new Error("Bad response");
-                }
-
-                // Nếu kết nối lại được thì ẩn modal (nếu đang mở)
-                const modalEl = document.getElementById('connectionModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) {
-                    modal.hide();
-                }
-            } catch (error) {
-                console.error("Không thể kết nối đến máy chủ:", error);
-
-                // Hiển thị modal cảnh báo
-                const modalEl = document.getElementById('connectionModal');
-                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                modal.show();
-            }
-        }
-
-        // Gọi khi trang load và mỗi 15 giây sau đó
-        checkServerConnection();
-        setInterval(checkServerConnection, 10000);
-
-    </script>
+    
 }
 
 
