@@ -5,13 +5,43 @@
    
 }
 
+
 <form asp-action="StudentManager" method="get" class="row mb-3">
     <div class="col-md-4">
         <input type="text" name="keyword" value="@ViewBag.Keyword" class="form-control" placeholder="Tìm kiếm theo họ tên/ mã số sinh viên ..." />
     </div>
+    @{
+        var lopList = (List<BlueSchoolSystem.Models.ViewModel.LopHocViewModel>)ViewBag.LopList;
+    }
     <div class="col-md-4">
-        <input type="text" name="keyword" value="@ViewBag.Keyword" class="form-control" placeholder="Tìm kiếm theo họ tên/ mã số sinh viên ..." />
+        <select class="form-select class-select" name="maLop">
+            <option value="">-- Tất cả các lớp --</option>
+            @if (Context.Request.Query["maLop"] == "__null__")
+            {
+                <option value="__null__" selected>Chưa xếp lớp</option>
+            }
+            else
+            {
+                <option value="__null__">Chưa xếp lớp</option>
+            }
+
+            @foreach (var lop in lopList)
+            {
+                if (Context.Request.Query["maLop"] == lop.MaLop)
+                {
+                    <option value="@lop.MaLop" selected>@lop.TenLop</option>
+                }
+                else
+                {
+                    <option value="@lop.MaLop">@lop.TenLop</option>
+                }
+            }
+        </select>
+
+
     </div>
+
+
     <div class="col-md-4">
         <button type="submit" class="btn btn-info me-2">
             <i class="fa-solid fa-magnifying-glass me-1"></i> Tìm kiếm
@@ -52,14 +82,15 @@
     <tbody>
         @foreach (var item in Model)
         {
-            string rowClass = item.TrangThai switch
+            string rowClass = item.TrangThai?.TenTrangThai switch
             {
-                "Đang học" => "table-success fw-semibold",      // xanh lá nhạt
-                "Bảo lưu" => "table-warning fw-semibold",      // vàng nhạt
-                "Tốt nghiệp" => "table-primary text-white fw-semibold", // xanh dương, chữ trắng
-                "Thôi học" => "table-danger text-white fw-semibold",  // đỏ, chữ trắng
-                _ => ""                                // mặc định không màu
+                "Đang học" => "table-success fw-semibold",
+                "Bảo lưu" => "table-warning fw-semibold",
+                "Đã tốt nghiệp" => "table-primary text-white fw-semibold",
+                "Thôi học" => "table-danger text-white fw-semibold",
+                _ => ""
             };
+
             <tr class="table-row @rowClass" style="cursor:pointer;" onclick="window.location='@Url.Action("StudentDetails", "Admin", new { id = item.Id })'">
                 <td class="text-center">@item.Id</td>
                 <td class="text-center">@item.MSSV</td>
@@ -72,7 +103,7 @@
                 <td class="text-center">
                     @(item.Lop?.TenLop ?? "Chưa xếp")
                 </td>
-                <td class="text-center">@item.TrangThai</td>
+                <td class="text-center">@item.TrangThai?.TenTrangThai</td>
             </tr>
         }
 
@@ -81,7 +112,15 @@
 </table>
 
 @section Scripts {
-    
+    <script>
+        $(document).ready(function() {
+            $('.class-select').select2({
+                placeholder: "Chọn hoặc tìm lớp...",
+                allowClear: true,
+                width: '100%'
+            });
+        });
+    </script>
 }
 
 
