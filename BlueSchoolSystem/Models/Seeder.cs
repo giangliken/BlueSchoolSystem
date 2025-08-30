@@ -44,7 +44,7 @@ namespace BlueSchoolSystem.Models
             }
 
             //Load dữ liệu mặc định cho khoa học
-            if(!await context.Khoas.AnyAsync())
+            if (!await context.Khoas.AnyAsync())
             {
                 context.Khoas.AddRange(
                     new Khoa { MaKhoa = "CNTT", TenKhoa = "Khoa Công nghệ thông tin" },
@@ -138,6 +138,39 @@ namespace BlueSchoolSystem.Models
                 await context.SaveChangesAsync();
             }
 
+            //Load dữ liệu mặc định cho trạng thái
+            if (!await context.TrangThais.AnyAsync())
+            {
+                var trangThais = new List<TrangThai>
+                {
+                    // --- Trạng thái Sinh viên ---
+                    new TrangThai { TenTrangThai = "Chưa nhập học", MoTa = "Sinh viên chưa nhập học", LoaiTrangThai = "SinhVien" },
+                    new TrangThai { TenTrangThai = "Đang học", MoTa = "Sinh viên đang theo học", LoaiTrangThai = "SinhVien" },
+                    new TrangThai { TenTrangThai = "Bảo lưu", MoTa = "Sinh viên bảo lưu kết quả", LoaiTrangThai = "SinhVien" },
+                    new TrangThai { TenTrangThai = "Đã tốt nghiệp", MoTa = "Sinh viên đã hoàn thành chương trình", LoaiTrangThai = "SinhVien" },
+                    new TrangThai { TenTrangThai = "Thôi học", MoTa = "Sinh viên thôi học", LoaiTrangThai = "SinhVien" },
+                    new TrangThai { TenTrangThai = "Chờ xét tốt nghiệp", MoTa = "Sinh viên chờ xét tốt nghiệp", LoaiTrangThai = "SinhVien" },
+
+                    // --- Trạng thái Lớp học phần ---
+                    new TrangThai { TenTrangThai = "Đang mở", MoTa = "Lớp học phần đang được mở", LoaiTrangThai = "LopHocPhan" },
+                    new TrangThai { TenTrangThai = "Đã kết thúc", MoTa = "Lớp học phần đã hoàn thành", LoaiTrangThai = "LopHocPhan" },
+                    new TrangThai { TenTrangThai = "Đã huỷ", MoTa = "Lớp học phần bị huỷ", LoaiTrangThai = "LopHocPhan" },
+                    new TrangThai { TenTrangThai = "Chờ mở", MoTa = "Lớp học phần chờ đủ số lượng để mở", LoaiTrangThai = "LopHocPhan" },
+
+                    // --- Trạng thái Môn học ---
+                    new TrangThai { TenTrangThai = "Bắt buộc", MoTa = "Môn học bắt buộc trong chương trình", LoaiTrangThai = "MonHoc" },
+                    new TrangThai { TenTrangThai = "Tự chọn", MoTa = "Môn học tự chọn", LoaiTrangThai = "MonHoc" },
+                    new TrangThai { TenTrangThai = "Đã hoàn thành", MoTa = "Môn học đã hoàn thành", LoaiTrangThai = "MonHoc" },
+
+                    // --- Trạng thái Đăng ký ---
+                    new TrangThai { TenTrangThai = "Chờ duyệt", MoTa = "Chưa được duyệt", LoaiTrangThai = "DangKy" },
+                    new TrangThai { TenTrangThai = "Đã duyệt", MoTa = "Đã được duyệt", LoaiTrangThai = "DangKy" },
+                    new TrangThai { TenTrangThai = "Bị từ chối", MoTa = "Không được duyệt", LoaiTrangThai = "DangKy" },
+                };
+
+                context.TrangThais.AddRange(trangThais);
+                await context.SaveChangesAsync();
+            }
 
         }
     }

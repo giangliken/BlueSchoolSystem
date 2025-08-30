@@ -18,7 +18,8 @@ namespace BlueSchoolSystem.Models
 
         public DateTime NgayNhapHoc { get; set; } // Ngày nhập học
         public DateTime NgayTotNghiep { get; set; } // Ngày tốt nghiệp
-        public string TrangThai { get; set; } // Trạng thái (đang học, đã tốt nghiệp, bỏ học, v.v.)
+        public int TrangThaiId { get; set; } // Trạng thái (đang học, đã tốt nghiệp, bỏ học, v.v.)
+        public TrangThai? TrangThai { get; set; } // Liên kết với bảng trạng thái
         public string? GhiChu { get; set; } // Ghi chú thêm về sinh viên
         public string? AvatarUrl { get; set; } // URL của ảnh đại diện sinh viên
         public string? UserId { get; set; } // ID của người dùng liên kết với sinh viên

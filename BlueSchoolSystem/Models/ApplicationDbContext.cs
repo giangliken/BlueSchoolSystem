@@ -27,6 +27,8 @@ namespace BlueSchoolSystem.Models
         public DbSet<BangDiem> BangDiems { get; set; } // Bảng điểm
         public DbSet<DangKyHocPhan> DangKyHocPhans { get; set; } // Bảng đăng ký học phần
 
+        //Table lưu trạng thái của hệ thống
+        public DbSet<TrangThai> TrangThais { get; set; } // Bảng trạng thái của hệ thống
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

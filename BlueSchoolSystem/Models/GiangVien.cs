@@ -11,7 +11,8 @@
         public bool GioiTinh { get; set; } // Giới tính
         public string DiaChi { get; set; } // Địa chỉ
 
-        public string TrangThai { get; set; } // Trạng thái
+        public int TrangThaiId { get; set; } // Trạng thái
+        public TrangThai? TrangThai { get; set; } // Liên kết với bảng trạng thái
         public string? GhiChu { get; set; } // Ghi chú thêm về giảng viên
         public string? AvatarUrl { get; set; } // URL của ảnh đại diện giảng viên
 

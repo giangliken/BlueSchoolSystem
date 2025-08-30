@@ -12,7 +12,8 @@
         public int? LopId { get; set; }
         public DateTime? NgayNhapHoc { get; set; }
         public DateTime? NgayTotNghiep { get; set; }
-        public string? TrangThai { get; set; }
+        public int? TrangThaiId { get; set; }
+        public TrangThai? TrangThai { get; set; }
         public string? GhiChu { get; set; }
         public string? AvatarUrl { get; set; }
     }
