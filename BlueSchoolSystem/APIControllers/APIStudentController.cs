@@ -31,6 +31,7 @@ namespace BlueSchoolSystem.APIControllers
         {
             var students = await _context.SinhViens
                         .Include(sv => sv.Lop)
+                        .Include(tt => tt.TrangThai)
                         .ToListAsync();
             var tongsinhvien = await _context.SinhViens.CountAsync();
             return Ok(new
@@ -50,6 +51,7 @@ namespace BlueSchoolSystem.APIControllers
         {
             var students = await _context.SinhViens
                 .Include(sv => sv.Lop)
+                .Include(tt => tt.TrangThai)
                 .Where(sv => sv.Lop.MaLop == maLop)
                 .ToListAsync();
             if (students == null || !students.Any())
@@ -78,6 +80,7 @@ namespace BlueSchoolSystem.APIControllers
         {
             var query = _context.SinhViens
                 .Include(sv => sv.Lop)
+                .Include(tt => tt.TrangThai)
                 .AsQueryable();
 
             // Lọc theo keyword (tìm trong MSSV, Họ tên đệm, Tên)
@@ -89,10 +92,17 @@ namespace BlueSchoolSystem.APIControllers
                     sv.Ten.Contains(keyword));
             }
 
-            // Lọc theo mã lớp
+            // Lọc theo mã lớp hoặc chưa xếp lớp
             if (!string.IsNullOrEmpty(maLop))
             {
-                query = query.Where(sv => sv.Lop.MaLop == maLop);
+                if (maLop == "__null__")
+                {
+                    query = query.Where(sv => sv.LopId == null);
+                }
+                else
+                {
+                    query = query.Where(sv => sv.Lop != null && sv.Lop.MaLop == maLop);
+                }
             }
 
             // Lọc theo giới tính

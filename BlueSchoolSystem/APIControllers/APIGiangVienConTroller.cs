@@ -74,10 +74,63 @@ namespace BlueSchoolSystem.APIControllers
             return Ok(new
             {
                 message = "Tạo giảng viên và tài khoản thành công!",
-                studentId = giangvien.Id,
+                giangvienId = giangvien.Id,
                 userId = user.Id
             });
         }
 
+        // Lấy lịch giảng dạy của giảng viên
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("lichgiangday/{maGiangVien}")]
+        public async Task<IActionResult> GetThoiKhoaBieuByMaGV(string maGiangVien)
+        {
+            var gv = await _context.GiangViens.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.MaGiangVien == maGiangVien);
+            if (gv == null)
+                return NotFound(new { result = false, code = 404, message = "Không tìm thấy mã giảng viên" });
+            var tkb = await (from lhp in _context.LopHocPhans
+                             join mh in _context.MonHocs on lhp.MonHocId equals mh.Id into _mh
+                             from mh in _mh.DefaultIfEmpty()
+                             join ph in _context.PhongHocs on lhp.PhongHocId equals ph.Id into _ph
+                             from ph in _ph.DefaultIfEmpty()
+                             where lhp.GiangVienId == gv.Id
+                             orderby lhp.Thu, lhp.GioBatDau
+                             select new
+                             {
+                                 gv.MaGiangVien,
+                                 HoTen = gv.HoVaTenDem + " " + gv.Ten,
+                                 GiangVienId = gv.Id,
+                                 LopHocPhanId = lhp.Id,
+                                 lhp.MaLopHocPhan,
+                                 lhp.TenLopHocPhan,
+                                 lhp.MoTa,
+                                 lhp.MonHocId,
+                                 MaMonHoc = mh != null ? mh.MaMonHoc : null,
+                                 TenMonHoc = mh != null ? mh.TenMonHoc : null,
+                                 lhp.PhongHocId,
+                                 MaPhongHoc = ph != null ? ph.MaPhongHoc : null,
+                                 TenPhongHoc = ph != null ? ph.TenPhongHoc : null,
+                                 lhp.Thu,
+                                 lhp.GioBatDau,
+                                 lhp.GioKetThuc,
+                                 lhp.NgayBatDau,
+                                 lhp.NgayKetThuc,
+                                 lhp.SiSo,
+                                 lhp.TrangThai
+                             }).ToListAsync();
+
+            if (!tkb.Any())
+            {
+                return NotFound(new { result = false, code = 404, message = "Không có thời khóa biểu" });
+            }
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy thời khóa biểu thành công",
+                soluong = tkb.Count,
+                data = tkb
+            });
+        }
     }
 }
