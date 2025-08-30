@@ -44,28 +44,60 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Trang quản lý sinh viên
-        public async Task<IActionResult> StudentManager(string? keyword)
+        public async Task<IActionResult> StudentManager(string? keyword, string? maLop)
         {
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
 
+            //Lấy token
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
             {
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
+            // Lấy danh sách lớp để đổ vào dropdown
+            var classResponse = await client.GetAsync("api/laydanhsachlophoc");
+            if (classResponse.IsSuccessStatusCode)
+            {
+                var classJson = await classResponse.Content.ReadAsStringAsync();
+                using var classDoc = JsonDocument.Parse(classJson);
+
+                // Lấy ra property "data" là 1 JsonElement
+                var classData = classDoc.RootElement.GetProperty("data");
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true // Không phân biệt hoa thường
+                };
+
+                var lopList = JsonSerializer.Deserialize<List<LopHocViewModel>>(classData.GetRawText(), options);
+                ViewBag.LopList = lopList;
+
+            }
+            else
+            {
+                ViewBag.LopList = new List<LopHocViewModel>();
+            }
+
             HttpResponseMessage response;
 
-            // Nếu có tìm kiếm thì gọi API lọc
-            if (!string.IsNullOrEmpty(keyword))
+            var url = "";
+            if (!string.IsNullOrEmpty(keyword) || ! string.IsNullOrEmpty(maLop))
             {
-                response = await client.GetAsync("api/timkiemsinhvien?keyword=" + Uri.EscapeDataString(keyword));
+                url = "api/timkiemsinhvien?";
+                if (!string.IsNullOrEmpty(keyword))
+                    url += "keyword=" + Uri.EscapeDataString(keyword) + "&";
+                if (!string.IsNullOrEmpty(maLop))
+                    url += "malop=" + Uri.EscapeDataString(maLop) + "&";
+                // Xoá dấu & thừa cuối nếu có nhé, hoặc dùng query builder đẹp hơn.
+                response = await client.GetAsync(url);
             }
             else
             {
                 response = await client.GetAsync("api/laydanhsachsinhvien");
             }
+
 
             if (!response.IsSuccessStatusCode)
             {
@@ -182,9 +214,20 @@ namespace BlueSchoolSystem.Controllers
                 {
                     var worksheet = package.Workbook.Worksheets[0];
                     int rowCount = worksheet.Dimension.Rows;
+                    // Lấy tất cả trạng thái áp dụng cho sinh viên và mapping Tên => Id
+                    var trangThaiDict = _context.TrangThais
+                        .Where(x => x.LoaiTrangThai == "SinhVien")
+                        .ToDictionary(x => x.TenTrangThai.Trim(), x => x.Id);
 
                     for (int row = 2; row <= rowCount; row++)
                     {
+                        var tenTrangThai = worksheet.Cells[row, 12].Text.Trim();
+                        int? trangThaiId = null;
+                        if (!string.IsNullOrEmpty(tenTrangThai) && trangThaiDict.TryGetValue(tenTrangThai, out int id))
+                            trangThaiId = id;
+                        else
+                            trangThaiId = trangThaiDict.ContainsKey("Đang học") ? trangThaiDict["Đang học"] : (int?)null;
+
                         var sv = new SinhVien
                         {
                             MSSV = worksheet.Cells[row, 1].Text.Trim(),
@@ -196,7 +239,7 @@ namespace BlueSchoolSystem.Controllers
                             DiaChi = worksheet.Cells[row, 9].Text.Trim(),
                             NgayNhapHoc = ParseExcelDate(worksheet.Cells[row, 10].Value),
                             NgayTotNghiep = ParseExcelDate(worksheet.Cells[row, 11].Value),
-                            TrangThai = worksheet.Cells[row, 12].Text.Trim(),
+                            TrangThaiId = (int)trangThaiId,
                             GhiChu = worksheet.Cells[row, 13].Text.Trim(),
                             User = new ApplicationUser
                             {
@@ -207,6 +250,7 @@ namespace BlueSchoolSystem.Controllers
                         };
                         students.Add(sv);
                     }
+
                 }
             }
 
