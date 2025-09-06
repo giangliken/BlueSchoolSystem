@@ -9,82 +9,249 @@
 
 <style>
     .tooltip-inner {
-        white-space: normal !important; /* Cho phép xuống dòng */
+        white-space: normal;
         text-align: left;
-        max-width: 350px; /* Giới hạn rộng để text gọn */
-        font-size: 0.9rem;
-        line-height: 1.4;
+        max-width: 350px;
+        font-size: .9rem;
+        line-height: 1.4
+    }
+
+    .fc .fc-timegrid-axis {
+        background: #e9db8e;
+        font-weight: 700;
+        color: #333
+    }
+
+    .fc-timegrid > .fc-scrollgrid > .fc-scrollgrid-section > .fc-scrollgrid-section-header th.fc-timegrid-axis-frame:after {
+        content: "Ca học";
+        display: block;
+        padding: .5rem .75rem;
+        font-weight: 800
+    }
+
+    .fc .fc-event {
+        border: none;
+        background: #dedede;
+        color: #222;
+        border-radius: .5rem;
+        padding: .25rem .4rem
+    }
+
+        .fc .fc-event .ev-line-1 {
+            font-weight: 700
+        }
+
+        .fc .fc-event .ev-line-2 {
+            font-size: .9rem;
+            opacity: .85
+        }
+    /* Nền xanh full ô lịch */
+    /* Full ô lịch có nền xanh */
+    .fc-col-header-cell {
+        background: #007bff !important; /* xanh lam */
+        padding: 0;
+    }
+    /* Bên trong căn giữa dọc + ngang */
+    /* Text bên trong */
+.fc-col-header-cell-cushion {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    white-space: normal !important;
+    line-height: 1.3;
+    font-size: 0.9rem;
+    font-weight: 600;
+    height: 100%;
+    width: 100%;
+    color: #fff !important;   /* chữ trắng dễ đọc */
+    text-decoration: none !important; /* bỏ gạch chân */
+}
+
+    /* Nếu vẫn còn link <a >, ép nó thành trắng luôn */
+    .fc-col-header-cell-cushion a {
+        color: #fff !important;
+        text-decoration: none !important;
+    }
+    /* Dòng thứ */
+    .fc-col-header-cell .dow {
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    /* Dòng ngày tháng */
+    .fc-col-header-cell .dmy {
+        font-size: 0.8rem;
+        opacity: 0.95;
+    }
+
+    .fc-toolbar-title {
+        font-weight: bold;
+        font-size: 20px;
+        color: #000;
+    }
+
+    .custom-date-label {
+        font-size: 16px;
+        font-weight: normal;
     }
 </style>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var calendarEl = document.getElementById('calendar');
+@{
+    // Mapping tiết → giờ
+    var tietMap = new Dictionary<int, string>{
+        {1,"06:45:00"},{2,"07:50:00"},{3,"08:40:00"},
+        {4,"09:30:00"},{5,"10:20:00"},{6,"11:10:00"},
+        {7,"13:00:00"},{8,"13:50:00"},{9,"14:40:00"},
+        {10,"15:30:00"},{11,"16:20:00"},{12,"17:10:00"},
+        {13,"18:00:00"},{14,"18:50:00"},{15,"19:40:00"}
+    };
 
-        var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'timeGridWeek',
-            locale: 'vi',
-            height: 700,
-            slotMinTime: "07:00:00",
-            slotMaxTime: "21:00:00",
-            expandRows: true,
-            allDaySlot: false,
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            },
-            buttonText: {
-                today: 'Hôm nay',
-                month: 'Tháng',
-                week: 'Tuần',
-                day: 'Ngày'
-            },
-                events: [
-    @foreach (var item in Model)
+    int MapToTiet(string? gio)
     {
-        <text>
-                {
-                    title: '@item.TenLopHocPhan - P.@item.MaPhongHoc',
-                    daysOfWeek: [@item.Thu], // 1=Thứ 2, 2=Thứ 3...
-                    startTime: '@item.GioBatDau',
-                    endTime: '@item.GioKetThuc',
-                    startRecur: '@item.NgayBatDau.ToString("yyyy-MM-dd")',
-                    endRecur: '@item.NgayKetThuc.ToString("yyyy-MM-dd")',
-                    extendedProps: {
-                        tenLopHocPhan: '@item.TenLopHocPhan',
-                        tenMonHoc: '@item.TenMonHoc',
-                        tenGiangVien: '@item.TenGiangVien',
-                        maPhongHoc: '@item.MaPhongHoc',
-                        thu: '@item.Thu',
-                        gioBatDau: '@item.GioBatDau',
-                        gioKetThuc: '@item.GioKetThuc'
-                    }
-                },
-        </text>
+        if (string.IsNullOrEmpty(gio)) return 0;
+        var hm = TimeSpan.Parse(gio);
+        if (hm < TimeSpan.Parse("07:20:00")) return 1;
+        if (hm < TimeSpan.Parse("08:15:00")) return 2;
+        if (hm < TimeSpan.Parse("09:05:00")) return 3;
+        if (hm < TimeSpan.Parse("09:55:00")) return 4;
+        if (hm < TimeSpan.Parse("10:45:00")) return 5;
+        if (hm < TimeSpan.Parse("11:35:00")) return 6;
+        if (hm < TimeSpan.Parse("13:25:00")) return 7;
+        if (hm < TimeSpan.Parse("14:15:00")) return 8;
+        if (hm < TimeSpan.Parse("15:05:00")) return 9;
+        if (hm < TimeSpan.Parse("15:55:00")) return 10;
+        if (hm < TimeSpan.Parse("16:45:00")) return 11;
+        if (hm < TimeSpan.Parse("17:35:00")) return 12;
+        if (hm < TimeSpan.Parse("18:25:00")) return 13;
+        if (hm < TimeSpan.Parse("19:15:00")) return 14;
+        return 15;
     }
-    ],
-            eventDidMount: function (info) {
-                var p = info.event.extendedProps;
-                var tooltipContent = `
-                    <b>Lớp HP:</b> ${p.tenLopHocPhan}<br/>
-                    <b>Môn:</b> ${p.tenMonHoc}<br/>
-                    <b>GV:</b> ${p.tenGiangVien}<br/>
-                    <b>Phòng:</b> ${p.maPhongHoc}<br/>
-                    <b>Thứ:</b> ${p.thu}<br/>
-                    <b>Thời gian:</b> ${p.gioBatDau} - ${p.gioKetThuc}<br/>
-                `;
 
-                new bootstrap.Tooltip(info.el, {
-                    title: tooltipContent,
-                    html: true,
-                    placement: 'top',
-                    trigger: 'hover',
-                    container: 'body'
-                });
-            }
-        });
+    var events = Model.Select(item => new
+    {
+        title = $"{item.TenLopHocPhan} - P.{item.MaPhongHoc}",
+        daysOfWeek = new[] { item.Thu },
+        startTime = item.GioBatDau ?? "",
+        endTime = item.GioKetThuc ?? "",
+        startRecur = item.NgayBatDau.ToString("yyyy-MM-dd"),
+        endRecur = item.NgayKetThuc.ToString("yyyy-MM-dd"),
+        extendedProps = new
+        {
+            item.TenLopHocPhan,
+            item.TenMonHoc,
+            item.TenGiangVien,
+            item.MaPhongHoc,
+            item.Thu,
+            item.GioBatDau,
+            item.GioKetThuc,
+            tietBatDau = MapToTiet(item.GioBatDau),
+            tietKetThuc = MapToTiet(item.GioKetThuc)
 
-        calendar.render();
+        }
+    });
+    var eventsJson = System.Text.Json.JsonSerializer.Serialize(events);
+}
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const tietMap = {
+        "06:45:00":"Tiết 1","07:50:00":"Tiết 2","08:40:00":"Tiết 3",
+        "09:30:00":"Tiết 4","10:20:00":"Tiết 5","11:10:00":"Tiết 6",
+        "13:00:00":"Tiết 7","13:50:00":"Tiết 8","14:40:00":"Tiết 9",
+        "15:30:00":"Tiết 10","16:20:00":"Tiết 11","17:10:00":"Tiết 12",
+        "18:00:00":"Tiết 13","18:50:00":"Tiết 14","19:40:00":"Tiết 15"
+      };
+
+      const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+        initialView: 'timeGridWeek',
+        locale: 'vi',
+        firstDay: 1,
+        height: 700,
+        slotDuration: "00:50:00",
+        slotMinTime: "07:00:00",
+        slotMaxTime: "20:00:00",
+        expandRows: true,
+        allDaySlot: false,
+        headerToolbar:{ left:'prev,next today', center:'title', right:'dayGridMonth,timeGridWeek,timeGridDay'},
+            titleFormat: { // giữ format ngày như cũ
+      year: 'numeric', month: 'short', day: 'numeric'
+    },
+        buttonText:{ today:'Hôm nay', month:'Tháng', week:'Tuần', day:'Ngày'},
+        displayEventTime:false,
+
+            dayHeaderContent: (arg) => {
+      const d = arg.date, dowMap=['CN','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+      return {
+        html:`<span class="dow">${dowMap[d.getDay()]}</span>
+              <span class="dmy">${d.toLocaleDateString('vi-VN')}</span>`
+      };
+    },
+
+            slotLabelContent: (arg) => {
+      const labels = [
+        "Tiết 1","Tiết 2","Tiết 3","Tiết 4","Tiết 5","Tiết 6",
+        "Tiết 7","Tiết 8","Tiết 9","Tiết 10","Tiết 11",
+        "Tiết 12","Tiết 13","Tiết 14","Tiết 15"
+      ];
+      const idx = arg.date.getHours()*60+arg.date.getMinutes();
+      // map index theo phút trong ngày
+      const slotIndex = Math.floor((idx-405)/50); // 06:45 = 405 phút
+      return { html: labels[slotIndex] || "" };
+    },
+
+                eventContent: function (info) {
+        const p = info.event.extendedProps;
+        return {
+                html: `
+        <div style="background:#e0e0e0; padding:5px; border-radius:4px; font-size:13px; line-height:1.4; color:#000;">
+            <div style="font-weight:500; text-align:center;">${p.TenLopHocPhan}</div>
+            <br>
+            <div style="text-align:left;">Phòng: ${p.MaPhongHoc}</div>
+            <div style="text-align:left;">GV: ${p.TenGiangVien}</div>
+        </div>
+    `
+        };
+    },
+
+        events: @Html.Raw(eventsJson),
+
+                eventDidMount: (info) => {
+      const p = info.event.extendedProps;
+      new bootstrap.Tooltip(info.el,{
+        title: `
+          <b>Lớp HP:</b> ${p.TenLopHocPhan}<br/>
+          <b>Môn:</b> ${p.TenMonHoc}<br/>
+          <b>GV:</b> ${p.TenGiangVien}<br/>
+          <b>Phòng:</b> ${p.MaPhongHoc}<br/>
+          <b>Thứ:</b> ${p.Thu}<br/>
+          <b>Giờ:</b> ${p.GioBatDau} - ${p.GioKetThuc}
+        `,
+        html: true,
+        placement: 'top',
+        trigger: 'hover',
+        container: 'body'
+      });
+    }
+      });
+
+      calendar.render();
+          // override tiêu đề
+    const centerTitle = document.querySelector('.fc-toolbar-title');
+    if (centerTitle) {
+      centerTitle.innerHTML = 'Thời khóa biểu'; // thay hẳn chữ giữa = Thời khóa biểu
+    }
+
+    // đẩy ngày sang phải (trước các nút view)
+    const toolbarRight = document.querySelector('.fc-toolbar-chunk:last-child');
+    const dateTitle = document.createElement('span');
+    dateTitle.className = 'custom-date-label';
+    dateTitle.style.marginRight = '10px';
+    dateTitle.textContent = calendar.view.title; // ví dụ: "1 – 7 thg 9, 2025"
+
+    // chèn vào trước các nút Tháng/Tuần/Ngày
+    if (toolbarRight) {
+      toolbarRight.insertBefore(dateTitle, toolbarRight.firstChild);
+    }
     });
 </script>
