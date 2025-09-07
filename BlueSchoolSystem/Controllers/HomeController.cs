@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace BlueSchoolSystem.Controllers
@@ -36,46 +37,71 @@ namespace BlueSchoolSystem.Controllers
         //Học vụ 
         //Giao diện Thời khóa biểu
         [Authorize]
-        [HttpGet] 
-        public async Task<IActionResult> ThoiKhoaBieu() 
+        [HttpGet]
+        public async Task<IActionResult> ThoiKhoaBieu(int weekOffset = 0, int monthOffset = 0, string viewMode = "week")
         {
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
 
+            // Lấy token từ Session để gọi API
             var token = HttpContext.Session.GetString("access_token");
-            if (!string.IsNullOrEmpty(token)) { 
-                client.DefaultRequestHeaders.Authorization = new 
-                    AuthenticationHeaderValue("Bearer", token); }
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
 
-            // Lấy MSSV từ Claim (hoặc Session, tùy cách bạn lưu khi login)
-            var mssv = User.Identity?.Name ;
-            //Console.WriteLine("===== MSSV hiện tại: " + mssv);
-            //ViewBag.MSSV = mssv; 
-            //if (string.IsNullOrEmpty(mssv)) 
-            //{ 
-            //    ViewBag.Error = "Không xác định được MSSV của người dùng.";
-            //    return View(new List<ThoiKhoaBieuViewModel>()); 
-            //}
-            
-            var response = await client.GetAsync($"api/thoikhoabieusinhvien/{mssv}");
-            if (!response.IsSuccessStatusCode) 
-            { 
-                ViewBag.Error = "Không thể lấy thời khóa biểu."; 
+            // Lấy MSSV từ Claim (khi login bạn đã set vào claim Identity)
+            var mssv = User.Identity?.Name ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.Identity?.Name;
+
+            if (string.IsNullOrEmpty(mssv))
+            {
+                ViewBag.Error = "Không xác định được MSSV của người dùng.";
                 return View(new List<ThoiKhoaBieuViewModel>());
-            } 
-            
+            }
+
+            // Gọi API lấy TKB của sinh viên
+            var response = await client.GetAsync($"api/thoikhoabieusinhvien/{mssv}");
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không thể lấy thời khóa biểu từ API.";
+                return View(new List<ThoiKhoaBieuViewModel>());
+            }
+
             var body = await response.Content.ReadAsStringAsync();
-            using var document = JsonDocument.Parse(body); 
-            var root = document.RootElement; 
-            if (!root.TryGetProperty("data", out var dataElement)) 
-            { 
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("data", out var dataElement))
+            {
                 ViewBag.Error = "Không tìm thấy dữ liệu thời khóa biểu.";
-                return View(new List<ThoiKhoaBieuViewModel>()); 
-            } 
-            var tkb = JsonSerializer.Deserialize<List<ThoiKhoaBieuViewModel>>(dataElement.ToString(), 
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }); 
-            return View(tkb ?? new List<ThoiKhoaBieuViewModel>()); 
+                return View(new List<ThoiKhoaBieuViewModel>());
+            }
+
+            var tkb = JsonSerializer.Deserialize<List<ThoiKhoaBieuViewModel>>(
+                dataElement.ToString(),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
+
+            // ===== TÍNH NGÀY BẮT ĐẦU TUẦN & THÁNG DỰA VÀO OFFSET =====
+            var today = DateTime.Today;
+
+            // Tuần: tính thứ 2 (Monday) của tuần hiện tại
+            var monday = today.AddDays(-(int)today.DayOfWeek + 1);
+            if (monday.DayOfWeek == DayOfWeek.Sunday) monday = monday.AddDays(-6);
+            monday = monday.AddDays(7 * weekOffset);
+
+            // Tháng: lấy ngày 1 của tháng hiện tại
+            var monthDate = new DateTime(today.Year, today.Month, 1).AddMonths(monthOffset);
+
+            ViewBag.WeekStart = monday;
+            ViewBag.MonthStart = monthDate;
+            ViewBag.WeekOffset = weekOffset;
+            ViewBag.MonthOffset = monthOffset;
+            ViewBag.ViewMode = viewMode;
+
+            return View(tkb ?? new List<ThoiKhoaBieuViewModel>());
         }
+
         //Giao diện Lịch thi
         public IActionResult LichThi()
         {

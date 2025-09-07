@@ -220,6 +220,7 @@ namespace BlueSchoolSystem.APIControllers
                                  lhp.MaLopHocPhan,
                                  lhp.TenLopHocPhan,
                                  lhp.MonHocId,
+                                 MaMonHoc = mh.MaMonHoc,
                                  TenMonHoc = mh.TenMonHoc,
                                  lhp.GiangVienId,
                                  TenGiangVien = gv.HoVaTenDem + " " + gv.Ten,
