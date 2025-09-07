@@ -74,12 +74,25 @@
                         <input asp-for="DiaChi" class="form-control" />
                         <span asp-validation-for="DiaChi" class="text-danger"></span>
                     </div>
-
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Ngành(*)</label>
+                        <select id="NganhSelect" name="NganhHocId" class="form-select" asp-items="ViewBag.NganhList"></select>
+                    </div>
                     <div class="col-md-6">
                         <label asp-for="LopId" class="form-label fw-semibold">Mã lớp(*)</label>
-                        <select asp-for="LopId" class="form-select" asp-items="ViewBag.LopId"></select>
+                        <select asp-for="LopId" id="LopSelect" class="form-select">
+                            <option value="">-- Chọn ngành trước --</option>
+                        </select>
                         <span asp-validation-for="LopId" class="text-danger"></span>
                     </div>
+                    <div class="col-md-6">
+                        <label asp-for="TrangThaiId" class="form-label fw-semibold">Trạng thái(*)</label>
+                        <select asp-for="TrangThaiId" class="form-select" asp-items="ViewBag.TrangThaiList"></select>
+                        <span asp-validation-for="TrangThaiId" class="text-danger"></span>
+                    </div>
+
+
 
                     <div class="col-md-6">
                         <label asp-for="NgayNhapHoc" class="form-label fw-semibold">Ngày nhập học(*)</label>
@@ -92,11 +105,6 @@
                         <span asp-validation-for="NgayTotNghiep" class="text-danger"></span>
                     </div>
 
-                    <div class="col-md-6">
-                        <label asp-for="TrangThai" class="form-label fw-semibold">Trạng thái(*)</label>
-                        <input asp-for="TrangThai" class="form-control" />
-                        <span asp-validation-for="TrangThai" class="text-danger"></span>
-                    </div>
                     <div class="col-md-6">
                         <label asp-for="GhiChu" class="form-label fw-semibold">Ghi chú</label>
                         <input asp-for="GhiChu" class="form-control" />
@@ -140,4 +148,34 @@
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
+    <script>
+        $(document).ready(function () {
+            // Khi chọn ngành thì load danh sách lớp của ngành đó
+            $('#NganhSelect').change(function () {
+                var maNganh = $(this).val();
+                // Clear dropdown lớp trước khi load mới
+                $('#LopSelect').html('<option>Đang tải...</option>');
+                $.ajax({
+                    url: '/api/lophoc/laydanhsachlophoctheonganh?maNganh=' + maNganh,
+                    method: 'GET',
+                    success: function (res) {
+                        if (res.result && res.data) {
+                            // Option tự động xếp lớp (value = 0)
+                            var options = '<option value="0">-- Tự động xếp lớp --</option>';
+                            res.data.forEach(function (lop) {
+                                options += `<option value="${lop.id}">${lop.tenLop} (sĩ số: ${lop.soLuongHienTai}/${lop.siSoToiDa})</option>`;
+                            });
+                            $('#LopSelect').html(options);
+                        } else {
+                            $('#LopSelect').html('<option value="">Không có lớp nào</option>');
+                        }
+                    },
+                    error: function () {
+                        $('#LopSelect').html('<option value="">Không tìm thấy lớp</option>');
+                    }
+                });
+            });
+        });
+    </script>
 }
+
