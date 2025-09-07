@@ -56,6 +56,44 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+        //Lấy danh sách lớp học theo mã ngành
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpGet("laydanhsachlophoctheonganh")]
+        public IActionResult GetLop(string maNganh)
+        {
+            var data = (from l in _context.LopHocs
+                        join n in _context.NganhHocs on l.NganhId equals n.Id
+                        where n.MaNganh.ToLower() == maNganh.ToLower()
+                        select new
+                        {
+                            l.Id,
+                            l.MaLop,
+                            l.TenLop
+                        }).ToList();
+
+
+            if (data.Count == 0)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy lớp học nào cho mã ngành đã cho"
+                });
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                tongsoluongloptheonganh = data.Count(),
+                data = data
+            });
+
+
+        }
+
+
         // Lấy thông tin lớp học theo id
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("laychitietlophoc")]

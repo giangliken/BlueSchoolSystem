@@ -42,6 +42,42 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpGet("laydanhsachnganhtheomakhoa")]
+        public IActionResult LayDSNganhTheoMaKhoa(string maKhoa)
+        {
+            var majors = _context.NganhHocs
+                .Where(n => n.Khoa.MaKhoa.ToLower() == maKhoa.ToLower())
+                .Select(n => new {
+                    n.Id,
+                    n.MaNganh,
+                    n.TenNganh
+                })
+                .ToList();
+
+            // Chỉ cần check count thôi!
+            if (majors.Count == 0)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy ngành học với mã khoa đã cho",
+                });
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy thông tin thành công",
+                tongsonganhthuockhoa = majors.Count,
+                data = majors
+            });
+        }
+
+
         // Lấy thông tin ngành học theo id
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("laythongtinnganhhoc")]
