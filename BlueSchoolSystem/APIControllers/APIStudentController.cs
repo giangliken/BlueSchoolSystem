@@ -215,16 +215,11 @@ namespace BlueSchoolSystem.APIControllers
                              select new
                              {
                                  sv.MSSV,
-                                 dk.SinhVienId,
-                                 LopHocPhanId = lhp.Id,
                                  lhp.MaLopHocPhan,
                                  lhp.TenLopHocPhan,
-                                 lhp.MonHocId,
                                  MaMonHoc = mh.MaMonHoc,
                                  TenMonHoc = mh.TenMonHoc,
-                                 lhp.GiangVienId,
                                  TenGiangVien = gv.HoVaTenDem + " " + gv.Ten,
-                                 lhp.PhongHocId,
                                  MaPhongHoc = ph.MaPhongHoc,
                                  lhp.Thu,
                                  lhp.GioBatDau,
