@@ -221,27 +221,25 @@ namespace BlueSchoolSystem.APIControllers
             var tkb = await (from dk in _context.ChiTietLopHocPhans
                              join lhp in _context.LopHocPhans on dk.LopHocPhanId equals lhp.Id
                              join sv in _context.SinhViens on dk.SinhVienId equals sv.Id
+                             join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                             join gv in _context.GiangViens on lhp.GiangVienId equals gv.Id
+                             join ph in _context.PhongHocs on lhp.PhongHocId equals ph.Id
                              where sv.MSSV == mssv
                              orderby lhp.Thu, lhp.GioBatDau
                              select new
                              {
                                  sv.MSSV,
-                                 sv.Ten,
-                                 dk.SinhVienId,
-                                 LopHocPhanId = lhp.Id,
                                  lhp.MaLopHocPhan,
                                  lhp.TenLopHocPhan,
-                                 lhp.MoTa,
-                                 lhp.MonHocId,
-                                 lhp.GiangVienId,
-                                 lhp.PhongHocId,
+                                 MaMonHoc = mh.MaMonHoc,
+                                 TenMonHoc = mh.TenMonHoc,
+                                 TenGiangVien = gv.HoVaTenDem + " " + gv.Ten,
+                                 MaPhongHoc = ph.MaPhongHoc,
                                  lhp.Thu,
                                  lhp.GioBatDau,
                                  lhp.GioKetThuc,
                                  lhp.NgayBatDau,
                                  lhp.NgayKetThuc,
-                                 lhp.SiSo,
-                                 lhp.TrangThai
                              }).ToListAsync();
 
             if (!tkb.Any())
@@ -263,6 +261,7 @@ namespace BlueSchoolSystem.APIControllers
                 data = tkb
             });
         }
+
 
     }
 }
