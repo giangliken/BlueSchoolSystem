@@ -21,19 +21,19 @@
         if (string.IsNullOrEmpty(gio)) return 0;
         var hm = TimeSpan.Parse(gio);
         if (hm < TimeSpan.Parse("07:30")) return 1;
-        if (hm < TimeSpan.Parse("08:15")) return 2;
-        if (hm < TimeSpan.Parse("09:00")) return 3;
-        if (hm < TimeSpan.Parse("10:05")) return 4;
-        if (hm < TimeSpan.Parse("10:50")) return 5;
-        if (hm < TimeSpan.Parse("11:35")) return 6;
-        if (hm < TimeSpan.Parse("13:15")) return 7;
-        if (hm < TimeSpan.Parse("13:55")) return 8;
-        if (hm < TimeSpan.Parse("14:45")) return 9;
-        if (hm < TimeSpan.Parse("15:50")) return 10;
-        if (hm < TimeSpan.Parse("16:35")) return 11;
-        if (hm < TimeSpan.Parse("17:20")) return 12;
-        if (hm < TimeSpan.Parse("18:45")) return 13;
-        if (hm < TimeSpan.Parse("19:30")) return 14;
+        if (hm <= TimeSpan.Parse("08:15")) return 2;
+        if (hm <= TimeSpan.Parse("09:00")) return 3;
+        if (hm <= TimeSpan.Parse("10:05")) return 4;
+        if (hm <= TimeSpan.Parse("10:50")) return 5;
+        if (hm <= TimeSpan.Parse("11:35")) return 6;
+        if (hm <= TimeSpan.Parse("13:15")) return 7;
+        if (hm <= TimeSpan.Parse("13:55")) return 8;
+        if (hm <= TimeSpan.Parse("14:45")) return 9;
+        if (hm <= TimeSpan.Parse("15:50")) return 10;
+        if (hm <= TimeSpan.Parse("16:35")) return 11;
+        if (hm <= TimeSpan.Parse("17:20")) return 12;
+        if (hm <= TimeSpan.Parse("18:45")) return 13;
+        if (hm <= TimeSpan.Parse("19:30")) return 14;
         return 15;
     }
 
@@ -165,6 +165,43 @@
                  && x.NgayBatDau.Date <= new DateTime(year, month, daysInMonth))
         .ToList();
 
+
+
+    // Giả sử học kỳ bắt đầu từ ngày đầu tiên có môn học
+    var ngayBatDauHocKy = Model.Min(x => x.NgayBatDau.Date);
+    var ngayKetThucHocKy = Model.Max(x => x.NgayKetThuc.Date);
+
+    int soTuan = 0;
+    var weekMap = new Dictionary<DateTime, int>();
+
+    for (var start = ngayBatDauHocKy; start <= ngayKetThucHocKy; start = start.AddDays(7))
+    {
+        var end = start.AddDays(6);
+
+        // Kiểm tra tuần này có môn không
+        bool coMon = Model.Any(x =>
+            x.NgayBatDau.Date <= end &&
+            x.NgayKetThuc.Date >= start);
+
+        if (coMon)
+        {
+            soTuan++;
+            weekMap[start] = soTuan;
+        }
+        else
+        {
+            weekMap[start] = 0; // tuần trống
+        }
+    }
+
+    // Lấy số tuần của tuần đang xem
+    int currentSoTuan = 0;
+    if (weekMap.ContainsKey(startOfWeek))
+    {
+        currentSoTuan = weekMap[startOfWeek];
+    }
+    ViewBag.SoTuan = currentSoTuan;
+
 }
 
 <h6 class="mb-3">Trang chủ/Học vụ/Thời khóa biểu</h6>
@@ -238,7 +275,6 @@
                                         <b>Thứ:</b> @lop.Thu <br />
                                         <b>Thời gian:</b> @(TimeSpan.Parse(lop.GioBatDau).ToString(@"hh\:mm")) - @(TimeSpan.Parse(lop.GioKetThuc).ToString(@"hh\:mm")) <br />
                                         <b>Giảng viên:</b> @lop.TenGiangVien <br />
-                                        <b>Ngày:</b> @ngayHoc.ToString("dd/MM/yyyy") <!-- Thêm dòng này để debug -->
                                     </span>
                                 </div>
                             </td>
@@ -319,29 +355,34 @@
 </div>
 
 <script>
-    function updateLabel() {
-            var tuan = document.getElementById("lichTuan").style.display !== "none";
-            var label = document.getElementById("currentLabel");
+            function updateLabel() {
+        var tuan = document.getElementById("lichTuan").style.display !== "none";
+        var label = document.getElementById("currentLabel");
 
-            if (tuan) {
-                // Tuần hiện tại
-                const today = new Date();
-                const monday = new Date(today);
-                monday.setDate(today.getDate() - today.getDay() + 1 + weekOffset * 7);
-                const sunday = new Date(monday);
-                sunday.setDate(monday.getDate() + 6);
+        if (tuan) {
+            const soTuan = @ViewBag.SoTuan;
 
-                label.innerText = `Tuần: ${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
+            // Tính lại monday và sunday của tuần hiện tại
+            const today = new Date();
+            const monday = new Date(today);
+            monday.setDate(today.getDate() - today.getDay() + 1 + weekOffset * 7);
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+
+            if (soTuan > 0) {
+                label.innerText = `Tuần ${soTuan} (${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()})`;
             } else {
-                // Tháng hiện tại
-                const today = new Date();
-                const month = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
-                const year = month.getFullYear();
-                const monthName = month.toLocaleString('default', { month: 'long' });
-
-                label.innerText = `Tháng: ${monthName} / ${year}`;
+                label.innerText = `Không có môn trong tuần này (${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()})`;
             }
+        } else {
+            const today = new Date();
+            const month = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+            const year = month.getFullYear();
+            const monthName = month.toLocaleString('default', { month: 'long' });
+
+            label.innerText = `Tháng: ${monthName} / ${year}`;
         }
+    }
 
         window.onload = function() {
             // Hiển thị view ban đầu
