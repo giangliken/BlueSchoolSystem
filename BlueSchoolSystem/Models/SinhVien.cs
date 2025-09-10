@@ -36,7 +36,7 @@ namespace BlueSchoolSystem.Models
 
         public ICollection<DiemDanh> DiemDanhs { get; set; } = new List<DiemDanh>();
 
-        public ICollection<BangDiem> BangDiems { get; set; }
+        public ICollection<BangDiem> BangDiems { get; set; } = new List<BangDiem>();
 
     }
 }
