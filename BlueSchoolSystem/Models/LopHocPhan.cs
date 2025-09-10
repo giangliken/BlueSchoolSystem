@@ -19,6 +19,14 @@
         public DateTime NgayBatDau { get; set; } // Ngày bắt đầu lớp học phần
         public DateTime NgayKetThuc { get; set; } // Ngày kết thúc lớp học phần
         public int SiSo { get; set; } // Sĩ số tối đa của lớp học phần
-        public string TrangThai { get; set; } // Trạng thái lớp học phần (ví dụ: Đang diễn ra, Đã kết thúc, Hủy)
+        public int TrangThaiId { get; set; } // Trạng thái lớp học phần (ví dụ: Đang diễn ra, Đã kết thúc, Hủy)
+        public TrangThai? TrangThai { get; set; } // Trạng thái lớp học phần
+
+        public ICollection<BangDiem> BangDiems { get; set; }
+        public ICollection<DiemDanh> DiemDanhs { get; set; } = new List<DiemDanh>();
+
+        //Học kì
+        public int HocKyId { get; set; } // Mã học kỳ liên kết
+        public HocKy? HocKy { get; set; } // Học kỳ liên kết
     }
 }

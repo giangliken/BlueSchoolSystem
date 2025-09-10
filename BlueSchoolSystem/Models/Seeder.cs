@@ -172,6 +172,133 @@ namespace BlueSchoolSystem.Models
                 await context.SaveChangesAsync();
             }
 
+            if (!await context.HocKys.AnyAsync())
+            {
+                context.HocKys.AddRange(
+                    // ----- 2020 -----
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 1 - 2020",
+                        NgayBatDau = new DateTime(2020, 1, 1),
+                        NgayKetThuc = new DateTime(2020, 4, 30)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 2 - 2020",
+                        NgayBatDau = new DateTime(2020, 5, 1),
+                        NgayKetThuc = new DateTime(2020, 8, 31)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 3 - 2020",
+                        NgayBatDau = new DateTime(2020, 9, 1),
+                        NgayKetThuc = new DateTime(2020, 12, 31)
+                    },
+
+                    // ----- 2021 -----
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 1 - 2021",
+                        NgayBatDau = new DateTime(2021, 1, 1),
+                        NgayKetThuc = new DateTime(2021, 4, 30)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 2 - 2021",
+                        NgayBatDau = new DateTime(2021, 5, 1),
+                        NgayKetThuc = new DateTime(2021, 8, 31)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 3 - 2021",
+                        NgayBatDau = new DateTime(2021, 9, 1),
+                        NgayKetThuc = new DateTime(2021, 12, 31)
+                    },
+
+                    // ----- 2022 -----
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 1 - 2022",
+                        NgayBatDau = new DateTime(2022, 1, 1),
+                        NgayKetThuc = new DateTime(2022, 4, 30)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 2 - 2022",
+                        NgayBatDau = new DateTime(2022, 5, 1),
+                        NgayKetThuc = new DateTime(2022, 8, 31)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 3 - 2022",
+                        NgayBatDau = new DateTime(2022, 9, 1),
+                        NgayKetThuc = new DateTime(2022, 12, 31)
+                    },
+
+                    // ----- 2023 -----
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 1 - 2023",
+                        NgayBatDau = new DateTime(2023, 1, 1),
+                        NgayKetThuc = new DateTime(2023, 4, 30)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 2 - 2023",
+                        NgayBatDau = new DateTime(2023, 5, 1),
+                        NgayKetThuc = new DateTime(2023, 8, 31)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 3 - 2023",
+                        NgayBatDau = new DateTime(2023, 9, 1),
+                        NgayKetThuc = new DateTime(2023, 12, 31)
+                    },
+
+                    // ----- 2024 -----
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 1 - 2024",
+                        NgayBatDau = new DateTime(2024, 1, 1),
+                        NgayKetThuc = new DateTime(2024, 4, 30)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 2 - 2024",
+                        NgayBatDau = new DateTime(2024, 5, 1),
+                        NgayKetThuc = new DateTime(2024, 8, 31)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 3 - 2024",
+                        NgayBatDau = new DateTime(2024, 9, 1),
+                        NgayKetThuc = new DateTime(2024, 12, 31)
+                    },
+
+                    // ----- 2025 -----
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 1 - 2025",
+                        NgayBatDau = new DateTime(2025, 1, 1),
+                        NgayKetThuc = new DateTime(2025, 4, 30)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 2 - 2025",
+                        NgayBatDau = new DateTime(2025, 5, 1),
+                        NgayKetThuc = new DateTime(2025, 8, 31)
+                    },
+                    new HocKy
+                    {
+                        TenHocKy = "Học Kỳ 3 - 2025",
+                        NgayBatDau = new DateTime(2025, 9, 1),
+                        NgayKetThuc = new DateTime(2025, 12, 31)
+                    }
+                );
+                await context.SaveChangesAsync();
+            }
+
+
         }
     }
 }
