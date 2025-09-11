@@ -158,6 +158,7 @@ namespace BlueSchoolSystem.Controllers
             var model = new SinhVien
             {
                 GioiTinh = true,
+                NgayNhapHoc = DateTime.Today,
                 User = new ApplicationUser()
             };
             return View(model);
@@ -217,8 +218,14 @@ namespace BlueSchoolSystem.Controllers
 
         private async Task LoadDropdownData()
         {
-            ViewBag.NganhList = new SelectList(await _context.NganhHocs.ToListAsync(), "Id", "TenNganh");
-            ViewBag.TrangThaiList = new SelectList(await _context.TrangThais.ToListAsync(), "Id", "TenTrangThai");
+            ViewBag.NganhList = await _context.NganhHocs.ToListAsync();
+            ViewBag.TrangThaiList = new SelectList(
+                await _context.TrangThais
+                    .Where(tt => tt.LoaiTrangThai == "SinhVien")
+                    .ToListAsync(),
+                "Id",
+                "TenTrangThai"
+            );
             // Nếu cần dropdown lớp thì tùy logic filter ngành đã chọn
         }
 
@@ -340,6 +347,7 @@ namespace BlueSchoolSystem.Controllers
                     .ThenInclude(l => l.Nganh)
                         .ThenInclude(n => n.Khoa)
                 .Include(s => s.User)
+                .Include(tt =>tt.TrangThai)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (sinhVien == null) return NotFound();
