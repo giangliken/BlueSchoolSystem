@@ -251,7 +251,7 @@ namespace BlueSchoolSystem.APIControllers
                                  lhp.GioBatDau,
                                  lhp.GioKetThuc,
                                  lhp.NgayBatDau,
-                                 lhp.NgayKetThuc,
+                                 lhp.NgayKetThuc
                              }).ToListAsync();
 
             if (!tkb.Any())
