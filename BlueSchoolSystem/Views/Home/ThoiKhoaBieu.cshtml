@@ -174,7 +174,8 @@
         .ToList();
 
     // Tháng (có offset)
-    var monthDate = new DateTime(today.Year, today.Month, 1).AddMonths((int)ViewBag.MonthOffset);
+    int monthOffset = ViewBag.MonthOffset != null ? (int)ViewBag.MonthOffset : 0;
+    var monthDate = new DateTime(today.Year, today.Month, 1).AddMonths(monthOffset);
     int month = monthDate.Month;
     int year = monthDate.Year;
     int daysInMonth = DateTime.DaysInMonth(year, month);
@@ -188,7 +189,7 @@
     int selectedMonth = ViewBag.Thang != null ? (int)ViewBag.Thang : month;
 }
 
-<h6 class="mb-3">Trang chủ/Học vụ/Thời khóa biểu</h6>
+<h6 class="mb-3">Trang chủ / Học vụ / Thời khóa biểu</h6>
 
 <div class="d-flex align-items-center gap-2 mb-3">
 
