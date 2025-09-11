@@ -12,8 +12,9 @@
     </div>
     @{
         var lopList = (List<BlueSchoolSystem.Models.ViewModel.LopHocViewModel>)ViewBag.LopList;
+        var khoaList = (List<BlueSchoolSystem.Models.Khoa>)ViewBag.KhoaList;
     }
-    <div class="col-md-4">
+    <div class="col-md-2">
         <select class="form-select class-select" name="maLop">
             <option value="">-- Tất cả các lớp --</option>
             @if (Context.Request.Query["maLop"] == "__null__")
@@ -34,6 +35,27 @@
                 else
                 {
                     <option value="@lop.MaLop">@lop.TenLop</option>
+                }
+            }
+        </select>
+
+
+    </div>
+
+    <div class="col-md-2">
+        <select class="form-select class-select" name="maKhoa">
+            <option value="">-- Tất cả các khoa --</option>
+           
+
+            @foreach (var khoa in khoaList)
+            {
+                if (Context.Request.Query["maKhoa"] == khoa.MaKhoa)
+                {
+                    <option value="@khoa.MaKhoa" selected>@khoa.TenKhoa</option>
+                }
+                else
+                {
+                    <option value="@khoa.MaKhoa">@khoa.TenKhoa</option>
                 }
             }
         </select>

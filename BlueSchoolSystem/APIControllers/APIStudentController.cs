@@ -76,10 +76,12 @@ namespace BlueSchoolSystem.APIControllers
 
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("timkiemsinhvien")]
-        public async Task<IActionResult> FilterStudents(string? keyword, string? maLop, bool? gioiTinh)
+        public async Task<IActionResult> FilterStudents(string? keyword, string? maLop, bool? gioiTinh, string? maKhoa)
         {
             var query = _context.SinhViens
                 .Include(sv => sv.Lop)
+                    .ThenInclude(n => n.Nganh)
+                            .ThenInclude(k => k.Khoa)
                 .Include(tt => tt.TrangThai)
                 .AsQueryable();
 
@@ -91,6 +93,18 @@ namespace BlueSchoolSystem.APIControllers
                     sv.HoVaTenDem.Contains(keyword) ||
                     sv.Ten.Contains(keyword));
             }
+
+            //Lọc theo mã khoa
+            if (!string.IsNullOrEmpty(maKhoa))
+            {
+                query = query.Where(sv =>
+                    sv.Lop != null
+                    && sv.Lop.Nganh != null
+                    && sv.Lop.Nganh.Khoa != null
+                    && sv.Lop.Nganh.Khoa.MaKhoa.ToLower() == maKhoa.ToLower()
+                );
+            }
+
 
             // Lọc theo mã lớp hoặc chưa xếp lớp
             if (!string.IsNullOrEmpty(maLop))

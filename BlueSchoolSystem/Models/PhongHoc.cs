@@ -7,7 +7,6 @@
         public string TenPhongHoc { get; set; } // Tên phòng học
         public int SoChoNgoi { get; set; } // Số chỗ ngồi trong phòng học
         public string? MoTa { get; set; } // Mô tả về phòng học
-        public ICollection<LichHoc> LichHocs { get; set; } // Danh sách lịch học liên kết với phòng học
         
     }
 }

@@ -21,11 +21,13 @@ namespace BlueSchoolSystem.Models
         public DbSet<MonHoc> MonHocs { get; set; } // Bảng môn học
         public DbSet<GiangVien> GiangViens { get; set; } // Bảng giảng viên
         public DbSet<LopHocPhan> LopHocPhans { get; set; } // Bảng lớp học phần
+        public DbSet<LichThi> LichThis { get; set; } // Bảng lịch thi
         public DbSet<ChiTietLopHocPhan> ChiTietLopHocPhans { get; set; } // Bảng chi tiết lớp học phần
         public DbSet<DiemDanh> DiemDanhs { get; set; } // Bảng điểm danh
         public DbSet<PhongHoc> PhongHocs { get; set; } // Bảng phòng học
         public DbSet<BangDiem> BangDiems { get; set; } // Bảng điểm
         public DbSet<DangKyHocPhan> DangKyHocPhans { get; set; } // Bảng đăng ký học phần
+        public DbSet<HocKy> HocKys { get; set; } // Bảng học kỳ
 
         //Table lưu trạng thái của hệ thống
         public DbSet<TrangThai> TrangThais { get; set; } // Bảng trạng thái của hệ thống
@@ -42,6 +44,31 @@ namespace BlueSchoolSystem.Models
                 .HasOne(u => u.GiangViens)
                 .WithOne(gv => gv.User)
                 .HasForeignKey<GiangVien>(gv => gv.UserId);
+
+            builder.Entity<BangDiem>()
+                .HasOne(bd => bd.SinhVien)
+                .WithMany(sv => sv.BangDiems)
+                .HasForeignKey(bd => bd.SinhVienId)
+                .OnDelete(DeleteBehavior.Restrict); // Không cascade
+
+            builder.Entity<BangDiem>()
+                .HasOne(bd => bd.LopHocPhan)
+                .WithMany(lhp => lhp.BangDiems)
+                .HasForeignKey(bd => bd.LopHocPhanId)
+                .OnDelete(DeleteBehavior.Cascade); // Chỉ
+
+            builder.Entity<DiemDanh>()
+                .HasOne(dd => dd.SinhVien)
+                .WithMany(sv => sv.DiemDanhs) // nếu có navigation property, nếu không thì .WithMany()
+                .HasForeignKey(dd => dd.SinhVienId)
+                .OnDelete(DeleteBehavior.Restrict); // hoặc .NoAction
+
+            builder.Entity<DiemDanh>()
+                .HasOne(dd => dd.LopHocPhan)
+                .WithMany(lhp => lhp.DiemDanhs) // nếu có navigation property, nếu không thì .WithMany()
+                .HasForeignKey(dd => dd.LopHocPhanId)
+                .OnDelete(DeleteBehavior.Cascade); // chỉ giữ Cascade ở 1 phía
+
         }
 
 
