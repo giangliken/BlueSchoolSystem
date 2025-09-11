@@ -66,11 +66,12 @@ namespace BlueSchoolSystem.APIControllers
                         where n.MaNganh.ToLower() == maNganh.ToLower()
                         select new
                         {
-                            l.Id,
-                            l.MaLop,
-                            l.TenLop
+                            id = l.Id,             
+                            maLop = l.MaLop,        
+                            tenLop = l.TenLop,
+                            soLuongHienTai = _context.SinhViens.Count(sv => sv.LopId == l.Id),
+                            siSoToiDa = 50,            
                         }).ToList();
-
 
             if (data.Count == 0)
             {
@@ -89,9 +90,8 @@ namespace BlueSchoolSystem.APIControllers
                 tongsoluongloptheonganh = data.Count(),
                 data = data
             });
-
-
         }
+
 
 
         // Lấy thông tin lớp học theo id
