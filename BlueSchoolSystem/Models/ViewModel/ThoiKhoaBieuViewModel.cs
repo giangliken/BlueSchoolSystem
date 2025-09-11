@@ -15,7 +15,5 @@
         public DateTime NgayBatDau { get; set; }
         public DateTime NgayKetThuc { get; set; }
 
-        public DateTime NgayBatDauHocKy { get; set; }
-        public DateTime NgayKetThucHocKy { get; set; }
     }
 }
