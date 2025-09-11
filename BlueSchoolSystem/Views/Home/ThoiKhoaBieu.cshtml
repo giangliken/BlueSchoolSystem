@@ -134,6 +134,34 @@
             opacity: 1;
         }
 
+    #weekSelect {
+        width: 200px;
+        font-size: 14px;
+        padding: 4px;
+    }
+
+        /* Giới hạn khi bấm xổ xuống */
+        #weekSelect option {
+            padding: 4px 6px;
+        }
+
+    #weekSelect {
+        max-height: 6em; /* cao khoảng 4 dòng */
+        overflow-y: auto; /* bật thanh cuộn */
+    }
+
+        /* Nếu muốn hiển thị như danh sách có cuộn */
+        #weekSelect[multiple],
+        #weekSelect[size] {
+            height: 120px; /* 👈 cố định chiều cao */
+            overflow-y: auto; /* 👈 có thanh cuộn dọc */
+        }
+
+    .btn-group .btn,
+    #weekSelect {
+        font-size: 13px;
+        padding: 4px 8px;
+    }
 </style>
 
 
@@ -167,18 +195,17 @@
 
 
 
-    // Giả sử học kỳ bắt đầu từ ngày đầu tiên có môn học
     var ngayBatDauHocKy = Model.Min(x => x.NgayBatDau.Date);
     var ngayKetThucHocKy = Model.Max(x => x.NgayKetThuc.Date);
 
     int soTuan = 0;
-    var weekMap = new Dictionary<DateTime, int>();
+    int currentSoTuan = 0;   // 👈 thêm biến này
+    var weekList = new List<(int SoTuan, DateTime Start, DateTime End)>();
 
     for (var start = ngayBatDauHocKy; start <= ngayKetThucHocKy; start = start.AddDays(7))
     {
         var end = start.AddDays(6);
 
-        // Kiểm tra tuần này có môn không
         bool coMon = Model.Any(x =>
             x.NgayBatDau.Date <= end &&
             x.NgayKetThuc.Date >= start);
@@ -186,34 +213,74 @@
         if (coMon)
         {
             soTuan++;
-            weekMap[start] = soTuan;
-        }
-        else
-        {
-            weekMap[start] = 0; // tuần trống
+
+            // kiểm tra tuần hiện tại (theo ViewBag.WeekOffset)
+            var mondayOfOffset = ngayBatDauHocKy.AddDays((int)ViewBag.WeekOffset * 7);
+            if (mondayOfOffset >= start && mondayOfOffset <= end)
+            {
+                currentSoTuan = soTuan;
+            }
+
+            weekList.Add((soTuan -1, start, end));
         }
     }
 
-    // Lấy số tuần của tuần đang xem
-    int currentSoTuan = 0;
-    if (weekMap.ContainsKey(startOfWeek))
-    {
-        currentSoTuan = weekMap[startOfWeek];
-    }
+    ViewBag.WeekList = weekList;
     ViewBag.SoTuan = currentSoTuan;
 
+
+    // chọn tháng
+    int selectedMonth = ViewBag.Thang != null ? (int)ViewBag.Thang : month;
 }
 
 <h6 class="mb-3">Trang chủ/Học vụ/Thời khóa biểu</h6>
 
-<div class="d-flex justify-content-between mb-2">
-    <div>
-        <button onclick="navigate('prev')">←</button>
-        <button onclick="navigate('today')">Hôm nay</button>
-        <button onclick="navigate('next')">→</button>
-        <span id="currentLabel" style="margin-left:15px; font-weight:bold;"></span>
-    </div>
-    <button id="btnToggle" onclick="toggleView()">Xem lịch tháng</button>
+<div class="d-flex align-items-center gap-2 mb-3">
+
+    <!-- Nút chuyển chế độ -->
+    <button id="btnToggle" class="btn btn-secondary btn-sm" onclick="toggleView()">Xem lịch tháng</button>
+
+    <!-- Nút lùi tuần/tháng -->
+    <button class="btn btn-outline-primary btn-sm" onclick="navigate('prev')">←</button>
+
+    <!-- Combobox chọn tuần -->
+    <select id="weekSelect" onchange="goToWeek(this.value)" class="form-select form-select-sm"
+            style="width: 220px; display:inline-block;">
+        @foreach (var w in (List<(int SoTuan, DateTime Start, DateTime End)>)ViewBag.WeekList)
+        {
+            <option value="@w.SoTuan" selected="@(w.SoTuan == ViewBag.SoTuan)">
+                Tuần @(w.SoTuan + 1) (@w.Start.ToString("dd/MM") - @w.End.ToString("dd/MM"))
+            </option>
+        }
+    </select>
+
+    <!-- Combobox chọn tháng -->
+    <select id="monthSelect" onchange="goToMonth(this.value)" class="form-select form-select-sm"
+            style="width: 160px; display:none;">
+        @for (int m = 1; m <= 12; m++)
+        {
+            if (m == selectedMonth)
+            {
+                <option value="@m" selected>Tháng @m</option>
+            }
+            else
+            {
+                <option value="@m">Tháng @m</option>
+            }
+        }
+    </select>
+
+    <!-- Nút tiến tuần/tháng -->
+    <button class="btn btn-outline-primary btn-sm" onclick="navigate('next')">→</button>
+
+    <!-- Nút Tuần hiện tại -->
+    <button id="btnCurrentWeek" class="btn btn-primary btn-sm" onclick="goToCurrentWeek()">
+        Tuần hiện tại
+    </button>
+    <!-- Nút chuyển về tháng hiện tại -->
+    <button id="btnCurrentMonth" class="btn btn-primary btn-sm" style="display:none;" onclick="goToCurrentMonth()">
+        Tháng hiện tại
+    </button>
 </div>
 
 <!-- Lịch tuần -->
@@ -355,14 +422,46 @@
 </div>
 
 <script>
-            function updateLabel() {
+    // Lấy offset tuần và tháng từ query string
+    const urlParams = new URLSearchParams(window.location.search);
+    let weekOffset = parseInt(urlParams.get("weekOffset") || 0);
+    let monthOffset = parseInt(urlParams.get("monthOffset") || 0);
+
+    function goToWeek(soTuan) {
+        let weekIndex = parseInt(soTuan) - 1;
+        window.location.href = `?weekOffset=${weekIndex}&monthOffset=${monthOffset}&viewMode=week`;
+    }
+
+    function goToCurrentWeek() {
+        // redirect tới tuần hiện tại
+        window.location.href = `?week=@(ViewBag.SoTuanHienTai ?? 1)&viewMode=week`;
+    }
+    // Giá trị tháng đang hiển thị (biến server-side nhúng vào JS)
+    const currentDisplayedMonth = @month;
+
+    function goToMonth(selectedMonth) {
+        // selectedMonth là 1..12 (string) -> chuyển về số
+        const m = parseInt(selectedMonth, 10);
+
+        // delta so với tháng đang hiển thị
+        const delta = m - currentDisplayedMonth;
+
+        // cập nhật monthOffset và điều hướng
+        const newMonthOffset = monthOffset + delta;
+        window.location.href = `?weekOffset=${weekOffset}&monthOffset=${newMonthOffset}&viewMode=month`;
+    }
+        function goToCurrentMonth() {
+        // Reset monthOffset = 0 => quay về tháng hiện tại
+        window.location.href = `?weekOffset=${weekOffset}&monthOffset=0&viewMode=month`;
+    }
+    function updateLabel() {
         var tuan = document.getElementById("lichTuan").style.display !== "none";
         var label = document.getElementById("currentLabel");
 
         if (tuan) {
-            const soTuan = @ViewBag.SoTuan;
+            const soTuan = @(ViewBag.SoTuan ?? 0);
 
-            // Tính lại monday và sunday của tuần hiện tại
+            // Tính monday và sunday theo weekOffset
             const today = new Date();
             const monday = new Date(today);
             monday.setDate(today.getDate() - today.getDay() + 1 + weekOffset * 7);
@@ -375,8 +474,7 @@
                 label.innerText = `Không có môn trong tuần này (${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()})`;
             }
         } else {
-            const today = new Date();
-            const month = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+            const month = new Date(new Date().getFullYear(), new Date().getMonth() + monthOffset, 1);
             const year = month.getFullYear();
             const monthName = month.toLocaleString('default', { month: 'long' });
 
@@ -384,44 +482,39 @@
         }
     }
 
-        window.onload = function() {
-            // Hiển thị view ban đầu
-            var tuan = document.getElementById("lichTuan");
-            var thang = document.getElementById("lichThang");
-            var btn = document.getElementById("btnToggle");
+    function toggleView() {
+        var tuan = document.getElementById("lichTuan");
+    var thang = document.getElementById("lichThang");
+    var btn = document.getElementById("btnToggle");
+    var weekSelect = document.getElementById("weekSelect");
+    var monthSelect = document.getElementById("monthSelect");
+    var btnCurrentWeek = document.getElementById("btnCurrentWeek");
+    var btnCurrentMonth = document.getElementById("btnCurrentMonth");
 
-            if ("@ViewBag.ViewMode" === "month") {
-                tuan.style.display = "none";
-                thang.style.display = "block";
-                btn.innerText = "Xem lịch tuần";
-            }
+    if (tuan.style.display === "none") {
+        // Đang xem tháng -> chuyển sang tuần
+        tuan.style.display = "block";
+        thang.style.display = "none";
+        weekSelect.style.display = "inline-block";
+        monthSelect.style.display = "none";
+        btnCurrentWeek.style.display = "inline-block";
+        btnCurrentMonth.style.display = "none";
+        btn.innerText = "Xem lịch tháng";
+    } else {
+        // Đang xem tuần -> chuyển sang tháng
+        tuan.style.display = "none";
+        thang.style.display = "block";
+        weekSelect.style.display = "none";
+        monthSelect.style.display = "inline-block";
+        btnCurrentWeek.style.display = "none";
+        btnCurrentMonth.style.display = "inline-block";
+        btn.innerText = "Xem lịch tuần";
+    }
 
-            updateLabel();
-        }
+        updateLabel();
+    }
 
-        function toggleView() {
-            var tuan = document.getElementById("lichTuan");
-            var thang = document.getElementById("lichThang");
-            var btn = document.getElementById("btnToggle");
-
-            if (tuan.style.display === "none") {
-                tuan.style.display = "block";
-                thang.style.display = "none";
-                btn.innerText = "Xem lịch tháng";
-            } else {
-                tuan.style.display = "none";
-                thang.style.display = "block";
-                btn.innerText = "Xem lịch tuần";
-            }
-
-            updateLabel();
-        }
-    // offset tuần và tháng lấy từ query string (nếu có)
-    const urlParams = new URLSearchParams(window.location.search);
-    let weekOffset = parseInt(urlParams.get("weekOffset") || 0);
-    let monthOffset = parseInt(urlParams.get("monthOffset") || 0);
-
-        function navigate(action) {
+    function navigate(action) {
         let viewMode = (document.getElementById("lichTuan").style.display !== "none") ? "week" : "month";
 
         if (viewMode === "week") {
@@ -433,6 +526,37 @@
             if (action === "next") monthOffset++;
             if (action === "today") monthOffset = 0;
         }
+
         window.location.href = `?weekOffset=${weekOffset}&monthOffset=${monthOffset}&viewMode=${viewMode}`;
+    }
+
+        window.onload = function () {
+        var tuan = document.getElementById("lichTuan");
+        var thang = document.getElementById("lichThang");
+        var btn = document.getElementById("btnToggle");
+        var weekSelect = document.getElementById("weekSelect");
+        var monthSelect = document.getElementById("monthSelect");
+        var btnCurrentWeek = document.getElementById("btnCurrentWeek");
+        var btnCurrentMonth = document.getElementById("btnCurrentMonth"); // 👈 thêm
+
+        if ("@ViewBag.ViewMode" === "month") {
+            tuan.style.display = "none";
+            thang.style.display = "block";
+            weekSelect.style.display = "none";
+            monthSelect.style.display = "inline-block";
+            btnCurrentWeek.style.display = "none";
+            btnCurrentMonth.style.display = "inline-block"; // 👈 bật lại nút tháng hiện tại
+            btn.innerText = "Xem lịch tuần";
+        } else {
+            tuan.style.display = "block";
+            thang.style.display = "none";
+            weekSelect.style.display = "inline-block";
+            monthSelect.style.display = "none";
+            btnCurrentWeek.style.display = "inline-block";
+            btnCurrentMonth.style.display = "none"; // 👈 ẩn đi khi ở tuần
+            btn.innerText = "Xem lịch tháng";
+        }
+
+        updateLabel();
     }
 </script>

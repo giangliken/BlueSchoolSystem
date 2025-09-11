@@ -224,6 +224,7 @@ namespace BlueSchoolSystem.APIControllers
                              join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
                              join gv in _context.GiangViens on lhp.GiangVienId equals gv.Id
                              join ph in _context.PhongHocs on lhp.PhongHocId equals ph.Id
+                             join hk in _context.HocKys on lhp.HocKyId equals hk.Id
                              where sv.MSSV == mssv
                              orderby lhp.Thu, lhp.GioBatDau
                              select new
@@ -240,6 +241,8 @@ namespace BlueSchoolSystem.APIControllers
                                  lhp.GioKetThuc,
                                  lhp.NgayBatDau,
                                  lhp.NgayKetThuc,
+                                 NgayBatDauHocKy = hk.NgayBatDau,
+                                 NgayKetThucHocKy = hk.NgayKetThuc
                              }).ToListAsync();
 
             if (!tkb.Any())
