@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using CsvHelper;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Globalization;
 using System.Threading.Tasks;
 
 namespace BlueSchoolSystem.Models
@@ -298,6 +300,53 @@ namespace BlueSchoolSystem.Models
                 await context.SaveChangesAsync();
             }
 
+
+            // Load dữ liệu cho Phòng học
+            if (!await context.PhongHocs.AnyAsync())
+            {
+                var path = Path.Combine(Directory.GetCurrentDirectory(), "DATA", "BoSungPhongHoc.csv");
+                using (var reader = new StreamReader(path))
+                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                {
+                    var records = csv.GetRecords<PhongHoc>().ToList();
+
+                    context.Database.OpenConnection();
+                    try
+                    {
+                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT PhongHocs ON");
+                        context.PhongHocs.AddRange(records);
+                        await context.SaveChangesAsync();
+                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT PhongHocs OFF");
+                    }
+                    finally
+                    {
+                        context.Database.CloseConnection();
+                    }
+                }
+            }
+
+            //Load dữ liệu cho Môn học
+            if (!await context.MonHocs.AnyAsync())
+            {
+                var path = Path.Combine(Directory.GetCurrentDirectory(), "DATA", "MonHocs_202508281440.csv");
+                using (var reader = new StreamReader(path))
+                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                {
+                    var records = csv.GetRecords<MonHoc>().ToList();
+                    context.Database.OpenConnection();
+                    try
+                    {
+                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT MonHocs ON");
+                        context.MonHocs.AddRange(records);
+                        await context.SaveChangesAsync();
+                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT MonHocs OFF");
+                    }
+                    finally
+                    {
+                        context.Database.CloseConnection();
+                    }
+                }
+            }
 
         }
     }

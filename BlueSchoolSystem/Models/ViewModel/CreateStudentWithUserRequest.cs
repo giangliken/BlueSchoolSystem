@@ -1,4 +1,6 @@
-﻿namespace BlueSchoolSystem.Models.ViewModel
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace BlueSchoolSystem.Models.ViewModel
 {
     public class CreateStudentWithUserRequest
     {
