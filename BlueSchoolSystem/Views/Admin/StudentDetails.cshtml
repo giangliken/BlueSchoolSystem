@@ -56,7 +56,7 @@
 
                         <li class="list-group-item"><strong>Ngày nhập học:</strong> @Model.NgayNhapHoc.ToString("dd/MM/yyyy")</li>
                         <li class="list-group-item"><strong>Ngày tốt nghiệp:</strong> @Model.NgayTotNghiep.ToString("dd/MM/yyyy")</li>
-                        <li class="list-group-item"><strong>Trạng thái:</strong> @Model.TrangThai</li>
+                        <li class="list-group-item"><strong>Trạng thái:</strong> @Model.TrangThai?.TenTrangThai</li>
                         <li class="list-group-item"><strong>Ghi chú:</strong> @Model.GhiChu</li>
                         <li class="list-group-item"><strong>Tài khoản:</strong> @Model.User?.UserName</li>
                         <li class="list-group-item"><strong>Ngày tạo:</strong> @Model.CreatedAt.ToString("HH:mm dd/MM/yyyy")</li>
