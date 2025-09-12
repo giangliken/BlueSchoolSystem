@@ -2,7 +2,8 @@
 
 @{
     ViewData["Title"] = "StudentManager";
-   
+    var token = Context.Session.GetString("access_token");
+
 }
 
 
@@ -14,8 +15,30 @@
         var lopList = (List<BlueSchoolSystem.Models.ViewModel.LopHocViewModel>)ViewBag.LopList;
         var khoaList = (List<BlueSchoolSystem.Models.Khoa>)ViewBag.KhoaList;
     }
+    
+
     <div class="col-md-2">
-        <select class="form-select class-select" name="maLop">
+        <select class="form-select class-select" id="KhoaSelect" name="maKhoa">
+            <option value="">-- Tất cả các khoa --</option>
+           
+
+            @foreach (var khoa in khoaList)
+            {
+                if (Context.Request.Query["maKhoa"] == khoa.MaKhoa)
+                {
+                    <option value="@khoa.MaKhoa" selected>@khoa.TenKhoa</option>
+                }
+                else
+                {
+                    <option value="@khoa.MaKhoa">@khoa.TenKhoa</option>
+                }
+            }
+        </select>
+
+
+    </div>
+    <div class="col-md-2">
+        <select class="form-select class-select" id="LopSelect" name="maLop">
             <option value="">-- Tất cả các lớp --</option>
             @if (Context.Request.Query["maLop"] == "__null__")
             {
@@ -41,28 +64,6 @@
 
 
     </div>
-
-    <div class="col-md-2">
-        <select class="form-select class-select" name="maKhoa">
-            <option value="">-- Tất cả các khoa --</option>
-           
-
-            @foreach (var khoa in khoaList)
-            {
-                if (Context.Request.Query["maKhoa"] == khoa.MaKhoa)
-                {
-                    <option value="@khoa.MaKhoa" selected>@khoa.TenKhoa</option>
-                }
-                else
-                {
-                    <option value="@khoa.MaKhoa">@khoa.TenKhoa</option>
-                }
-            }
-        </select>
-
-
-    </div>
-
 
     <div class="col-md-4">
         <button type="submit" class="btn btn-info me-2">
@@ -135,14 +136,49 @@
 
 @section Scripts {
     <script>
+        window.__accessToken = @Html.Raw(Json.Serialize(token));
+    </script>
+
+    <script>
         $(document).ready(function() {
-            $('.class-select').select2({
-                placeholder: "Chọn hoặc tìm lớp...",
-                allowClear: true,
-                width: '100%'
-            });
+                    $('#KhoaSelect').on('change', function () {
+            let maKhoa = $(this).val();
+            var token = window.__accessToken;
+            let options;
+            if (!maKhoa) {
+                // Nếu KHÔNG chọn khoa, vẫn show option "Chưa xếp lớp"
+                options = '<option value="">-- Tất cả các lớp --</option><option value="__null__">Chưa xếp lớp</option>';
+                // Gọi API hoặc render lại full danh sách lớp (tùy backend bạn support)
+                // Hoặc bạn có thể reload trang, hoặc giữ nguyên list cũ
+                $('#LopSelect').html(options).trigger('change.select2');
+            } else {
+                // Nếu đã chọn khoa, KHÔNG show "Chưa xếp lớp"
+                options = '<option value="">-- Tất cả các lớp --</option>';
+                $.ajax({
+                    url: `/api/laydanhsachlophoctheokhoa?maKhoa=${maKhoa}`,
+                    type: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    },
+                    success: function (res) {
+                        if (res.data) {
+                            res.data.forEach(function (lop) {
+                                options += `<option value="${lop.maLop}">${lop.tenLop}</option>`;
+                            });
+                        }
+                        $('#LopSelect').html(options).trigger('change.select2');
+                    },
+                    error: function () {
+                        alert("Hiện không có lớp nào thuộc khoa này");
+                    }
+                });
+            }
+        });
+
         });
     </script>
 }
+
+
 
 

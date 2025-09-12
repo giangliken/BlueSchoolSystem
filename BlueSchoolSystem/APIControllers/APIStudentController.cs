@@ -115,9 +115,16 @@ namespace BlueSchoolSystem.APIControllers
                 }
                 else
                 {
-                    query = query.Where(sv => sv.Lop != null && sv.Lop.MaLop == maLop);
+                    // Hỗ trợ truyền nhiều mã lớp, ví dụ: "22DTHG1,22DTHG2,22DTHG3"
+                    var arrMaLop = maLop
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(x => x.Trim())
+                        .ToList();
+
+                    query = query.Where(sv => sv.Lop != null && arrMaLop.Contains(sv.Lop.MaLop));
                 }
             }
+
 
             // Lọc theo giới tính
             if (gioiTinh.HasValue)
@@ -166,9 +173,30 @@ namespace BlueSchoolSystem.APIControllers
             student.UserId = user.Id;
             student.CreatedAt = DateTime.Now;
             student.UpdatedAt = DateTime.Now;
+
+            //Nếu LopId = 0 thì tự động xếp lớp
             if (request.Student.LopId == 0)
             {
-                student.LopId = request.Student.LopId;
+                // Tìm lớp còn trống đúng ngành (ưu tiên ít người nhất)
+
+                var lopTrong = _context.LopHocs
+                    .Where(l => l.Nganh.MaNganh == request.NganhHocId)
+                    .Select(l => new
+                    {
+                        Lop = l,
+                        SoLuongHienTai = _context.SinhViens.Count(sv => sv.LopId == l.Id)
+                    })
+                    .Where(x => x.SoLuongHienTai < 50) // Sĩ số tối đa = 50
+                    .FirstOrDefault();
+
+                if (lopTrong == null)
+                {
+                    return BadRequest("Không còn lớp nào trống thuộc ngành này! Vui lòng tạo lớp mới.");
+                }
+
+                // Gán vào lớp tìm được
+                student.LopId = lopTrong.Lop.Id;
+
             }
             else if (request.Student.LopId == null)
             {
@@ -176,8 +204,16 @@ namespace BlueSchoolSystem.APIControllers
             }
             else
             {
-                student.LopId = request.Student.LopId;
+                // Check lớp tự chọn có đủ chỗ không
+                var lop = await _context.LopHocs.FindAsync(request.Student.LopId);
+                if (lop == null)
+                    return BadRequest("Lớp không tồn tại!");
 
+                var soLuong = _context.SinhViens.Count(sv => sv.LopId == lop.Id);
+                if (soLuong >= 50)
+                    return BadRequest("Lớp đã đủ sĩ số!");
+
+                student.LopId = request.Student.LopId;
             }
             // 3. Lưu vào DB
             _context.SinhViens.Add(student);

@@ -50,7 +50,7 @@ namespace BlueSchoolSystem.Controllers
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
 
-            //Lấy token
+            // Lấy token
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
             {
@@ -59,41 +59,32 @@ namespace BlueSchoolSystem.Controllers
 
             // Lấy danh sách lớp để đổ vào dropdown
             var classResponse = await client.GetAsync("api/laydanhsachlophoc");
+            List<LopHocViewModel> lopList;
             if (classResponse.IsSuccessStatusCode)
             {
                 var classJson = await classResponse.Content.ReadAsStringAsync();
                 using var classDoc = JsonDocument.Parse(classJson);
 
-                // Lấy ra property "data" là 1 JsonElement
                 var classData = classDoc.RootElement.GetProperty("data");
-
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true // Không phân biệt hoa thường
-                };
-
-                var lopList = JsonSerializer.Deserialize<List<LopHocViewModel>>(classData.GetRawText(), options);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                lopList = JsonSerializer.Deserialize<List<LopHocViewModel>>(classData.GetRawText(), options);
                 ViewBag.LopList = lopList;
-
             }
             else
             {
-                ViewBag.LopList = new List<LopHocViewModel>();
+                lopList = new List<LopHocViewModel>();
+                ViewBag.LopList = lopList;
             }
 
-
-            //Lấy danh sách khoa để đổ vào dropdown
+            // Lấy danh sách khoa để đổ vào dropdown
             var facultyResponse = await client.GetAsync("api/laydanhsachkhoa");
             if (facultyResponse.IsSuccessStatusCode)
             {
                 var facultyJson = await facultyResponse.Content.ReadAsStringAsync();
                 using var facultyDoc = JsonDocument.Parse(facultyJson);
-                // Lấy ra property "data" là 1 JsonElement
+
                 var facultyData = facultyDoc.RootElement.GetProperty("data");
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true // Không phân biệt hoa thường
-                };
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 var khoaList = JsonSerializer.Deserialize<List<Khoa>>(facultyData.GetRawText(), options);
                 ViewBag.KhoaList = khoaList;
             }
@@ -102,34 +93,56 @@ namespace BlueSchoolSystem.Controllers
                 ViewBag.KhoaList = new List<Khoa>();
             }
 
+            // --- Build query filter sinh viên ---
+            string malopQuery = "";
+
+            if (!string.IsNullOrEmpty(maLop))
+            {
+                // Nếu có chọn lớp
+                malopQuery = maLop;
+            }
+            else if (!string.IsNullOrEmpty(maKhoa))
+            {
+                var lopTheoKhoa = _context.LopHocs
+                    .Where(l => l.Nganh != null &&
+                                l.Nganh.Khoa != null &&
+                                l.Nganh.Khoa.MaKhoa == maKhoa)
+                    .Select(l => l.MaLop) // Chỉ lấy MaLop thôi!
+                    .ToList();
+
+                if (lopTheoKhoa.Any())
+                    malopQuery = string.Join(",", lopTheoKhoa); // Đúng chuẩn
+            }
+
 
             HttpResponseMessage response;
+            var url = "api/timkiemsinhvien?";
 
-            var url = "";
-            if (!string.IsNullOrEmpty(keyword) || ! string.IsNullOrEmpty(maLop))
-            {
-                url = "api/timkiemsinhvien?";
-                if (!string.IsNullOrEmpty(keyword))
-                    url += "keyword=" + Uri.EscapeDataString(keyword) + "&";
-                if (!string.IsNullOrEmpty(maLop))
-                    url += "malop=" + Uri.EscapeDataString(maLop) + "&";
-                if (!string.IsNullOrEmpty(maKhoa))
-                    url += "maKhoa=" + Uri.EscapeDataString(maKhoa) + "&";
-                // Xoá dấu & thừa cuối nếu có nhé, hoặc dùng query builder đẹp hơn.
-                response = await client.GetAsync(url);
-            }
-            else
+            if (!string.IsNullOrEmpty(keyword))
+                url += "keyword=" + Uri.EscapeDataString(keyword) + "&";
+
+            if (!string.IsNullOrEmpty(malopQuery))
+                url += "malop=" + Uri.EscapeDataString(malopQuery) + "&";
+
+            if (!string.IsNullOrEmpty(maKhoa))
+                url += "maKhoa=" + Uri.EscapeDataString(maKhoa) + "&";
+
+            // Nếu không có filter nào thì lấy tất cả sinh viên
+            if (string.IsNullOrEmpty(keyword) && string.IsNullOrEmpty(maLop) && string.IsNullOrEmpty(maKhoa))
             {
                 response = await client.GetAsync("api/laydanhsachsinhvien");
             }
-
+            else
+            {
+                response = await client.GetAsync(url.TrimEnd('&'));
+            }
 
             if (!response.IsSuccessStatusCode)
             {
                 ViewBag.Error = "Không thể lấy danh sách sinh viên.";
                 return View(new List<SinhVien>());
             }
-             
+
             var body = await response.Content.ReadAsStringAsync();
             using var document = JsonDocument.Parse(body);
             var root = document.RootElement;
@@ -147,9 +160,12 @@ namespace BlueSchoolSystem.Controllers
 
             // Truyền lại input
             ViewBag.Keyword = keyword;
+            ViewBag.MaKhoa = maKhoa;
+            ViewBag.MaLop = maLop;
 
             return View(students ?? new List<SinhVien>());
         }
+
 
         //Thêm sinh viên theo cách thủ công
         public async Task<IActionResult> AddStudent()
@@ -168,6 +184,9 @@ namespace BlueSchoolSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddStudent(SinhVien model)
         {
+            // Lấy ngành từ form
+            var nganhHocId = Request.Form["NganhHocId"].ToString();
+
             if (!ModelState.IsValid)
             {
                 var errors = ModelState.Values.SelectMany(v => v.Errors);
@@ -182,6 +201,7 @@ namespace BlueSchoolSystem.Controllers
                 UserName = model.MSSV,
                 Email = model.User.Email,
                 PhoneNumber = model.User.PhoneNumber,
+                NganhHocId = nganhHocId,
                 Password = "Abc@123", 
                 Student = model 
             };
@@ -229,7 +249,6 @@ namespace BlueSchoolSystem.Controllers
             // Nếu cần dropdown lớp thì tùy logic filter ngành đã chọn
         }
 
-
         //Nhập danh sach sinh viên từ file Excel
         [HttpGet]
         public IActionResult ImportStudentListFromExcel()
@@ -256,20 +275,10 @@ namespace BlueSchoolSystem.Controllers
                 {
                     var worksheet = package.Workbook.Worksheets[0];
                     int rowCount = worksheet.Dimension.Rows;
-                    // Lấy tất cả trạng thái áp dụng cho sinh viên và mapping Tên => Id
-                    var trangThaiDict = _context.TrangThais
-                        .Where(x => x.LoaiTrangThai == "SinhVien")
-                        .ToDictionary(x => x.TenTrangThai.Trim(), x => x.Id);
+                   
 
                     for (int row = 2; row <= rowCount; row++)
                     {
-                        var tenTrangThai = worksheet.Cells[row, 12].Text.Trim();
-                        int? trangThaiId = null;
-                        if (!string.IsNullOrEmpty(tenTrangThai) && trangThaiDict.TryGetValue(tenTrangThai, out int id))
-                            trangThaiId = id;
-                        else
-                            trangThaiId = trangThaiDict.ContainsKey("Đang học") ? trangThaiDict["Đang học"] : (int?)null;
-
                         var sv = new SinhVien
                         {
                             MSSV = worksheet.Cells[row, 1].Text.Trim(),
@@ -277,12 +286,12 @@ namespace BlueSchoolSystem.Controllers
                             HoVaTenDem = worksheet.Cells[row, 3].Text.Trim(),
                             Ten = worksheet.Cells[row, 4].Text.Trim(),
                             NgaySinh = ParseExcelDate(worksheet.Cells[row, 5].Value),
-                            GioiTinh = worksheet.Cells[row, 6].Text.Trim().ToLower() == "nam",
+                            GioiTinh = worksheet.Cells[row, 6].Text.Trim().ToUpper() == "NAM",
                             DiaChi = worksheet.Cells[row, 9].Text.Trim(),
                             NgayNhapHoc = ParseExcelDate(worksheet.Cells[row, 10].Value),
                             NgayTotNghiep = ParseExcelDate(worksheet.Cells[row, 11].Value),
-                            TrangThaiId = (int)trangThaiId,
-                            GhiChu = worksheet.Cells[row, 13].Text.Trim(),
+                            TrangThaiId = 2, 
+                            GhiChu = worksheet.Cells[row, 12].Value?.ToString()?.Trim() ?? "",
                             User = new ApplicationUser
                             {
                                 Email = worksheet.Cells[row, 8].Text.Trim(),
@@ -293,6 +302,9 @@ namespace BlueSchoolSystem.Controllers
                         students.Add(sv);
                     }
 
+
+
+
                 }
             }
 
@@ -302,6 +314,7 @@ namespace BlueSchoolSystem.Controllers
             var token = HttpContext.Session.GetString("access_token");
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
+            var errors = new List<string>();
             int successCount = 0;
             foreach (var sv in students)
             {
@@ -317,10 +330,19 @@ namespace BlueSchoolSystem.Controllers
                 var json = JsonConvert.SerializeObject(apiRequest);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var response = await httpClient.PostAsync(apiUrl, content);
-                if (response.IsSuccessStatusCode) successCount++;
-            }
 
+                if (response.IsSuccessStatusCode)
+                    successCount++;
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    errors.Add($"{sv.MSSV}: {apiError}");
+                }
+            }
             TempData["Success"] = $"Nhập thành công {successCount}/{students.Count} sinh viên!";
+            if (errors.Count > 0)
+                TempData["Error"] = "Lỗi import:<br>" + string.Join("<br>", errors);
+
             return RedirectToAction("StudentManager");
         }
 
@@ -333,9 +355,6 @@ namespace BlueSchoolSystem.Controllers
                 return dt;
             return DateTime.MinValue;
         }
-
-
-
 
         //Xem thông tin chi tiết sinh viên
         public async Task<IActionResult> StudentDetails(int? id)

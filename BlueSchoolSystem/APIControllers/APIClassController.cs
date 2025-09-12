@@ -93,6 +93,44 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
+        // Lấy danh sách lớp học theo mã khoa
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpGet("laydanhsachlophoctheokhoa")]
+        public IActionResult GetLopByKhoa(string maKhoa)
+        {
+            // Join LopHocs -> NganhHocs -> Khoas để filter đúng khoa
+            var data = (from l in _context.LopHocs
+                        join n in _context.NganhHocs on l.NganhId equals n.Id
+                        join k in _context.Khoas on n.KhoaId equals k.Id
+                        where k.MaKhoa.ToLower() == maKhoa.ToLower()
+                        select new
+                        {
+                            id = l.Id,
+                            maLop = l.MaLop,
+                            tenLop = l.TenLop,
+                            soLuongHienTai = _context.SinhViens.Count(sv => sv.LopId == l.Id),
+                            siSoToiDa = 50 // hoặc l.SiSoToiDa nếu bạn có field này
+                        }).ToList();
+
+            if (data.Count == 0)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy lớp học nào cho mã khoa đã cho"
+                });
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                tongsoluongloptheokhoa = data.Count(),
+                data = data
+            });
+        }
+
 
         // Lấy thông tin lớp học theo id
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]

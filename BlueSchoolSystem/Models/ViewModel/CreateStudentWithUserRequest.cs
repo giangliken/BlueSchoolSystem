@@ -8,6 +8,8 @@ namespace BlueSchoolSystem.Models.ViewModel
         public string Email { get; set; }
         public string PhoneNumber { get; set; }
         public string Password { get; set; }
+
+        public string? NganhHocId { get; set; } 
         public SinhVien? Student { get; set; } // Model sinh viên bên bạn đã có
     }
 }
