@@ -103,9 +103,55 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Giao diện Lịch thi
-        public IActionResult LichThi()
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> LichThi()
         {
-            return View();
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            // Lấy token từ Session
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            // Lấy MSSV từ Claim
+            var mssv = User.Identity?.Name ??
+                       User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                       User.Identity?.Name;
+
+            if (string.IsNullOrEmpty(mssv))
+            {
+                ViewBag.Error = "Không xác định được MSSV của người dùng.";
+                return View(new List<LichThiViewModel>());
+            }
+
+            // Gọi API lịch thi
+            var response = await client.GetAsync($"api/lichthisinhvien/{mssv}");
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không thể lấy lịch thi từ API.";
+                return View(new List<LichThiViewModel>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("data", out var dataElement))
+            {
+                ViewBag.Error = "Không tìm thấy dữ liệu lịch thi.";
+                return View(new List<LichThiViewModel>());
+            }
+
+            var lichThi = JsonSerializer.Deserialize<List<LichThiViewModel>>(
+                dataElement.ToString(),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
+
+            return View(lichThi ?? new List<LichThiViewModel>());
         }
         //Giao diện Xem điểm
         public IActionResult XemDiem()

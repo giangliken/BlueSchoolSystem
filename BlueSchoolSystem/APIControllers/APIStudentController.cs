@@ -310,6 +310,55 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+        // Lấy danh sách lịch thi theo MSSV
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
+        [HttpGet("lichthisinhvien/{mssv}")]
+        public async Task<IActionResult> GetLichThiByMSSV(string mssv)
+        {
+            var lichThi = await (from dk in _context.ChiTietLopHocPhans
+                                 join lhp in _context.LopHocPhans on dk.LopHocPhanId equals lhp.Id
+                                 join sv in _context.SinhViens on dk.SinhVienId equals sv.Id
+                                 join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                                 join hk in _context.HocKys on lhp.HocKyId equals hk.Id
+                                 join lt in _context.LichThis on lhp.Id equals lt.LopHocPhanId
+                                 join ph in _context.PhongHocs on lt.PhongHocId equals ph.Id
+                                 where sv.MSSV == mssv
+                                 orderby lt.NgayThi, lt.GioBatDau
+                                 select new
+                                 {
+                                     sv.MSSV,
+                                     hk.TenHocKy,
+                                     mh.MaMonHoc,
+                                     mh.TenMonHoc,
+                                     lhp.MaLopHocPhan,
+                                     lhp.TenLopHocPhan,
+                                     lt.NgayThi,
+                                     GioBatDauThi = lt.GioBatDau,
+                                     GioKetThucThi = lt.GioKetThuc,
+                                     ph.MaPhongHoc,
+                                     lt.HinhThucThi
+                                 }).ToListAsync();
+
+            if (!lichThi.Any())
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy lịch thi cho MSSV này"
+                });
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy lịch thi thành công",
+                soluong = lichThi.Count,
+                data = lichThi
+            });
+        }
+
 
     }
 }
