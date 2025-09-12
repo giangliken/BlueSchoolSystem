@@ -14,12 +14,10 @@ namespace BlueSchoolSystem.Models
 
         [Required(ErrorMessage = "Họ và tên đệm là bắt buộc")]
         [StringLength(50, MinimumLength = 5, ErrorMessage = "Họ và tên đệm phải ít nhất 5 ký tự và tối đa 50 ký tự")]
-        [RegularExpression(@"^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềềểếỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸỳỵỷỹ\s]+$",ErrorMessage = "Họ và tên đệm chỉ được chứa chữ cái và dấu cách")]
         public string HoVaTenDem { get; set; }
 
         [Required(ErrorMessage = "Tên là bắt buộc")]
         [StringLength(20, MinimumLength = 1, ErrorMessage = "Tên phải từ 1 đến 20 ký tự")]
-        [RegularExpression(@"^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềềểếỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸỳỵỷỹ\s]+$", ErrorMessage = "Tên chỉ được chứa chữ cái và dấu cách")]
         public string Ten { get; set; } // Tên
 
         [Required(ErrorMessage = "CCCD là bắt buộc")]
