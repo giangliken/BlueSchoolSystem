@@ -56,6 +56,12 @@
     </div>
 }
 
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@Html.Raw(TempData["Error"])</div>
+}
+
+
 <div class="container mt-4">
     <div class="card shadow-lg border-0 rounded-3">
         <div class="card-body">
