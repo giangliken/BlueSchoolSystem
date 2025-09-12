@@ -256,20 +256,10 @@ namespace BlueSchoolSystem.Controllers
                 {
                     var worksheet = package.Workbook.Worksheets[0];
                     int rowCount = worksheet.Dimension.Rows;
-                    // Lấy tất cả trạng thái áp dụng cho sinh viên và mapping Tên => Id
-                    var trangThaiDict = _context.TrangThais
-                        .Where(x => x.LoaiTrangThai == "SinhVien")
-                        .ToDictionary(x => x.TenTrangThai.Trim(), x => x.Id);
+                   
 
                     for (int row = 2; row <= rowCount; row++)
                     {
-                        var tenTrangThai = worksheet.Cells[row, 12].Text.Trim();
-                        int? trangThaiId = null;
-                        if (!string.IsNullOrEmpty(tenTrangThai) && trangThaiDict.TryGetValue(tenTrangThai, out int id))
-                            trangThaiId = id;
-                        else
-                            trangThaiId = trangThaiDict.ContainsKey("Đang học") ? trangThaiDict["Đang học"] : (int?)null;
-
                         var sv = new SinhVien
                         {
                             MSSV = worksheet.Cells[row, 1].Text.Trim(),
@@ -277,12 +267,12 @@ namespace BlueSchoolSystem.Controllers
                             HoVaTenDem = worksheet.Cells[row, 3].Text.Trim(),
                             Ten = worksheet.Cells[row, 4].Text.Trim(),
                             NgaySinh = ParseExcelDate(worksheet.Cells[row, 5].Value),
-                            GioiTinh = worksheet.Cells[row, 6].Text.Trim().ToLower() == "nam",
+                            GioiTinh = worksheet.Cells[row, 6].Text.Trim().ToUpper() == "NAM",
                             DiaChi = worksheet.Cells[row, 9].Text.Trim(),
                             NgayNhapHoc = ParseExcelDate(worksheet.Cells[row, 10].Value),
                             NgayTotNghiep = ParseExcelDate(worksheet.Cells[row, 11].Value),
-                            TrangThaiId = (int)trangThaiId,
-                            GhiChu = worksheet.Cells[row, 13].Text.Trim(),
+                            TrangThaiId = 2, 
+                            GhiChu = worksheet.Cells[row, 12].Value?.ToString()?.Trim() ?? "",
                             User = new ApplicationUser
                             {
                                 Email = worksheet.Cells[row, 8].Text.Trim(),
@@ -293,6 +283,9 @@ namespace BlueSchoolSystem.Controllers
                         students.Add(sv);
                     }
 
+
+
+
                 }
             }
 
@@ -302,6 +295,7 @@ namespace BlueSchoolSystem.Controllers
             var token = HttpContext.Session.GetString("access_token");
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
+            var errors = new List<string>();
             int successCount = 0;
             foreach (var sv in students)
             {
@@ -317,10 +311,19 @@ namespace BlueSchoolSystem.Controllers
                 var json = JsonConvert.SerializeObject(apiRequest);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var response = await httpClient.PostAsync(apiUrl, content);
-                if (response.IsSuccessStatusCode) successCount++;
-            }
 
+                if (response.IsSuccessStatusCode)
+                    successCount++;
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    errors.Add($"{sv.MSSV}: {apiError}");
+                }
+            }
             TempData["Success"] = $"Nhập thành công {successCount}/{students.Count} sinh viên!";
+            if (errors.Count > 0)
+                TempData["Error"] = "Lỗi import:<br>" + string.Join("<br>", errors);
+
             return RedirectToAction("StudentManager");
         }
 
