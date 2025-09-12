@@ -166,19 +166,19 @@ namespace BlueSchoolSystem.APIControllers
             student.UserId = user.Id;
             student.CreatedAt = DateTime.Now;
             student.UpdatedAt = DateTime.Now;
-            if (request.Student.LopId == 0)
-            {
-                student.LopId = request.Student.LopId;
-            }
-            else if (request.Student.LopId == null)
-            {
-                student.LopId = null;
-            }
-            else
-            {
-                student.LopId = request.Student.LopId;
+            //if (request.Student.LopId == 0)
+            //{
+            //    student.LopId = request.Student.LopId;
+            //}
+            //else if (request.Student.LopId == null)
+            //{
+            //    student.LopId = null;
+            //}
+            //else
+            //{
+            //    student.LopId = request.Student.LopId;
 
-            }
+            //}
             // 3. Lưu vào DB
             _context.SinhViens.Add(student);
             await _context.SaveChangesAsync();
