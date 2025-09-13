@@ -13,6 +13,7 @@
         public TimeSpan GioKetThucThi { get; set; }
         public string MaPhongHoc { get; set; }
         public string HinhThucThi { get; set; }
+        public string TinhTrangLichThi { get; set; }
         // Tính số phút tự động
         public int SoPhut
         {

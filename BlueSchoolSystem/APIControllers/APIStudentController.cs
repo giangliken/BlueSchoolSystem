@@ -321,6 +321,11 @@ namespace BlueSchoolSystem.APIControllers
                                  join hk in _context.HocKys on lhp.HocKyId equals hk.Id
                                  join lt in _context.LichThis on lhp.Id equals lt.LopHocPhanId
                                  join ph in _context.PhongHocs on lt.PhongHocId equals ph.Id
+
+                                 // LEFT JOIN với TrangThai
+                                 join tt in _context.TrangThais on lt.TrangThaiId equals tt.Id into trangThaiGroup
+                                 from tt in trangThaiGroup.DefaultIfEmpty()
+
                                  where sv.MSSV == mssv
                                  orderby lt.NgayThi, lt.GioBatDau
                                  select new
@@ -335,7 +340,8 @@ namespace BlueSchoolSystem.APIControllers
                                      GioBatDauThi = lt.GioBatDau,
                                      GioKetThucThi = lt.GioKetThuc,
                                      ph.MaPhongHoc,
-                                     lt.HinhThucThi
+                                     lt.HinhThucThi,
+                                     TinhTrangLichThi = tt.TenTrangThai 
                                  }).ToListAsync();
 
             if (!lichThi.Any())
