@@ -45,7 +45,7 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Trang quản lý sinh viên
-        public async Task<IActionResult> StudentManager(string? keyword, string? maLop, string? maKhoa)
+        public async Task<IActionResult> StudentManager(string? keyword, string? maLop, string? maKhoa, string? nienKhoa)
         {
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
@@ -93,42 +93,48 @@ namespace BlueSchoolSystem.Controllers
                 ViewBag.KhoaList = new List<Khoa>();
             }
 
-            // --- Build query filter sinh viên ---
-            string malopQuery = "";
+            //Lấy sách danh niên khóa để đổ vào dropdown
+            var nienKhoaList = await _context.SinhViens
+                .Select(sv => sv.NgayNhapHoc.Year)
+                .Distinct()
+                .OrderByDescending(year => year)
+                .ToListAsync();
 
-            if (!string.IsNullOrEmpty(maLop))
+            ViewBag.ListNienKhoa = nienKhoaList;
+            ViewBag.NienKhoa = nienKhoa;
+
+            string malopQuery = maLop;
+
+            if (string.IsNullOrEmpty(maLop) && !string.IsNullOrEmpty(maKhoa))
             {
-                // Nếu có chọn lớp
-                malopQuery = maLop;
-            }
-            else if (!string.IsNullOrEmpty(maKhoa))
-            {
-                var lopTheoKhoa = _context.LopHocs
-                    .Where(l => l.Nganh != null &&
-                                l.Nganh.Khoa != null &&
-                                l.Nganh.Khoa.MaKhoa == maKhoa)
-                    .Select(l => l.MaLop) // Chỉ lấy MaLop thôi!
-                    .ToList();
-
-                if (lopTheoKhoa.Any())
-                    malopQuery = string.Join(",", lopTheoKhoa); // Đúng chuẩn
+                // Nếu chỉ chọn khoa, tự động fill malopQuery = tất cả mã lớp thuộc khoa đó
+                malopQuery = string.Join(",", _context.LopHocs
+                    .Where(l => l.Nganh != null && l.Nganh.Khoa != null && l.Nganh.Khoa.MaKhoa == maKhoa)
+                    .Select(l => l.MaLop)
+                    .ToList());
             }
 
-
-            HttpResponseMessage response;
             var url = "api/timkiemsinhvien?";
+
 
             if (!string.IsNullOrEmpty(keyword))
                 url += "keyword=" + Uri.EscapeDataString(keyword) + "&";
-
             if (!string.IsNullOrEmpty(malopQuery))
-                url += "malop=" + Uri.EscapeDataString(malopQuery) + "&";
-
+                url += "maLop=" + Uri.EscapeDataString(malopQuery) + "&";
             if (!string.IsNullOrEmpty(maKhoa))
                 url += "maKhoa=" + Uri.EscapeDataString(maKhoa) + "&";
+            if (!string.IsNullOrEmpty(nienKhoa))
+                url += "nienKhoa=" + Uri.EscapeDataString(nienKhoa) + "&";
+
+            // In ra để debug thử URL thực sự gọi API:
+            Console.WriteLine("API URL: " + url);
+
+
+
+            HttpResponseMessage response;
 
             // Nếu không có filter nào thì lấy tất cả sinh viên
-            if (string.IsNullOrEmpty(keyword) && string.IsNullOrEmpty(maLop) && string.IsNullOrEmpty(maKhoa))
+            if (string.IsNullOrEmpty(keyword) && string.IsNullOrEmpty(maLop) && string.IsNullOrEmpty(maKhoa) && string.IsNullOrEmpty(nienKhoa))
             {
                 response = await client.GetAsync("api/laydanhsachsinhvien");
             }
@@ -162,6 +168,7 @@ namespace BlueSchoolSystem.Controllers
             ViewBag.Keyword = keyword;
             ViewBag.MaKhoa = maKhoa;
             ViewBag.MaLop = maLop;
+            ViewBag.NienKhoa = nienKhoa;
 
             return View(students ?? new List<SinhVien>());
         }
