@@ -76,17 +76,16 @@ namespace BlueSchoolSystem.APIControllers
 
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("timkiemsinhvien")]
-        public async Task<IActionResult> FilterStudents(string? keyword, string? maLop, bool? gioiTinh, string? maKhoa)
+        public async Task<IActionResult> FilterStudents(string? keyword, string? maLop, bool? gioiTinh, string? maKhoa, string? nienKhoa)
         {
             var query = _context.SinhViens
                 .Include(sv => sv.Lop)
-                    .ThenInclude(n => n.Nganh)
-                            .ThenInclude(k => k.Khoa)
-                .Include(tt => tt.TrangThai)
+                    .ThenInclude(l => l.Nganh)
+                        .ThenInclude(n => n.Khoa)
+                .Include(sv => sv.TrangThai)
                 .AsQueryable();
 
-            // Lọc theo keyword (tìm trong MSSV, Họ tên đệm, Tên)
-            if (!string.IsNullOrEmpty(keyword))
+            if (!string.IsNullOrWhiteSpace(keyword))
             {
                 query = query.Where(sv =>
                     sv.MSSV.Contains(keyword) ||
@@ -94,20 +93,19 @@ namespace BlueSchoolSystem.APIControllers
                     sv.Ten.Contains(keyword));
             }
 
-            //Lọc theo mã khoa
-            if (!string.IsNullOrEmpty(maKhoa))
+            if (!string.IsNullOrWhiteSpace(maKhoa))
             {
+                string maKhoaLower = maKhoa.ToLower();
                 query = query.Where(sv =>
-                    sv.Lop != null
-                    && sv.Lop.Nganh != null
-                    && sv.Lop.Nganh.Khoa != null
-                    && sv.Lop.Nganh.Khoa.MaKhoa.ToLower() == maKhoa.ToLower()
+                    sv.Lop != null &&
+                    sv.Lop.Nganh != null &&
+                    sv.Lop.Nganh.Khoa != null &&
+                    sv.Lop.Nganh.Khoa.MaKhoa.ToLower() == maKhoaLower
                 );
             }
 
 
-            // Lọc theo mã lớp hoặc chưa xếp lớp
-            if (!string.IsNullOrEmpty(maLop))
+            if (!string.IsNullOrWhiteSpace(maLop))
             {
                 if (maLop == "__null__")
                 {
@@ -115,7 +113,6 @@ namespace BlueSchoolSystem.APIControllers
                 }
                 else
                 {
-                    // Hỗ trợ truyền nhiều mã lớp, ví dụ: "22DTHG1,22DTHG2,22DTHG3"
                     var arrMaLop = maLop
                         .Split(',', StringSplitOptions.RemoveEmptyEntries)
                         .Select(x => x.Trim())
@@ -125,22 +122,24 @@ namespace BlueSchoolSystem.APIControllers
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(nienKhoa) && int.TryParse(nienKhoa, out int year))
+            {
+                query = query.Where(sv => sv.NgayNhapHoc.Year == year);
+            }
 
-            // Lọc theo giới tính
             if (gioiTinh.HasValue)
             {
                 query = query.Where(sv => sv.GioiTinh == gioiTinh.Value);
             }
 
             var students = await query.ToListAsync();
-            var count = students.Count;
 
             return Ok(new
             {
                 result = true,
                 code = 200,
                 message = "Lọc sinh viên thành công",
-                soluongsinhvien = count,
+                soluongsinhvien = students.Count,
                 data = students
             });
         }
