@@ -1,63 +1,83 @@
 ﻿@model IEnumerable<BlueSchoolSystem.Models.ViewModel.LichThiViewModel>
-<h7>Trang chủ / Học vụ / Lịch thi</h7>
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h6 class="mb-0">
-            <i class="bi bi-table"></i> Xem Lịch thi
+
+<h7 class="text-muted">Trang chủ / Học vụ / Lịch thi</h7>
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
+        <h6 class="mb-0 fw-bold text-primary">
+            <i class="bi bi-table"></i> LỊCH THI
         </h6>
-        <a asp-action="LichThi" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-clockwise"></i> Tải lại danh sách lịch thi
-        </a>
     </div>
 
-    <div class="card-body p-0">
-        <table class="table table-bordered table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Mã học phần</th>
-                    <th>Tên học phần</th>
-                    <th>Mã lớp học phần</th>
-                    <th>Tên lớp học phần</th>
-                    <th>Ngày thi</th>
-                    <th>Giờ Thi</th>
-                    <th>Phòng thi</th>
-                    <th>Số phút</th>
-                    <th>Hình thức thi</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (Model != null && Model.Any())
-                {
-                    var hocKyGroup = Model.GroupBy(x => x.TenHocKy);
-                    foreach (var group in hocKyGroup)
-                    {
-                        <tr class="table-primary">
-                            <td colspan="10"><strong>@group.Key</strong></td>
-                        </tr>
+    <div class="card-body">
+        <!-- Chọn chế độ xem -->
+        <div class="mb-3 d-flex align-items-center justify-content-between">
+            <div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="viewMode" id="viewNgay" />
+                    <label class="form-check-label small fw-semibold" for="viewNgay">XEM THEO NGÀY</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="viewMode" id="viewDanhSach" checked />
+                    <label class="form-check-label small fw-semibold" for="viewDanhSach">XEM THEO DANH SÁCH</label>
+                </div>
+            </div>
 
-                        foreach (var item in group)
+            <!-- Dropdown chọn học kỳ -->
+            <form method="get" asp-action="LichThi" class="mb-0">
+                <select name="hocKy" class="form-select form-select-sm fw-semibold text-primary border-primary" onchange="this.form.submit()" style="min-width: 250px;">
+                    <option value="">-- Tất cả học kỳ --</option>
+                    @foreach (var hk in ViewBag.HocKyList as List<string>)
+                    {
+                        <option value="@hk" selected="@(hk == ViewBag.HocKySelected)">
+                            @hk
+                        </option>
+                    }
+                </select>
+            </form>
+        </div>
+
+        <!-- Bảng lịch thi -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle text-center">
+                <thead class="table-primary text-white fw-bold" style="background-color:#0d6efd;">
+                    <tr>
+                        <th>Mã HP</th>
+                        <th class="text-start">Tên HP</th>
+                        <th>Nhóm thi</th>
+                        <th>Tổ thi</th>
+                        <th>Ngày thi</th>
+                        <th>Giờ BD</th>
+                        <th>Số phút</th>
+                        <th>Phòng</th>
+                        <th>Hình thức thi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        foreach (var item in Model)
                         {
                             <tr>
                                 <td>@item.MaMonHoc</td>
-                                <td>@item.TenMonHoc</td>
+                                <td class="text-start">@item.TenMonHoc</td>
                                 <td>@item.MaLopHocPhan</td>
                                 <td>@item.TenLopHocPhan</td>
                                 <td>@item.NgayThi.ToString("dd/MM/yyyy")</td>
                                 <td>@item.GioBatDauThi.ToString(@"hh\:mm")</td>
-                                <td>@item.MaPhongHoc</td>
                                 <td>@item.SoPhut</td>
+                                <td>@item.MaPhongHoc</td>
                                 <td>@item.HinhThucThi</td>
                             </tr>
                         }
                     }
-                }
-                else
-                {
-                    <tr>
-                        <td colspan="10" class="text-center text-muted">Không có lịch thi.</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+                    else
+                    {
+                        <tr>
+                            <td colspan="10" class="text-center text-muted">Không có lịch thi.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>

@@ -105,19 +105,17 @@ namespace BlueSchoolSystem.Controllers
         //Giao diện Lịch thi
         [Authorize]
         [HttpGet]
-        public async Task<IActionResult> LichThi()
+        public async Task<IActionResult> LichThi(string hocKy)
         {
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
 
-            // Lấy token từ Session
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
             {
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            // Lấy MSSV từ Claim
             var mssv = User.Identity?.Name ??
                        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
                        User.Identity?.Name;
@@ -128,7 +126,6 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<LichThiViewModel>());
             }
 
-            // Gọi API lịch thi
             var response = await client.GetAsync($"api/lichthisinhvien/{mssv}");
             if (!response.IsSuccessStatusCode)
             {
@@ -146,12 +143,23 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<LichThiViewModel>());
             }
 
+            // lấy toàn bộ lịch thi từ API
             var lichThi = JsonSerializer.Deserialize<List<LichThiViewModel>>(
                 dataElement.ToString(),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            );
+            ) ?? new List<LichThiViewModel>();
 
-            return View(lichThi ?? new List<LichThiViewModel>());
+            // lấy danh sách học kỳ từ toàn bộ dữ liệu
+            ViewBag.HocKyList = lichThi.Select(x => x.TenHocKy).Distinct().ToList();
+
+            // lọc dữ liệu hiển thị theo học kỳ nếu có
+            if (!string.IsNullOrEmpty(hocKy))
+            {
+                lichThi = lichThi.Where(x => x.TenHocKy == hocKy).ToList();
+                ViewBag.HocKySelected = hocKy;
+            }
+
+            return View(lichThi);
         }
         //Giao diện Xem điểm
         public IActionResult XemDiem()
