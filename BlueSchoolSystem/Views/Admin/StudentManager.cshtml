@@ -8,7 +8,7 @@
 
 
 <form asp-action="StudentManager" method="get" class="row mb-3">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <input type="text" name="keyword" value="@ViewBag.Keyword" class="form-control" placeholder="Tìm kiếm theo họ tên/ mã số sinh viên ..." />
     </div>
     @{
@@ -16,8 +16,27 @@
         var khoaList = (List<BlueSchoolSystem.Models.Khoa>)ViewBag.KhoaList;
     }
     
-
     <div class="col-md-2">
+        <select class="form-select class-select" id="NienKhoaSelect" name="nienKhoa">
+            <option value="">-- Tất cả niên khóa --</option>
+            @foreach (var year in ViewBag.ListNienKhoa as List<int>)
+            {
+                // Giữ selected nếu đã chọn
+                if ((Context.Request.Query["nienKhoa"] == year.ToString()) || (ViewBag.NienKhoa?.ToString() == year.ToString()))
+                {
+                    <option value="@year" selected>@year</option>
+                }
+                else
+                {
+                    <option value="@year">@year</option>
+                }
+            }
+        </select>
+    </div>
+
+
+
+    <div class="col-md-3">
         <select class="form-select class-select" id="KhoaSelect" name="maKhoa">
             <option value="">-- Tất cả các khoa --</option>
            
@@ -65,7 +84,7 @@
 
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-2">
         <button type="submit" class="btn btn-info me-2">
             <i class="fa-solid fa-magnifying-glass me-1"></i> Tìm kiếm
         </button>
@@ -78,17 +97,33 @@
 
 <p>
     <a class="btn btn-primary" asp-action="AddStudent">
-        <i class="fa-solid fa-user-plus me-2"></i>Thêm sinh viên mới
+        <i class="fa-solid fa-user-plus me-2"></i>Thêm mới
     </a>
     <a class="btn btn-success" asp-action="ImportStudentListFromExcel">
-        <i class="fa-solid fa-file-import me-2"></i>Nhập danh sách sinh viên
+        <i class="fa-solid fa-file-import me-2"></i>Nhập từ Excel
     </a>
-    <a class="btn btn-warning" asp-action="Create">
-        <i class="fa-solid fa-file-export me-2"></i>Xuất danh sách sinh viên
-    </a>
+    <button type="button" class="btn btn-warning" id="btnExportExcel">
+        <i class="fa-solid fa-file-excel me-2"></i> Xuất Excel
+    </button>
+    <button type="button" class="btn btn-info" id="btnExportCSV">
+        <i class="fa-solid fa-file-csv me-2"></i> Xuất CSV
+    </button>
+   
+
+
+
 </p>
 
-<div class="mb-3"><b>Tổng số:</b> @Model.Count() dòng</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div><b>Tổng số:</b> @Model.Count() dòng</div>
+    <button type="button" class="btn btn-dark" id="btnPrint">
+        <i class="fa-solid fa-print me-2"></i> In danh sách
+    </button>
+</div>
+
+
+
 <table class="table table-hover table-striped table-bordered">
     <thead class="table-dark">
         <tr>
@@ -102,6 +137,7 @@
             <th class="text-center">Trạng thái</th>
         </tr>
     </thead>
+   
     <tbody>
         @foreach (var item in Model)
         {
@@ -135,6 +171,10 @@
 </table>
 
 @section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.7.0/jspdf.plugin.autotable.min.js"></script>
+
     <script>
         window.__accessToken = @Html.Raw(Json.Serialize(token));
     </script>
@@ -177,6 +217,47 @@
 
         });
     </script>
+
+    <script>
+        document.getElementById('btnExportExcel').addEventListener('click', function () {
+            var table = document.querySelector('table.table');
+            var wb = XLSX.utils.table_to_book(table, { sheet: "Danh sách sinh viên" });
+            XLSX.writeFile(wb, 'DanhSachSinhVien.xlsx');
+        });
+
+        document.getElementById('btnExportCSV').addEventListener('click', function () {
+            var table = document.querySelector('table.table');
+            var ws = XLSX.utils.table_to_sheet(table);
+            var csv = XLSX.utils.sheet_to_csv(ws);
+            // Tạo link download file csv
+            var blob = new Blob([csv], { type: 'text/csv' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'DanhSachSinhVien.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+    <script>
+        document.getElementById('btnPrint').addEventListener('click', function () {
+            var printContents = document.querySelector('table.table').outerHTML;
+            var originalContents = document.body.innerHTML;
+
+            // Tạo 1 document mới chỉ chứa table
+            document.body.innerHTML = `
+                <div style="text-align:center; margin-bottom:16px;">
+                    <h2>Danh sách sinh viên</h2>
+                </div>
+                ${printContents}
+            `;
+            window.print();
+
+            // Sau khi in xong thì load lại trang (trả về như cũ)
+            window.location.reload();
+        });
+    </script>
+
 }
 
 
