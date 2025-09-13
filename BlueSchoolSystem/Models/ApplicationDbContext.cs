@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection.Emit;
 
 namespace BlueSchoolSystem.Models
 {
@@ -68,6 +69,13 @@ namespace BlueSchoolSystem.Models
                 .WithMany(lhp => lhp.DiemDanhs) // nếu có navigation property, nếu không thì .WithMany()
                 .HasForeignKey(dd => dd.LopHocPhanId)
                 .OnDelete(DeleteBehavior.Cascade); // chỉ giữ Cascade ở 1 phía
+
+            builder.Entity<LichThi>()
+                   .HasOne(l => l.TrangThai)
+                   .WithMany()
+                   .HasForeignKey(l => l.TrangThaiId)
+                   .OnDelete(DeleteBehavior.Restrict); // hoặc NoAction
+
 
         }
 
