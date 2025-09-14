@@ -2,22 +2,26 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 #nullable disable
 
-using System;
-using System.ComponentModel.DataAnnotations;
-using System.Security.Claims;
-using System.Text;
-using System.Text.Encodings.Web;
-using System.Threading;
-using System.Threading.Tasks;
+using BlueSchoolSystem.Models;
+using BlueSchoolSystem.Models.ViewModel;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
-using BlueSchoolSystem.Models;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace BlueSchoolSystem.Areas.Identity.Pages.Account
 {
@@ -29,6 +33,8 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
         private readonly IUserStore<ApplicationUser> _userStore;
         private readonly IUserEmailStore<ApplicationUser> _emailStore;
         private readonly IEmailSender _emailSender;
+        private readonly JwtSettings _jwtSettings;
+
         private readonly ILogger<ExternalLoginModel> _logger;
 
         public ExternalLoginModel(
@@ -36,11 +42,13 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
             UserManager<ApplicationUser> userManager,
             IUserStore<ApplicationUser> userStore,
             ILogger<ExternalLoginModel> logger,
+            IOptions<JwtSettings> jwtSettings,
             IEmailSender emailSender)
         {
             _signInManager = signInManager;
             _userManager = userManager;
             _userStore = userStore;
+            _jwtSettings = jwtSettings.Value;
             _emailStore = GetEmailStore();
             _logger = logger;
             _emailSender = emailSender;
@@ -117,6 +125,7 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
             // Lấy email từ Google
             var email = info.Principal.FindFirstValue(ClaimTypes.Email);
 
+
             if (string.IsNullOrEmpty(email))
             {
                 ErrorMessage = "Không lấy được email từ tài khoản Google.";
@@ -131,21 +140,15 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
                 return RedirectToPage("./Login", new { ReturnUrl = returnUrl });
             }
 
-            // Nếu user đã từng login Google trước đó thì login luôn
-            var userLogins = await _userManager.GetLoginsAsync(user);
-            if (!userLogins.Any(l => l.LoginProvider == info.LoginProvider && l.ProviderKey == info.ProviderKey))
-            {
-                var addLoginResult = await _userManager.AddLoginAsync(user, info);
-                if (!addLoginResult.Succeeded)
-                {
-                    ErrorMessage = "Không thể liên kết tài khoản Google với tài khoản hiện có.";
-                    return RedirectToPage("./Login", new { ReturnUrl = returnUrl });
-                }
-            }
-
             await _signInManager.SignInAsync(user, isPersistent: false, info.LoginProvider);
-            // Lấy role
+
             var roles = await _userManager.GetRolesAsync(user);
+            var jwtToken = GenerateJwtToken(user, roles);
+
+            HttpContext.Session.SetString("access_token", jwtToken);
+
+
+            // Lấy role
             var role = roles.FirstOrDefault(); // Giả sử mỗi user có 1 role
 
             if (role == "Admin")
@@ -162,6 +165,39 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
             }
 
         }
+
+
+        private string GenerateJwtToken(ApplicationUser user, IList<string> roles)
+        {
+            var claims = new List<Claim>
+            {
+                //new Claim(ClaimTypes.NameIdentifier, user.Id),
+                //new Claim(ClaimTypes.Email, user.Email),
+                //new Claim(ClaimTypes.Name, user.UserName)
+                new("userId", user.Id),
+                new("username", user.UserName),
+                new("email", user.Email),
+            };
+
+            foreach (var role in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _jwtSettings.Issuer,
+                audience: _jwtSettings.Audience,
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(2),
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
 
 
         public async Task<IActionResult> OnPostConfirmationAsync(string returnUrl = null)
