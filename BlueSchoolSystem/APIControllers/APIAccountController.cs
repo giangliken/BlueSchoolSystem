@@ -49,6 +49,7 @@ namespace BlueSchoolSystem.APIControllers
             //var user = await _userManager.FindByEmailAsync(model.Email);
             var user = await _userManager.Users
                 .Include(u => u.SinhViens)
+                .Include(u => u.GiangViens)
                 .FirstOrDefaultAsync(u => u.UserName == model.UserName);
 
             if (user == null)
@@ -109,7 +110,28 @@ namespace BlueSchoolSystem.APIControllers
                     });
                 }
 
-                
+                //Nếu người dùng đăng nhập bằng tài khoản giảng viên
+                if (role == SD.Role_Teacher)
+                {
+                    return Ok(new
+                    {
+                        result = true,
+                        code = 200,
+                        message = "Đăng nhập thành công",
+                        token = token,
+                        user = new
+                        {
+                            username = user.UserName,
+                            role = role,
+                            maGV = user.GiangViens.MaGiangVien,
+                            hoGV = user.GiangViens.HoVaTenDem,
+                            tenGV = user.GiangViens.Ten,
+                            email = user.Email,
+                            ngaySinh = user.GiangViens.NgaySinh,
+                        }
+                    });
+                }
+
             }
 
             return Unauthorized(new 
@@ -119,6 +141,7 @@ namespace BlueSchoolSystem.APIControllers
                 message = "Mật khẩu không đúng" 
             });
         }
+
 
         private string GenerateJwtToken(ApplicationUser user, IList<string> roles)
         {
