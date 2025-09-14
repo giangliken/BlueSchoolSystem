@@ -3,7 +3,9 @@
     public class LichThiViewModel
     {
         public string MSSV { get; set; }
+        public int HocKyId { get; set; }
         public string TenHocKy { get; set; }
+        public DateTime NgayBatDau { get; set; }
         public string MaMonHoc { get; set; }
         public string TenMonHoc { get; set; }
         public string MaLopHocPhan { get; set; }

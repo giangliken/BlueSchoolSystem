@@ -50,11 +50,7 @@
 
 <h6 class="mb-3">Trang chủ / Học vụ / Lịch thi</h6>
 <div class="card shadow-sm border-0">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
-        <h6 class="mb-0 fw-bold text-primary">
-            <i class="bi bi-table"></i> LỊCH THI
-        </h6>
-    </div>
+    
 
     <div class="card-body">
         <!-- Chọn chế độ xem -->
@@ -63,16 +59,25 @@
 
             <!-- Dropdown chọn học kỳ -->
             <form method="get" asp-action="LichThi" class="mb-0">
-                <select name="hocKy" class="form-select form-select-sm fw-semibold text-primary border-primary" onchange="this.form.submit()" style="min-width: 250px;">
-                    <option value="">-- Tất cả học kỳ --</option>
-                    @foreach (var hk in ViewBag.HocKyList as List<string>)
+    <select name="hocKy" class="form-select form-select-sm fw-semibold text-primary border-primary"
+            onchange="this.form.submit()" style="min-width: 250px;">
+                    @foreach (var hk in ViewBag.HocKyList)
                     {
-                        <option value="@hk" selected="@(hk == ViewBag.HocKySelected)">
-                            @hk
-                        </option>
+                        if (hk.HocKyId == ViewBag.HocKySelected)
+                        {
+                            <option value="@hk.HocKyId" selected="selected">
+                                @hk.TenHocKy 
+                            </option>
+                        }
+                        else
+                        {
+                            <option value="@hk.HocKyId">
+                                @hk.TenHocKy 
+                            </option>
+                        }
                     }
-                </select>
-            </form>
+    </select>
+</form>
         </div>
 
         <!-- Bảng lịch thi -->

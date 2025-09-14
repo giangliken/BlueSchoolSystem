@@ -143,20 +143,45 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<LichThiViewModel>());
             }
 
-            // lấy toàn bộ lịch thi từ API
-            var lichThi = JsonSerializer.Deserialize<List<LichThiViewModel>>(
-                dataElement.ToString(),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            ) ?? new List<LichThiViewModel>();
+            // Lấy toàn bộ danh sách học kỳ từ API
+            var hocKys = JsonDocument.Parse(body)
+                                     .RootElement
+                                     .GetProperty("data");
 
-            // lấy danh sách học kỳ từ toàn bộ dữ liệu
-            ViewBag.HocKyList = lichThi.Select(x => x.TenHocKy).Distinct().ToList();
+            // Lấy danh sách học kỳ để fill dropdown
+            ViewBag.HocKyList = hocKys.EnumerateArray()
+                .Select(hk => new
+                {
+                    HocKyId = hk.GetProperty("hocKyId").GetInt32(),
+                    TenHocKy = hk.GetProperty("tenHocKy").GetString(),
+                    NgayBatDau = hk.GetProperty("ngayBatDau").GetDateTime()
+                })
+                .OrderByDescending(hk => hk.NgayBatDau)
+                .ToList();
 
-            // lọc dữ liệu hiển thị theo học kỳ nếu có
-            if (!string.IsNullOrEmpty(hocKy))
+            // Nếu chưa chọn thì mặc định học kỳ mới nhất
+            var hocKyList = (IEnumerable<dynamic>)ViewBag.HocKyList;
+
+            if (string.IsNullOrEmpty(hocKy) && hocKyList.Any())
             {
-                lichThi = lichThi.Where(x => x.TenHocKy == hocKy).ToList();
-                ViewBag.HocKySelected = hocKy;
+                hocKy = hocKyList.First().HocKyId.ToString();
+            }
+
+            ViewBag.HocKySelected = int.TryParse(hocKy, out var hkId) ? hkId : 0;
+
+            // Tìm học kỳ được chọn
+            var selectedElement = hocKys.EnumerateArray()
+                .FirstOrDefault(hk => hk.GetProperty("hocKyId").GetInt32() == ViewBag.HocKySelected);
+
+            // Nếu có thì lấy trực tiếp `lichThis`
+            List<LichThiViewModel> lichThi = new();
+            if (selectedElement.ValueKind != JsonValueKind.Undefined &&
+                selectedElement.TryGetProperty("lichThis", out var lichThiElement))
+            {
+                lichThi = JsonSerializer.Deserialize<List<LichThiViewModel>>(
+                    lichThiElement.GetRawText(),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                ) ?? new List<LichThiViewModel>();
             }
 
             return View(lichThi);

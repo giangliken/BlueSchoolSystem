@@ -321,17 +321,15 @@ namespace BlueSchoolSystem.APIControllers
                                  join hk in _context.HocKys on lhp.HocKyId equals hk.Id
                                  join lt in _context.LichThis on lhp.Id equals lt.LopHocPhanId
                                  join ph in _context.PhongHocs on lt.PhongHocId equals ph.Id
-
-                                 // LEFT JOIN với TrangThai
                                  join tt in _context.TrangThais on lt.TrangThaiId equals tt.Id into trangThaiGroup
                                  from tt in trangThaiGroup.DefaultIfEmpty()
-
                                  where sv.MSSV == mssv
-                                 orderby lt.NgayThi, lt.GioBatDau
                                  select new
                                  {
                                      sv.MSSV,
+                                     HocKyId = hk.Id,
                                      hk.TenHocKy,
+                                     hk.NgayBatDau,
                                      mh.MaMonHoc,
                                      mh.TenMonHoc,
                                      lhp.MaLopHocPhan,
@@ -341,8 +339,18 @@ namespace BlueSchoolSystem.APIControllers
                                      GioKetThucThi = lt.GioKetThuc,
                                      ph.MaPhongHoc,
                                      lt.HinhThucThi,
-                                     TinhTrangLichThi = tt.TenTrangThai 
-                                 }).ToListAsync();
+                                     TinhTrangLichThi = tt.TenTrangThai
+                                 })
+                     .GroupBy(x => new { x.HocKyId, x.TenHocKy, x.NgayBatDau })
+                     .Select(g => new
+                     {
+                         HocKyId = g.Key.HocKyId,
+                         TenHocKy = g.Key.TenHocKy,
+                         NgayBatDau = g.Key.NgayBatDau,
+                         LichThis = g.OrderBy(x => x.NgayThi).ThenBy(x => x.GioBatDauThi).ToList()
+                     })
+                     .OrderByDescending(x => x.NgayBatDau)
+                     .ToListAsync();
 
             if (!lichThi.Any())
             {
