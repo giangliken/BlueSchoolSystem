@@ -56,26 +56,41 @@ builder.Services.AddCors(options =>
 
 });
 
+// Cấu hình JwtSettings
+var jwtSettingsSection = builder.Configuration.GetSection("JwtSettings");
+builder.Services.Configure<JwtSettings>(jwtSettingsSection);
+var jwtSettings = jwtSettingsSection.Get<JwtSettings>();
+
+
+// Cấu hình JWT Auth
+var key = Encoding.UTF8.GetBytes(jwtSettings.SecretKey);
+
 // Add Google authentication
-builder.Services.AddAuthentication(options =>
-{
-    //options.DefaultScheme = "Cookies";
-    //options.DefaultChallengeScheme = "Google";
-    options.DefaultScheme = IdentityConstants.ApplicationScheme; // hoặc "Cookies" nếu bạn dùng cookie
-    options.DefaultChallengeScheme = IdentityConstants.ApplicationScheme;
-})
-.AddCookie("Cookies")
+builder.Services.AddAuthentication()
 .AddGoogle(options =>
 {
     options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "";
     options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "";
     options.SaveTokens = true;
-
+    options.Scope.Add("openid");
     options.Scope.Add("profile");
     options.Scope.Add("email");
     options.ClaimActions.MapJsonKey("picture", "picture");
     options.ClaimActions.MapJsonKey("locale", "locale");
-});
+})
+.AddJwtBearer(options =>
+ {
+     options.TokenValidationParameters = new TokenValidationParameters
+     {
+         ValidateIssuer = true,
+         ValidateAudience = true,
+         ValidateLifetime = true,
+         ValidateIssuerSigningKey = true,
+         ValidIssuer = jwtSettings.Issuer,
+         ValidAudience = jwtSettings.Audience,
+         IssuerSigningKey = new SymmetricSecurityKey(key)
+     };
+ });
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -96,8 +111,6 @@ builder.Services.ConfigureApplicationCookie(options =>
     };
 });
 
-
-
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("LoginLimiter", opt =>
@@ -112,33 +125,6 @@ builder.Services.AddRateLimiter(options =>
 
 });
 
-
-// Cấu hình JwtSettings
-var jwtSettingsSection = builder.Configuration.GetSection("JwtSettings");
-builder.Services.Configure<JwtSettings>(jwtSettingsSection);
-var jwtSettings = jwtSettingsSection.Get<JwtSettings>();
-
-// Cấu hình JWT Auth
-var key = Encoding.UTF8.GetBytes(jwtSettings.SecretKey);
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings.Issuer,
-        ValidAudience = jwtSettings.Audience,
-        IssuerSigningKey = new SymmetricSecurityKey(key)
-    };
-});
 
 builder.Services.AddSession();
 builder.Services.AddHttpClient();
