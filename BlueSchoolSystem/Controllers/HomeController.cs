@@ -103,9 +103,93 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Giao diện Lịch thi
-        public IActionResult LichThi()
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> LichThi(string hocKy)
         {
-            return View();
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var mssv = User.Identity?.Name ??
+                       User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                       User.Identity?.Name;
+
+            if (string.IsNullOrEmpty(mssv))
+            {
+                ViewBag.Error = "Không xác định được MSSV của người dùng.";
+                return View(new List<LichThiViewModel>());
+            }
+
+            var response = await client.GetAsync($"api/lichthisinhvien/{mssv}");
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không thể lấy lịch thi từ API.";
+                return View(new List<LichThiViewModel>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("data", out var dataElement))
+            {
+                ViewBag.Error = "Không tìm thấy dữ liệu lịch thi.";
+                return View(new List<LichThiViewModel>());
+            }
+
+            // Lấy toàn bộ danh sách học kỳ từ API
+            var hocKys = JsonDocument.Parse(body)
+                                     .RootElement
+                                     .GetProperty("data");
+
+            // Lấy danh sách học kỳ để fill dropdown
+            ViewBag.HocKyList = hocKys.EnumerateArray()
+                .Select(hk => new
+                {
+                    HocKyId = hk.GetProperty("hocKyId").GetInt32(),
+                    TenHocKy = hk.GetProperty("tenHocKy").GetString(),
+                    NgayBatDau = hk.GetProperty("ngayBatDau").GetDateTime()
+                })
+                .OrderByDescending(hk => hk.NgayBatDau)
+                .ToList();
+            // Kiểm tra null
+            if (ViewBag.HocKyList == null)
+            {
+                ViewBag.HocKyList = new List<object>(); // danh sách rỗng để tránh null
+            }
+
+            // Nếu chưa chọn thì mặc định học kỳ mới nhất
+            var hocKyList = (IEnumerable<dynamic>)ViewBag.HocKyList;
+
+            if (string.IsNullOrEmpty(hocKy) && hocKyList.Any())
+            {
+                hocKy = hocKyList.First().HocKyId.ToString();
+            }
+
+            ViewBag.HocKySelected = int.TryParse(hocKy, out var hkId) ? hkId : 0;
+
+            // Tìm học kỳ được chọn
+            var selectedElement = hocKys.EnumerateArray()
+                .FirstOrDefault(hk => hk.GetProperty("hocKyId").GetInt32() == ViewBag.HocKySelected);
+
+            // Nếu có thì lấy trực tiếp `lichThis`
+            List<LichThiViewModel> lichThi = new();
+            if (selectedElement.ValueKind != JsonValueKind.Undefined &&
+                selectedElement.TryGetProperty("lichThis", out var lichThiElement))
+            {
+                lichThi = JsonSerializer.Deserialize<List<LichThiViewModel>>(
+                    lichThiElement.GetRawText(),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                ) ?? new List<LichThiViewModel>();
+            }
+
+            return View(lichThi);
         }
         //Giao diện Xem điểm
         public IActionResult XemDiem()

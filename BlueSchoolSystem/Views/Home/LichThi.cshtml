@@ -1,5 +1,171 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
-@{
-}
+﻿@model IEnumerable<BlueSchoolSystem.Models.ViewModel.LichThiViewModel>
+
+<style>
+    /* Card */
+    .card {
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    /* Header */
+    .card-header {
+        background: linear-gradient(90deg, #0dcaf0, #0d9dfd);
+        color: white;
+        font-weight: bold;
+        border-bottom: none !important;
+    }
+    .card-header h6 {
+        color: white;
+        margin: 0;
+    }
+
+    /* Dropdown */
+    .form-select {
+        border-radius: 8px;
+        transition: all 0.2s ease-in-out;
+        min-width: 300px;
+        height: 42px;
+        font-size: 1rem;
+    }
+    .form-select:hover {
+        box-shadow: 0 0 6px rgba(13,110,253,.3);
+    }
+
+    /* Table */
+    .table-responsive {
+        max-height: 500px; 
+        overflow: auto;
+    }
+    table.table {
+        border-radius: 8px;
+        overflow: hidden;
+        min-width: 1200px;
+    }
+    thead.table-primary {
+        background: linear-gradient(90deg, #0d6efd, #0d9dfd) !important;
+        color: #fff !important;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    /* Sticky columns */
+    th.sticky-col, td.sticky-col {
+        position: sticky;
+        left: 0;
+        background: #f8f9fa !important;
+        z-index: 3;
+        font-weight: 600;
+        border-right: 1px solid #dee2e6;
+    }
+    th.sticky-col-2, td.sticky-col-2 {
+        position: sticky;
+        left: 70px; /* chiều rộng STT */
+        background: #f8f9fa !important;
+        z-index: 3;
+        border-right: 1px solid #dee2e6;
+    }
+
+    /* Row hover & alternate */
+    tbody tr:nth-child(even) {
+        background-color: #fafbfc;
+    }
+    tbody tr:hover {
+        background-color: #eaf3ff !important;
+    }
+
+    /* STT column */
+    td.sticky-col {
+        text-align: center;
+        font-weight: bold;
+        color: #0d6efd;
+    }
+
+    /* Borders */
+    .table-bordered th, .table-bordered td {
+        border: 1px solid #dee2e6;
+        vertical-align: middle;
+    }
+</style>
+
+<h6 class="mb-3">Trang chủ / Học vụ / Lịch thi</h6>
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <!-- Dropdown chọn học kỳ -->
+        <div class="mb-3 d-flex align-items-center justify-content-between">
+            <form method="get" asp-action="LichThi" class="mb-0">
+                <select name="hocKy" class="form-select fw-semibold text-primary border-primary"
+                        onchange="this.form.submit()">
+                    @if (ViewBag.HocKyList != null)
+                    {
+                        foreach (var hk in ViewBag.HocKyList)
+                        {
+                            if (hk.HocKyId == ViewBag.HocKySelected)
+                            {
+                                <option value="@hk.HocKyId" selected="selected">@hk.TenHocKy</option>
+                            }
+                            else
+                            {
+                                <option value="@hk.HocKyId">@hk.TenHocKy</option>
+                            }
+                        }
+                    }
+                    else
+                    {
+                        <option disabled selected>Không có học kỳ</option>
+                    }
+                </select>
+            </form>
+        </div>
+
+        <!-- Bảng lịch thi -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle text-center">
+                <thead class="table-primary text-white fw-bold">
+                    <tr>
+                        <th>STT</th>
+                        <th>Tên HP</th>
+                        <th>Mã HP</th>
+                        <th>Nhóm thi</th>
+                        <th>Tổ thi</th>
+                        <th>Ngày thi</th>
+                        <th>Giờ BD</th>
+                        <th>Số phút</th>
+                        <th>Phòng</th>
+                        <th>Hình thức thi</th>
+                        <th>Tình trạng</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        var stt = 1;
+                        foreach (var item in Model)
+                        {
+                            <tr>
+                                <td>@stt</td>
+                                <td>@item.TenMonHoc</td>
+                                <td>@item.MaMonHoc</td>
+                                <td>@item.MaLopHocPhan</td>
+                                <td>@item.TenLopHocPhan</td>
+                                <td>@item.NgayThi.ToString("dd/MM/yyyy")</td>
+                                <td>@item.GioBatDauThi.ToString(@"hh\:mm")</td>
+                                <td>@item.SoPhut</td>
+                                <td>@item.MaPhongHoc</td>
+                                <td>@item.HinhThucThi</td>
+                                <td>@item.TinhTrangLichThi</td>
+                            </tr>
+                            stt++;
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="11" class="text-center text-muted">Không có lịch thi.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
