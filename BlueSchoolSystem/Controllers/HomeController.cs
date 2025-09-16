@@ -158,6 +158,11 @@ namespace BlueSchoolSystem.Controllers
                 })
                 .OrderByDescending(hk => hk.NgayBatDau)
                 .ToList();
+            // Kiểm tra null
+            if (ViewBag.HocKyList == null)
+            {
+                ViewBag.HocKyList = new List<object>(); // danh sách rỗng để tránh null
+            }
 
             // Nếu chưa chọn thì mặc định học kỳ mới nhất
             var hocKyList = (IEnumerable<dynamic>)ViewBag.HocKyList;
