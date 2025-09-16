@@ -1,6 +1,7 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -20,12 +21,14 @@ namespace BlueSchoolSystem.Controllers
         private readonly ILogger<AdminController> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ApplicationDbContext _context;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context)
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
             _context = context;
+            _userManager = userManager;
         }
 
         //Giao diện trang chủ của Admin
@@ -282,12 +285,30 @@ namespace BlueSchoolSystem.Controllers
                 {
                     var worksheet = package.Workbook.Worksheets[0];
                     int rowCount = worksheet.Dimension.Rows;
-                   
+
+
+                    var allLopHocs = _context.LopHocs
+                        .Select(l => new { l.Id, l.MaLop })
+                        .ToList()
+                        .ToDictionary(x => x.MaLop.Trim().ToUpper(), x => x.Id);
 
                     for (int row = 2; row <= rowCount; row++)
                     {
+                        var maLop = worksheet.Cells[row, 12].Text.Trim().ToUpper();
+
+                        int? lopId = null;
+                        if (!string.IsNullOrEmpty(maLop) && allLopHocs.TryGetValue(maLop, out var foundId))
+                            lopId = foundId;
+
+                        if (lopId == null)
+                        {
+                            continue; 
+                        }
+
                         var sv = new SinhVien
                         {
+
+
                             MSSV = worksheet.Cells[row, 1].Text.Trim(),
                             CCCD = worksheet.Cells[row, 2].Text.Trim(),
                             HoVaTenDem = worksheet.Cells[row, 3].Text.Trim(),
@@ -297,8 +318,8 @@ namespace BlueSchoolSystem.Controllers
                             DiaChi = worksheet.Cells[row, 9].Text.Trim(),
                             NgayNhapHoc = ParseExcelDate(worksheet.Cells[row, 10].Value),
                             NgayTotNghiep = ParseExcelDate(worksheet.Cells[row, 11].Value),
-                            TrangThaiId = 2, 
-                            GhiChu = worksheet.Cells[row, 12].Value?.ToString()?.Trim() ?? "",
+                            TrangThaiId = 2,
+                            LopId = lopId.Value,
                             User = new ApplicationUser
                             {
                                 Email = worksheet.Cells[row, 8].Text.Trim(),
@@ -308,10 +329,6 @@ namespace BlueSchoolSystem.Controllers
                         };
                         students.Add(sv);
                     }
-
-
-
-
                 }
             }
 
@@ -380,6 +397,61 @@ namespace BlueSchoolSystem.Controllers
 
             return View(sinhVien);
         }
+
+        [HttpPost]
+        public async Task<IActionResult> ResetPassword(int id, string type)
+        {
+            ApplicationUser user = null;
+
+            if (type == "SinhVien")
+            {
+                var sinhVien = await _context.SinhViens
+                    .Include(sv => sv.User)
+                    .FirstOrDefaultAsync(sv => sv.Id == id);
+                user = sinhVien?.User;
+            }
+            else if (type == "GiangVien")
+            {
+                var giangVien = await _context.GiangViens
+                    .Include(gv => gv.User)
+                    .FirstOrDefaultAsync(gv => gv.Id == id);
+                user = giangVien?.User;
+            }
+
+            if (user == null)
+                return NotFound();
+
+            var result = await ResetPasswordToDefaultAsync(user.Id);
+
+            if (result)
+                TempData["Success"] = "Đã reset lại mật khẩu thành công!";
+            else
+                TempData["Error"] = "Có lỗi xảy ra khi reset mật khẩu!";
+
+            // Redirect về đúng trang chi tiết
+            if (type == "SinhVien")
+                return RedirectToAction("StudentDetails", new { id = id });
+            else
+                return RedirectToAction("TeacherDetails", "GiangVien", new { id = id });
+        }
+
+
+        //Hàm cấp lại mật khẩu tài khoản sinh viên
+        public async Task<bool> ResetPasswordToDefaultAsync(string userId, string defaultPassword = "Abc@123")
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                return false;
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var result = await _userManager.ResetPasswordAsync(user, token, defaultPassword);
+
+            return result.Succeeded;
+        }
+
+
+
+
 
         //Trang quản lí khoa viện
         public async Task<IActionResult> FacultyManager()
