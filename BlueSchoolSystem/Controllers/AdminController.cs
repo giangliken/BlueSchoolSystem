@@ -380,6 +380,37 @@ namespace BlueSchoolSystem.Controllers
             return DateTime.MinValue;
         }
 
+
+        //File mẫu định dạng Import danh sách sinh viên
+        public IActionResult DownloadStudentExcelTemplate()
+        {
+            // Tên các cột header đúng chuẩn UI
+            var headers = new string[]
+            {
+                "Mã số sinh viên", "CCCD", "Họ và tên đệm", "Tên", "Ngày sinh", "Giới tính",
+                "Số điện thoại", "Email", "Địa chỉ", "Ngày nhập học", "Ngày tốt nghiệp dự kiến",
+                "Mã lớp", "Ghi chú"
+            };
+
+            using (var package = new ExcelPackage())
+            {
+                var ws = package.Workbook.Worksheets.Add("SinhVien_Template");
+
+                // Ghi header
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    ws.Cells[1, i + 1].Value = headers[i];
+                    ws.Cells[1, i + 1].Style.Font.Bold = true;
+                }
+
+                ws.Cells[ws.Dimension.Address].AutoFitColumns();
+
+                var stream = new MemoryStream(package.GetAsByteArray());
+                string fileName = "MauNhapDSSinhVien.xlsx";
+                return File(stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+        }
+
         //Xem thông tin chi tiết sinh viên
         public async Task<IActionResult> StudentDetails(int? id)
         {
@@ -394,6 +425,12 @@ namespace BlueSchoolSystem.Controllers
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (sinhVien == null) return NotFound();
+
+            ViewBag.TrangThaiList = _context.TrangThais
+               .Where(t => t.LoaiTrangThai == "SinhVien")
+               .Select(t => new { t.Id, t.TenTrangThai })
+               .ToList();
+
 
             return View(sinhVien);
         }
