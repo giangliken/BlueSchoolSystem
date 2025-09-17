@@ -315,6 +315,28 @@ namespace BlueSchoolSystem.APIControllers
         [HttpGet("lichthisinhvien/{mssv}")]
         public async Task<IActionResult> GetLichThiByMSSV(string mssv)
         {
+            // Lấy MSSV từ JWT claim
+            var mssvFromToken = User.FindFirst("username")?.Value;
+
+            if (mssvFromToken == null)
+            {
+                return Unauthorized(new
+                {
+                    result = false,
+                    code = 401,
+                    message = "Không lấy được MSSV từ token"
+                });
+            }
+
+            if (mssvFromToken != mssv)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    result = false,
+                    code = 403,
+                    message = "Bạn không có quyền truy cập lịch thi của sinh viên khác"
+                });
+            }
             var lichThi = await (from dk in _context.ChiTietLopHocPhans
                                  join lhp in _context.LopHocPhans on dk.LopHocPhanId equals lhp.Id
                                  join sv in _context.SinhViens on dk.SinhVienId equals sv.Id
