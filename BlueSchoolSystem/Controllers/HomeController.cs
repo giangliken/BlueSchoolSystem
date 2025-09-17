@@ -2,6 +2,7 @@
 using BlueSchoolSystem.Models.ViewModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Security.Claims;
@@ -13,11 +14,13 @@ namespace BlueSchoolSystem.Controllers
     {
         private readonly ILogger<HomeController> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ApplicationDbContext _context;
 
-        public HomeController(ILogger<HomeController> logger, IHttpClientFactory httpClientFactory)
+        public HomeController(ILogger<HomeController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
+            _context = context;
         }
 
         //Giao diện trang chủ
@@ -120,6 +123,8 @@ namespace BlueSchoolSystem.Controllers
                        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
                        User.Identity?.Name;
 
+
+
             if (string.IsNullOrEmpty(mssv))
             {
                 ViewBag.Error = "Không xác định được MSSV của người dùng.";
@@ -148,7 +153,13 @@ namespace BlueSchoolSystem.Controllers
                                      .RootElement
                                      .GetProperty("data");
 
-            // Lấy danh sách học kỳ để fill dropdown
+            // Lấy ngày nhập học của sinh viên từ DB
+            var ngayNhapHoc = await _context.SinhViens
+                .Where(s => s.MSSV == mssv)
+                .Select(s => s.NgayNhapHoc)
+                .FirstOrDefaultAsync();
+
+            // Lấy danh sách học kỳ từ API và lọc theo ngày nhập học
             ViewBag.HocKyList = hocKys.EnumerateArray()
                 .Select(hk => new
                 {
@@ -156,6 +167,7 @@ namespace BlueSchoolSystem.Controllers
                     TenHocKy = hk.GetProperty("tenHocKy").GetString(),
                     NgayBatDau = hk.GetProperty("ngayBatDau").GetDateTime()
                 })
+                .Where(hk => hk.NgayBatDau >= ngayNhapHoc)  // 👉 chỉ lấy học kỳ sau ngày nhập học
                 .OrderByDescending(hk => hk.NgayBatDau)
                 .ToList();
             // Kiểm tra null
