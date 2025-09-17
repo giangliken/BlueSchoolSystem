@@ -2,6 +2,8 @@
 
 @{
     ViewData["Title"] = "Chi tiết sinh viên";
+    var token = Context.Session.GetString("access_token");
+
 }
 @if (TempData["Success"] != null)
 {
@@ -43,14 +45,13 @@
                     <div class="text-center mb-4">
                         @if (!string.IsNullOrEmpty(Model.AvatarUrl))
                         {
-                            <img src="@Model.AvatarUrl"
-                                 class="rounded-circle border"
-                                 style="width: 150px; height: 150px; object-fit: cover; border: 2px solid #ccc;" />
+                            <img src="@Model.AvatarUrl" class="rounded-circle border"
+                                style="width: 150px; height: 150px; object-fit: cover; border: 2px solid #ccc;" />
                         }
                         else
                         {
                             <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center"
-                                 style="width: 150px; height: 150px; border: 2px solid #ccc;">
+                                style="width: 150px; height: 150px; border: 2px solid #ccc;">
                                 <span>Avatar</span>
                             </div>
                         }
@@ -59,14 +60,80 @@
 
 
                     <ul class="list-group list-group-flush">
-                        <li class="list-group-item d-flex justify-content-between d-flex justify-content-between"><strong>MSSV:</strong> @Model.MSSV</li>
-                        <li class="list-group-item d-flex justify-content-between d-flex justify-content-between"><strong>Họ tên:</strong> @Model.HoVaTenDem @Model.Ten</li>
-                        <li class="list-group-item d-flex justify-content-between d-flex justify-content-between"><strong>Giới tính:</strong> @(Model.GioiTinh ? "Nam" : "Nữ")</li>
-                        <li class="list-group-item d-flex justify-content-between d-flex justify-content-between"><strong>Ngày sinh:</strong> @Model.NgaySinh.ToString("dd/MM/yyyy")</li>
-                        <li class="list-group-item d-flex justify-content-between d-flex justify-content-between"><strong>CCCD:</strong> @Model.CCCD</li>
-                        <li class="list-group-item d-flex justify-content-between"><strong>Số điện thoại:</strong> @Model.User?.PhoneNumber</li>
-                        <li class="list-group-item d-flex justify-content-between"><strong>Email:</strong> @Model.User?.Email</li>
-                        <li class="list-group-item d-flex justify-content-between"><strong>Địa chỉ:</strong> @Model.DiaChi</li>
+                        <li class="list-group-item d-flex justify-content-between d-flex justify-content-between">
+                            <strong>MSSV:</strong> @Model.MSSV</li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Họ tên: </strong>
+                            <span id="hoten-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.HoVaTenDem @Model.Ten
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                    onclick="editField('hoten', '@Model.MSSV', '@Model.HoVaTenDem', '@Model.Ten')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+
+
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Giới tính:</strong>
+                            <span id="gioitinh-val" class="d-inline-flex align-items-center ms-2">
+                                @(Model.GioiTinh ? "Nam" : "Nữ")
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                    onclick="editGender('@Model.MSSV', '@Model.GioiTinh')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Ngày sinh:</strong>
+                            <span id="ngaysinh-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.NgaySinh.ToString("dd/MM/yyyy")
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                    onclick="editNgaySinh('@Model.MSSV', '@Model.NgaySinh.ToString("yyyy-MM-dd")')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>CCCD:</strong>
+                            <span id="cccd-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.CCCD
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                    onclick="editCCCD('@Model.MSSV', '@Model.CCCD')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Số điện thoại:</strong>
+                            <span id="phone-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.User?.PhoneNumber
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                    onclick="editPhone('@Model.MSSV', '@Model.User?.PhoneNumber')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Email:</strong>
+                            <span id="email-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.User?.Email
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                    onclick="editEmail('@Model.MSSV', '@Model.User?.Email')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Địa chỉ:</strong>
+                            <span id="diachi-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.DiaChi
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                    onclick="editDiaChi('@Model.MSSV', '@Model.DiaChi')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
                         <li class="list-group-item d-flex justify-content-between">
                             <strong>Lớp:</strong>
                             @(Model.Lop != null ? Model.Lop.TenLop : "Chưa xếp")
@@ -80,13 +147,37 @@
                             @(Model.Lop?.Nganh?.Khoa?.TenKhoa ?? "Chưa thuộc khoa viện nào")
                         </li>
 
-                        <li class="list-group-item d-flex justify-content-between"><strong>Ngày nhập học:</strong> @Model.NgayNhapHoc.ToString("dd/MM/yyyy")</li>
-                        <li class="list-group-item d-flex justify-content-between"><strong>Ngày tốt nghiệp:</strong> @Model.NgayTotNghiep.ToString("dd/MM/yyyy")</li>
-                        <li class="list-group-item d-flex justify-content-between"><strong>Trạng thái:</strong> @Model.TrangThai?.TenTrangThai</li>
-                        <li class="list-group-item d-flex justify-content-between"><strong>Ghi chú:</strong> @Model.GhiChu</li>
-                        <li class="list-group-item d-flex justify-content-between"><strong>Tài khoản:</strong> @Model.User?.UserName</li>
-                        <li class="list-group-item d-flex justify-content-between"><strong>Ngày tạo:</strong> @Model.CreatedAt.ToString("HH:mm dd/MM/yyyy")</li>
-                        <li class="list-group-item d-flex justify-content-between"><strong>Cập nhật gần nhất:</strong> @Model.UpdatedAt.ToString("HH:mm dd/MM/yyyy")</li>
+                        <li class="list-group-item d-flex justify-content-between"><strong>Ngày nhập học:</strong>
+                            @Model.NgayNhapHoc.ToString("dd/MM/yyyy")</li>
+                        <li class="list-group-item d-flex justify-content-between"><strong>Ngày tốt nghiệp:</strong>
+                            @Model.NgayTotNghiep.ToString("dd/MM/yyyy")</li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Trạng thái:</strong>
+                            <span id="trangthai-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.TrangThai?.TenTrangThai
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                    onclick="editTrangThai('@Model.MSSV', '@Model.TrangThaiId', '@(Model.TrangThai?.TenTrangThai ?? "Chưa xác định")')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Ghi chú:</strong>
+                            <span id="ghichu-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.GhiChu
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                    onclick="editGhiChu('@Model.MSSV', '@Model.GhiChu')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between"><strong>Tài khoản:</strong>
+                            @Model.User?.UserName</li>
+                        <li class="list-group-item d-flex justify-content-between"><strong>Ngày tạo:</strong>
+                            @Model.CreatedAt.ToString("HH:mm dd/MM/yyyy")</li>
+                        <li class="list-group-item d-flex justify-content-between"><strong>Cập nhật gần nhất:</strong>
+                            @Model.UpdatedAt.ToString("HH:mm dd/MM/yyyy")</li>
                     </ul>
                 </div>
 
@@ -94,7 +185,8 @@
                     <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning me-2">
                         <i class="fa-solid fa-pen-to-square me-2"></i>Sửa
                     </a>
-                    <form asp-action="ResetPassword" asp-route-id="@Model.Id" asp-route-type="SinhVien" method="post" class="d-inline">
+                    <form asp-action="ResetPassword" asp-route-id="@Model.Id" asp-route-type="SinhVien" method="post"
+                        class="d-inline">
                         <button type="submit" class="btn btn-primary me-2">
                             <i class="fa-solid fa-key me-2"></i>
                             Cấp lại mật khẩu
@@ -111,3 +203,454 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+
+    <script>
+        window.__accessToken = @Html.Raw(Json.Serialize(token));
+    </script>
+
+    <script>
+
+        function editField(field, mssv, hoVaTenDem, ten) {
+            // Hiện ô input để sửa
+            let html = `
+                    <input type="text" id="hoten-dem" value="${hoVaTenDem}" style="width:120px;" />
+                    <input type="text" id="hoten-ten" value="${ten}" style="width:80px;" />
+                    <button class="btn btn-sm btn-success ms-1" onclick="saveField('${field}', '${mssv}')">Lưu</button>
+                    <button class="btn btn-sm btn-secondary ms-1" onclick="cancelEditField('${field}', '${hoVaTenDem}', '${ten}')">Hủy</button>
+                `;
+            document.getElementById('hoten-val').innerHTML = html;
+        }
+
+        function saveField(field, mssv) {
+            const hoVaTenDem = document.getElementById('hoten-dem').value;
+            const ten = document.getElementById('hoten-ten').value;
+            var token = window.__accessToken;
+
+            fetch(`/api/suathongtinsinhvien/${mssv}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    HoVaTenDem: hoVaTenDem,
+                    Ten: ten
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('hoten-val').innerHTML = `${hoVaTenDem} ${ten}`;
+                        // Có thể show toast hoặc alert thành công ở đây
+                    } else {
+                        alert('Lỗi: ' + data.message);
+                    }
+                });
+        }
+
+        function cancelEditField(field, hoVaTenDem, ten) {
+            document.getElementById('hoten-val').innerHTML = `${hoVaTenDem} ${ten}`;
+        }
+
+        function editGender(mssv, gioiTinh) {
+            let html = `
+                    <select id="gender-input" class="form-select form-select-sm" style="width:100px;display:inline-block;">
+                        <option value="true" ${gioiTinh === "True" || gioiTinh === "true" || gioiTinh === true ? 'selected' : ''}>Nam</option>
+                        <option value="false" ${gioiTinh === "False" || gioiTinh === "false" || gioiTinh === false ? 'selected' : ''}>Nữ</option>
+                    </select>
+                    <button class="btn btn-sm btn-success ms-1" onclick="saveGender('${mssv}')">Lưu</button>
+                    <button class="btn btn-sm btn-secondary ms-1" onclick="cancelGender('${mssv}', '${gioiTinh}')">Hủy</button>
+                `;
+            document.getElementById('gioitinh-val').innerHTML = html;
+        }
+
+        function saveGender(mssv) {
+            const gioiTinh = document.getElementById('gender-input').value === "true";
+            var token = window.__accessToken;
+            fetch(`/api/suathongtinsinhvien/${mssv}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    GioiTinh: gioiTinh
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('gioitinh-val').innerHTML = (gioiTinh ? "Nam" : "Nữ")
+                            + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editGender('${mssv}', '${gioiTinh}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        alert('Lỗi: ' + data.message);
+                    }
+                });
+        }
+
+        function cancelGender(mssv, oldValue) {
+            let genderLabel = (oldValue === "True" || oldValue === "true" || oldValue === true) ? "Nam" : "Nữ";
+            document.getElementById('gioitinh-val').innerHTML = genderLabel
+                + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editGender('${mssv}', '${oldValue}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+        function editNgaySinh(mssv, ngaysinh) {
+            let html = `
+                    <input type="date" id="ngaysinh-input" value="${ngaysinh}" class="form-control form-control-sm" style="width:150px;display:inline-block;" />
+                    <button class="btn btn-sm btn-success ms-1" onclick="saveNgaySinh('${mssv}')">Lưu</button>
+                    <button class="btn btn-sm btn-secondary ms-1" onclick="cancelNgaySinh('${mssv}', '${ngaysinh}')">Hủy</button>
+                    <span id="ngaysinh-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+                `;
+            document.getElementById('ngaysinh-val').innerHTML = html;
+        }
+
+        function saveNgaySinh(mssv) {
+            const ngaysinh = document.getElementById('ngaysinh-input').value;
+            const errSpan = document.getElementById('ngaysinh-error');
+            if (!ngaysinh) {
+                errSpan.innerText = "Ngày sinh không được bỏ trống!";
+                return;
+            }
+
+            // Kiểm tra phải là quá khứ và đủ 18 tuổi
+            const dob = new Date(ngaysinh);
+            const today = new Date();
+            const age = today.getFullYear() - dob.getFullYear();
+            const m = today.getMonth() - dob.getMonth();
+            const d = today.getDate() - dob.getDate();
+            let is18 = (age > 18) || (age === 18 && (m > 0 || (m === 0 && d >= 0)));
+
+            if (dob >= today) {
+                errSpan.innerText = "Ngày sinh phải nhỏ hơn hiện tại!";
+                return;
+            }
+            if (!is18) {
+                errSpan.innerText = "Sinh viên phải đủ 18 tuổi trở lên!";
+                return;
+            }
+
+            var token = window.__accessToken;
+            fetch(`/api/suathongtinsinhvien/${mssv}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    NgaySinh: ngaysinh
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        // format lại dạng dd/MM/yyyy
+                        const date = new Date(ngaysinh);
+                        const formatted = date.toLocaleDateString('vi-VN');
+                        document.getElementById('ngaysinh-val').innerHTML = formatted +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editNgaySinh('${mssv}', '${ngaysinh}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelNgaySinh(mssv, ngaysinh) {
+            const date = new Date(ngaysinh);
+            document.getElementById('ngaysinh-val').innerHTML =
+                date.toLocaleDateString('vi-VN') +
+                `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editNgaySinh('${mssv}', '${ngaysinh}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+        function editCCCD(mssv, cccd) {
+            let html = `
+                    <input type="text" id="cccd-input" value="${cccd}" class="form-control form-control-sm" style="width:160px;display:inline-block;" maxlength="12"/>
+                    <button class="btn btn-sm btn-success ms-1" onclick="saveCCCD('${mssv}')">Lưu</button>
+                    <button class="btn btn-sm btn-secondary ms-1" onclick="cancelCCCD('${mssv}', '${cccd}')">Hủy</button>
+                    <span id="cccd-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+                `;
+            document.getElementById('cccd-val').innerHTML = html;
+        }
+
+        function saveCCCD(mssv) {
+            const cccd = document.getElementById('cccd-input').value.trim();
+            const errSpan = document.getElementById('cccd-error');
+
+            // Validate CCCD: phải có 12 số, chỉ chứa số, không ký tự đặc biệt
+            if (!/^\d{12}$/.test(cccd)) {
+                errSpan.innerText = "CCCD phải gồm đúng 12 số!";
+                return;
+            }
+
+            var token = window.__accessToken;
+            fetch(`/api/suathongtinsinhvien/${mssv}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    CCCD: cccd
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('cccd-val').innerHTML = cccd +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editCCCD('${mssv}', '${cccd}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelCCCD(mssv, cccd) {
+            document.getElementById('cccd-val').innerHTML =
+                cccd + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editCCCD('${mssv}', '${cccd}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+        function editPhone(mssv, phone) {
+            let html = `
+                    <input type="text" id="phone-input" value="${phone ?? ''}" class="form-control form-control-sm" style="width:140px;display:inline-block;" maxlength="10"/>
+                    <button class="btn btn-sm btn-success ms-1" onclick="savePhone('${mssv}')">Lưu</button>
+                    <button class="btn btn-sm btn-secondary ms-1" onclick="cancelPhone('${mssv}', '${phone ?? ''}')">Hủy</button>
+                    <span id="phone-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+                `;
+            document.getElementById('phone-val').innerHTML = html;
+        }
+
+        function savePhone(mssv) {
+            const phone = document.getElementById('phone-input').value.trim();
+            const errSpan = document.getElementById('phone-error');
+
+            // Phone: phải 10 số, bắt đầu bằng 0
+            if (!/^0\d{9}$/.test(phone)) {
+                errSpan.innerText = "Số điện thoại phải gồm đúng 10 số và bắt đầu bằng 0!";
+                return;
+            }
+
+            var token = window.__accessToken;
+            fetch(`/api/suathongtinsinhvien/${mssv}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    PhoneNumber: phone
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('phone-val').innerHTML = phone +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editPhone('${mssv}', '${phone}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelPhone(mssv, phone) {
+            document.getElementById('phone-val').innerHTML =
+                phone + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editPhone('${mssv}', '${phone}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+
+        function editEmail(mssv, email) {
+            let html = `
+            <input type="email" id="email-input" value="${email ?? ''}" class="form-control form-control-sm" style="width:200px;display:inline-block;" />
+            <button class="btn btn-sm btn-success ms-1" onclick="saveEmail('${mssv}')">Lưu</button>
+            <button class="btn btn-sm btn-secondary ms-1" onclick="cancelEmail('${mssv}', '${email ?? ''}')">Hủy</button>
+            <span id="email-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+        `;
+            document.getElementById('email-val').innerHTML = html;
+        }
+
+        function saveEmail(mssv) {
+            const email = document.getElementById('email-input').value.trim();
+            const errSpan = document.getElementById('email-error');
+
+            var token = window.__accessToken;
+            fetch(`/api/suathongtinsinhvien/${mssv}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    Email: email
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('email-val').innerHTML = email +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editEmail('${mssv}', '${email}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelEmail(mssv, email) {
+            document.getElementById('email-val').innerHTML =
+                email + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editEmail('${mssv}', '${email}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+        function editDiaChi(mssv, diachi) {
+            let html = `
+                    <input type="text" id="diachi-input" value="${diachi ?? ''}" class="form-control form-control-sm" style="width:230px;display:inline-block;" maxlength="150" />
+                    <button class="btn btn-sm btn-success ms-1" onclick="saveDiaChi('${mssv}')">Lưu</button>
+                    <button class="btn btn-sm btn-secondary ms-1" onclick="cancelDiaChi('${mssv}', '${diachi ?? ''}')">Hủy</button>
+                    <span id="diachi-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+                `;
+            document.getElementById('diachi-val').innerHTML = html;
+        }
+
+        function saveDiaChi(mssv) {
+            const diachi = document.getElementById('diachi-input').value.trim();
+            const errSpan = document.getElementById('diachi-error');
+
+            // Nếu muốn bắt buộc điền thì validate như dưới, còn không thì bỏ cũng được
+            if (!diachi) {
+                errSpan.innerText = "Địa chỉ không được để trống!";
+                return;
+            }
+
+            var token = window.__accessToken;
+            fetch(`/api/suathongtinsinhvien/${mssv}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    DiaChi: diachi
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('diachi-val').innerHTML = diachi +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editDiaChi('${mssv}', '${diachi}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelDiaChi(mssv, diachi) {
+            document.getElementById('diachi-val').innerHTML =
+                diachi + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editDiaChi('${mssv}', '${diachi}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+        function editTrangThai(mssv, trangThaiId, tenTrangThai) {
+            let optionsHtml = trangThaiOptions.map(opt =>
+                `<option value="${opt.id}" ${parseInt(trangThaiId) === opt.id ? "selected" : ""}>${opt.label}</option>`
+            ).join('');
+            let html = `
+                    <select id="trangthai-input" class="form-select form-select-sm" style="width:160px;display:inline-block;">
+                        ${optionsHtml}
+                    </select>
+                    <button class="btn btn-sm btn-success ms-1" onclick="saveTrangThai('${mssv}')">Lưu</button>
+                    <button class="btn btn-sm btn-secondary ms-1" onclick="cancelTrangThai('${mssv}', '${trangThaiId}', '${tenTrangThai}')">Hủy</button>
+                    <span id="trangthai-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+                `;
+            document.getElementById('trangthai-val').innerHTML = html;
+        }
+
+        function saveTrangThai(mssv) {
+            const trangThaiId = document.getElementById('trangthai-input').value;
+            const errSpan = document.getElementById('trangthai-error');
+            var token = window.__accessToken;
+
+            fetch(`/api/suathongtinsinhvien/${mssv}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    TrangThaiId: parseInt(trangThaiId)
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        const label = trangThaiOptions.find(x => x.id == trangThaiId)?.label ?? "";
+                        document.getElementById('trangthai-val').innerHTML = label +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editTrangThai('${mssv}', '${trangThaiId}', '${label}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelTrangThai(mssv, trangThaiId, tenTrangThai) {
+            document.getElementById('trangthai-val').innerHTML =
+                tenTrangThai + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editTrangThai('${mssv}', '${trangThaiId}', '${tenTrangThai}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+        function editGhiChu(mssv, ghiChu) {
+            let html = `
+                    <input type="text" id="ghichu-input" value="${ghiChu ? ghiChu.replace(/"/g, '&quot;') : ''}" class="form-control form-control-sm" style="width:200px;display:inline-block;" maxlength="255"/>
+                    <button class="btn btn-sm btn-success ms-1" onclick="saveGhiChu('${mssv}')">Lưu</button>
+                    <button class="btn btn-sm btn-secondary ms-1" onclick="cancelGhiChu('${mssv}', '${ghiChu ? ghiChu.replace(/'/g, "\\'") : ''}')">Hủy</button>
+                    <span id="ghichu-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+                `;
+            document.getElementById('ghichu-val').innerHTML = html;
+        }
+
+        function saveGhiChu(mssv) {
+            const ghiChu = document.getElementById('ghichu-input').value.trim();
+            const errSpan = document.getElementById('ghichu-error');
+            var token = window.__accessToken;
+
+            if (ghiChu.length > 255) {
+                errSpan.innerText = "Ghi chú tối đa 255 ký tự!";
+                return;
+            }
+
+            fetch(`/api/suathongtinsinhvien/${mssv}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    GhiChu: ghiChu
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('ghichu-val').innerHTML = ghiChu +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editGhiChu('${mssv}', '${ghiChu.replace(/'/g, "\\'")}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelGhiChu(mssv, ghiChu) {
+            document.getElementById('ghichu-val').innerHTML =
+                ghiChu + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editGhiChu('${mssv}', '${ghiChu.replace(/'/g, "\\'")}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+
+    </script>
+
+    <script>
+        // Mảng trạng thái lấy động từ ViewBag
+        const trangThaiOptions = [
+                @foreach (var item in ViewBag.TrangThaiList)
+            {
+                <text>{id: @item.Id, label: "@item.TenTrangThai" },</text>
+                }
+            ];
+    </script>
+
+
+}
