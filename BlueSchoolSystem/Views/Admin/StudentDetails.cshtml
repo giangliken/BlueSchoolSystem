@@ -182,9 +182,7 @@
                 </div>
 
                 <div class="card-footer bg-light text-center">
-                    <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning me-2">
-                        <i class="fa-solid fa-pen-to-square me-2"></i>Sửa
-                    </a>
+
                     <form asp-action="ResetPassword" asp-route-id="@Model.Id" asp-route-type="SinhVien" method="post"
                         class="d-inline">
                         <button type="submit" class="btn btn-primary me-2">
