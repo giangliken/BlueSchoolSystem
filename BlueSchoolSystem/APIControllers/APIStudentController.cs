@@ -221,25 +221,28 @@ namespace BlueSchoolSystem.APIControllers
 
             return Ok(new
             {
+                result = true,
+                code = 200,
                 message = "Tạo sinh viên và tài khoản thành công!",
                 studentId = student.Id,
                 userId = user.Id
             });
         }
 
-        //Sửa thông tin sinh viên
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpPut("suathongtinsinhvien/{id}")]
-        public async Task<IActionResult> UpdateStudent(int id, [FromBody] UpdateStudentRequest request)
+        [HttpPut("suathongtinsinhvien/{mssv}")]
+        public async Task<IActionResult> UpdateStudentByMSSV(string mssv, [FromBody] UpdateStudentRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var student = await _context.SinhViens.FindAsync(id);
+            var student = await _context.SinhViens
+                .Include(sv => sv.User)
+                .FirstOrDefaultAsync(sv => sv.MSSV == mssv);
+
             if (student == null)
                 return NotFound(new { message = "Không tìm thấy sinh viên." });
 
-            // Cập nhật thông tin sinh viên
             if (request.MSSV != null) student.MSSV = request.MSSV;
             if (request.HoVaTenDem != null) student.HoVaTenDem = request.HoVaTenDem;
             if (request.Ten != null) student.Ten = request.Ten;
@@ -247,19 +250,50 @@ namespace BlueSchoolSystem.APIControllers
             if (request.NgaySinh.HasValue) student.NgaySinh = request.NgaySinh.Value;
             if (request.GioiTinh.HasValue) student.GioiTinh = request.GioiTinh.Value;
             if (request.DiaChi != null) student.DiaChi = request.DiaChi;
-            if (request.LopId.HasValue) student.LopId = request.LopId.Value;
-            if (request.NgayNhapHoc.HasValue) student.NgayNhapHoc = request.NgayNhapHoc.Value;
-            if (request.NgayTotNghiep.HasValue) student.NgayTotNghiep = request.NgayTotNghiep.Value;
-            if (request.TrangThai != null) student.TrangThai = request.TrangThai;
+            //if (request.LopId.HasValue) student.LopId = request.LopId.Value;
+            //if (request.NgayNhapHoc.HasValue) student.NgayNhapHoc = request.NgayNhapHoc.Value;
+            //if (request.NgayTotNghiep.HasValue) student.NgayTotNghiep = request.NgayTotNghiep.Value;
+            if (request.TrangThaiId.HasValue) student.TrangThaiId = request.TrangThaiId.Value;
             if (request.GhiChu != null) student.GhiChu = request.GhiChu;
-            if (request.AvatarUrl != null) student.AvatarUrl = request.AvatarUrl;
+            //if (request.AvatarUrl != null) student.AvatarUrl = request.AvatarUrl;
 
             student.UpdatedAt = DateTime.Now;
 
+            if (student.User != null)
+            {
+                var userManager = HttpContext.RequestServices.GetService<UserManager<ApplicationUser>>();
+                bool userChanged = false;
+
+                if (!string.IsNullOrWhiteSpace(request.PhoneNumber) && student.User.PhoneNumber != request.PhoneNumber)
+                {
+                    student.User.PhoneNumber = request.PhoneNumber;
+                    userChanged = true;
+                }
+                if (!string.IsNullOrWhiteSpace(request.Email) && student.User.Email != request.Email)
+                {
+                    var result = await userManager.SetEmailAsync(student.User, request.Email);
+                    if (!result.Succeeded)
+                        return BadRequest(new { message = "Không thể cập nhật Email tài khoản." });
+                    userChanged = true;
+                }
+                if (userChanged)
+                {
+                    var updateResult = await userManager.UpdateAsync(student.User);
+                    if (!updateResult.Succeeded)
+                        return BadRequest(new { message = "Lỗi khi cập nhật tài khoản sinh viên." });
+                }
+            }
+
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Cập nhật thông tin sinh viên thành công!" });
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Cập nhật thông tin sinh viên thành công!"
+            });
         }
+
 
         //Lấy danh sách thời khóa biểu theo mã số sinh viên
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
