@@ -134,21 +134,64 @@
             opacity: 1;
         }
 
-    #weekSelect {
-        max-height: 200px; /* Giới hạn chiều cao dropdown */
-        overflow-y: auto;
+    /* Đồng bộ select */
+    #weekSelect,
+    #monthSelect {
+        border-radius: 8px;
+        transition: all 0.2s ease-in-out;
+        min-width: 220px;
+        height: 42px;
+        font-size: 1rem; /* giống lịch thi */
+        color: #0d6efd; /* chữ xanh */
+        font-weight: 500; /* đậm vừa */
+        border: 1px solid #0d6efd;
     }
 
-        #weekSelect option {
-            padding: 4px 6px;
+        /* Hiệu ứng hover */
+        #weekSelect:hover,
+        #monthSelect:hover {
+            box-shadow: 0 0 6px rgba(13,110,253,.3);
         }
 
+        /* Đồng bộ luôn các option bên trong */
+        #weekSelect option,
+        #monthSelect option {
+            font-size: 1rem;
+            color: #0d6efd;
+            font-weight: 500;
+        }
 
 
     .btn-group .btn,
     #weekSelect {
         font-size: 13px;
         padding: 4px 8px;
+    }
+
+    /* Style đồng bộ cho nút điều hướng & nút toggle */
+    .btn-sm, #btnToggle, #btnCurrentWeek, #btnCurrentMonth {
+        border-radius: 8px !important;
+        height: 42px !important;
+        font-size: 1rem !important;
+        padding: 0 14px !important;
+        min-width: 100px; /* để cân đối với select */
+    }
+
+    /* Riêng nút mũi tên nhỏ hơn một chút */
+    .btn-outline-primary.btn-sm {
+        min-width: 100px !important;
+        padding: 0 !important;
+    }
+
+    .form-select {
+        border-radius: 8px;
+        transition: all 0.2s ease-in-out;
+        min-width: 300px;
+        height: 42px;
+        font-size: 1rem;
+    }
+        .form-select:hover {
+        box-shadow: 0 0 6px rgba(13,110,253,.3);
     }
 </style>
 
@@ -202,7 +245,7 @@
     <!-- Combobox chọn tuần -->
     <select id="weekSelect"
         onchange="goToSelectedWeek(this.value)"
-        class="form-select form-select-sm"
+        class="form-select "
         style="width:220px;display:inline-block;">
         @for (int i = -4; i <= 4; i++)
         {
@@ -220,7 +263,7 @@
         }
      </select>
     <!-- Combobox chọn tháng -->
-    <select id="monthSelect" onchange="goToMonth(this.value)" class="form-select form-select-sm"
+    <select id="monthSelect" onchange="goToMonth(this.value)" class="form-select "
             style="width: 160px; display:none;">
         @for (int m = 1; m <= 12; m++)
         {
