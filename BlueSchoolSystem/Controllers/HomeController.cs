@@ -2,6 +2,7 @@
 using BlueSchoolSystem.Models.ViewModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Net.Http.Headers;
@@ -123,15 +124,44 @@ namespace BlueSchoolSystem.Controllers
                        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
                        User.Identity?.Name;
 
-
-
             if (string.IsNullOrEmpty(mssv))
             {
                 ViewBag.Error = "Không xác định được MSSV của người dùng.";
                 return View(new List<LichThiViewModel>());
             }
 
-            var response = await client.GetAsync($"api/lichthisinhvien/{mssv}");
+            // Lấy ngày nhập học từ DB
+            var ngayNhapHoc = await _context.SinhViens
+                .Where(s => s.MSSV == mssv)
+                .Select(s => s.NgayNhapHoc)
+                .FirstOrDefaultAsync();
+
+            // Lấy danh sách học kỳ từ bảng HocKys (lọc >= ngày nhập học)
+            var hocKyData = await _context.HocKys
+                .Where(hk => hk.NgayBatDau >= ngayNhapHoc)
+                .OrderByDescending(hk => hk.NgayBatDau)
+                .Select(hk => new
+                {
+                    hk.Id,
+                    hk.TenHocKy,
+                    hk.NgayBatDau
+                })
+                .ToListAsync();
+
+            // Nếu chưa chọn thì mặc định chọn học kỳ mới nhất
+            if (string.IsNullOrEmpty(hocKy) && hocKyData.Any())
+            {
+                hocKy = hocKyData.First().Id.ToString();
+            }
+
+            // Gán học kỳ đã chọn
+            ViewBag.HocKySelected = int.TryParse(hocKy, out var hkId) ? hkId : 0;
+
+            // Dropdown từ bảng HocKys
+            ViewBag.HocKyList = new SelectList(hocKyData, "Id", "TenHocKy", ViewBag.HocKySelected);
+
+            // Gọi API lấy lịch thi của sinh viên
+            var response = await client.GetAsync($"api/lichthisinhvien/{mssv}?hocKyId={ViewBag.HocKySelected}");
             if (!response.IsSuccessStatusCode)
             {
                 ViewBag.Error = "Không thể lấy lịch thi từ API.";
@@ -148,61 +178,31 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<LichThiViewModel>());
             }
 
-            // Lấy toàn bộ danh sách học kỳ từ API
-            var hocKys = JsonDocument.Parse(body)
-                                     .RootElement
-                                     .GetProperty("data");
-
-            // Lấy ngày nhập học của sinh viên từ DB
-            var ngayNhapHoc = await _context.SinhViens
-                .Where(s => s.MSSV == mssv)
-                .Select(s => s.NgayNhapHoc)
-                .FirstOrDefaultAsync();
-
-            // Lấy danh sách học kỳ từ API và lọc theo ngày nhập học
-            ViewBag.HocKyList = hocKys.EnumerateArray()
-                .Select(hk => new
-                {
-                    HocKyId = hk.GetProperty("hocKyId").GetInt32(),
-                    TenHocKy = hk.GetProperty("tenHocKy").GetString(),
-                    NgayBatDau = hk.GetProperty("ngayBatDau").GetDateTime()
-                })
-                .Where(hk => hk.NgayBatDau >= ngayNhapHoc)  // 👉 chỉ lấy học kỳ sau ngày nhập học
-                .OrderByDescending(hk => hk.NgayBatDau)
-                .ToList();
-            // Kiểm tra null
-            if (ViewBag.HocKyList == null)
-            {
-                ViewBag.HocKyList = new List<object>(); // danh sách rỗng để tránh null
-            }
-
-            // Nếu chưa chọn thì mặc định học kỳ mới nhất
-            var hocKyList = (IEnumerable<dynamic>)ViewBag.HocKyList;
-
-            if (string.IsNullOrEmpty(hocKy) && hocKyList.Any())
-            {
-                hocKy = hocKyList.First().HocKyId.ToString();
-            }
-
-            ViewBag.HocKySelected = int.TryParse(hocKy, out var hkId) ? hkId : 0;
-
-            // Tìm học kỳ được chọn
-            var selectedElement = hocKys.EnumerateArray()
-                .FirstOrDefault(hk => hk.GetProperty("hocKyId").GetInt32() == ViewBag.HocKySelected);
-
-            // Nếu có thì lấy trực tiếp `lichThis`
+            // Deserialize lịch thi
             List<LichThiViewModel> lichThi = new();
-            if (selectedElement.ValueKind != JsonValueKind.Undefined &&
-                selectedElement.TryGetProperty("lichThis", out var lichThiElement))
+
+            if (dataElement.ValueKind == JsonValueKind.Array)
             {
-                lichThi = JsonSerializer.Deserialize<List<LichThiViewModel>>(
-                    lichThiElement.GetRawText(),
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                ) ?? new List<LichThiViewModel>();
+                // Tìm học kỳ đã chọn trong mảng data
+                var selectedHocKy = dataElement
+                    .EnumerateArray()
+                    .FirstOrDefault(hk => hk.GetProperty("hocKyId").GetInt32() == ViewBag.HocKySelected);
+
+                if (selectedHocKy.ValueKind != JsonValueKind.Undefined &&
+                    selectedHocKy.TryGetProperty("lichThis", out var lichThisElement) &&
+                    lichThisElement.ValueKind == JsonValueKind.Array)
+                {
+                    lichThi = JsonSerializer.Deserialize<List<LichThiViewModel>>(
+                        lichThisElement.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    ) ?? new List<LichThiViewModel>();
+                }
             }
 
             return View(lichThi);
         }
+
+
         //Giao diện Xem điểm
         public IActionResult XemDiem()
         {
