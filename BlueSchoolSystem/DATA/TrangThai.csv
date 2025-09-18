@@ -1,0 +1,31 @@
+"Id","TenTrangThai","MoTa","LoaiTrangThai"
+1,Chưa nhập học,Sinh viên chưa nhập học,SinhVien
+2,Đang học,Sinh viên đang theo học,SinhVien
+3,Bảo lưu,Sinh viên bảo lưu kết quả,SinhVien
+4,Đã tốt nghiệp,Sinh viên đã hoàn thành chương trình,SinhVien
+5,Thôi học,Sinh viên thôi học,SinhVien
+6,Chờ xét tốt nghiệp,Sinh viên chờ xét tốt nghiệp,SinhVien
+7,Đang mở,Lớp học phần đang được mở,LopHocPhan
+8,Đã kết thúc,Lớp học phần đã hoàn thành,LopHocPhan
+9,Đã huỷ,Lớp học phần bị huỷ,LopHocPhan
+10,Chờ mở,Lớp học phần chờ đủ số lượng để mở,LopHocPhan
+11,Bắt buộc,Môn học bắt buộc trong chương trình,MonHoc
+12,Tự chọn,Môn học tự chọn,MonHoc
+13,Đã hoàn thành,Môn học đã hoàn thành,MonHoc
+14,Chờ duyệt,Chưa được duyệt,DangKy
+15,Đã duyệt,Đã được duyệt,DangKy
+16,Bị từ chối,Không được duyệt,DangKy
+17,Đang công tác,Giảng viên đang giảng dạy hoặc công tác tại trường,GiangVien
+18,Nghỉ phép,Giảng viên xin nghỉ phép (ngắn hạn),GiangVien
+19,Nghỉ việc,"Giảng viên đã nghỉ việc, không còn thuộc biên chế trường",GiangVien
+20,Tạm ngưng giảng dạy,Giảng viên tạm thời ngừng công tác giảng dạy,GiangVien
+21,Đang đào tạo nâng cao,Giảng viên được cử đi học/đào tạo nâng cao,GiangVien
+22,Đang thử việc,Giảng viên trong thời gian thử việc,GiangVien
+23,Đã nghỉ hưu,Giảng viên đã nghỉ hưu theo chế độ,GiangVien
+24,Hợp đồng hết hạn,Giảng viên có hợp đồng lao động đã hết hạn,GiangVien
+25,Có mặt,Sinh viên tham gia đầy đủ buổi học,DiemDanh
+26,Vắng mặt,Sinh viên không tham dự buổi học,DiemDanh
+27,Đi trễ,Sinh viên đến lớp nhưng trễ giờ,DiemDanh
+28,Về sớm,Sinh viên rời lớp sớm hơn giờ quy định,DiemDanh
+29,Có phép,Sinh viên vắng mặt có lý do và đã xin phép,DiemDanh
+30,Không phép,Sinh viên vắng mặt không có lý do chính đáng,DiemDanh
