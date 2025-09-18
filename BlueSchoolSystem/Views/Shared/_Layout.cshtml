@@ -50,7 +50,13 @@
                     </li> *@
                     <li>
                         <a href="/Admin/StudentManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/StudentManager") ? "active text-white bg-primary" : "text-white")">
-                            <i class="fa-solid fa-users me-2"></i>Quản lý sinh viên
+                            <i class="fa-solid fa-users me-2"></i>Sinh viên
+                        </a>
+
+                    </li>
+                    <li>
+                        <a href="/Admin/TeacherManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/TeacherManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-users me-2"></i>Cán bộ / Giảng viên
                         </a>
 
                     </li>
