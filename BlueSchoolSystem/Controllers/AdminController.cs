@@ -380,7 +380,6 @@ namespace BlueSchoolSystem.Controllers
             return DateTime.MinValue;
         }
 
-
         //File mẫu định dạng Import danh sách sinh viên
         public IActionResult DownloadStudentExcelTemplate()
         {
@@ -435,6 +434,13 @@ namespace BlueSchoolSystem.Controllers
             return View(sinhVien);
         }
 
+
+        //Trang quản lí giảng viên
+        public IActionResult TeacherManager()
+        {
+            return View();
+        }
+
         [HttpPost]
         public async Task<IActionResult> ResetPassword(int id, string type)
         {
@@ -472,7 +478,6 @@ namespace BlueSchoolSystem.Controllers
                 return RedirectToAction("TeacherDetails", "GiangVien", new { id = id });
         }
 
-
         //Hàm cấp lại mật khẩu tài khoản sinh viên
         public async Task<bool> ResetPasswordToDefaultAsync(string userId, string defaultPassword = "Abc@123")
         {
@@ -485,10 +490,6 @@ namespace BlueSchoolSystem.Controllers
 
             return result.Succeeded;
         }
-
-
-
-
 
         //Trang quản lí khoa viện
         public async Task<IActionResult> FacultyManager()
