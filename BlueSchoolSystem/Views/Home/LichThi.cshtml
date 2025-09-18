@@ -95,25 +95,8 @@
         <div class="mb-3 d-flex align-items-center justify-content-between">
             <form method="get" asp-action="LichThi" class="mb-0">
                 <select name="hocKy" class="form-select fw-semibold text-primary border-primary"
+                        asp-items="ViewBag.HocKyList"
                         onchange="this.form.submit()">
-                    @if (ViewBag.HocKyList != null)
-                    {
-                        foreach (var hk in ViewBag.HocKyList)
-                        {
-                            if (hk.HocKyId == ViewBag.HocKySelected)
-                            {
-                                <option value="@hk.HocKyId" selected="selected">@hk.TenHocKy</option>
-                            }
-                            else
-                            {
-                                <option value="@hk.HocKyId">@hk.TenHocKy</option>
-                            }
-                        }
-                    }
-                    else
-                    {
-                        <option disabled selected>Không có học kỳ</option>
-                    }
                 </select>
             </form>
         </div>
