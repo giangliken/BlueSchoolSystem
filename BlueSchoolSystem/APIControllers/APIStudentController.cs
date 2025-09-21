@@ -460,6 +460,109 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+        //Lấy điểm của sinh viên
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
+        [HttpGet("diemsinhvien/{mssv}")]
+        public async Task<IActionResult> GetDiemByMSSV(string mssv, [FromQuery] int? hocKyId)
+        {
+            var mssvFromToken = User.FindFirst("username")?.Value;
+
+            if (mssvFromToken == null)
+            {
+                return Unauthorized(new
+                {
+                    result = false,
+                    code = 401,
+                    message = "Không lấy được MSSV từ token"
+                });
+            }
+
+            if (mssvFromToken != mssv)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    result = false,
+                    code = 403,
+                    message = "Bạn không có quyền truy cập điểm của sinh viên khác"
+                });
+            }
+
+            // Truy vấn điểm + môn học + học kỳ
+            var query = from bd in _context.BangDiems
+                        join sv in _context.SinhViens on bd.SinhVienId equals sv.Id
+                        join lhp in _context.LopHocPhans on bd.LopHocPhanId equals lhp.Id
+                        join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                        join hk in _context.HocKys on lhp.HocKyId equals hk.Id
+                        join ct in _context.ChiTietLopHocPhans
+                             on new { SinhVienId = bd.SinhVienId, LopHocPhanId = bd.LopHocPhanId }
+                             equals new { SinhVienId = ct.SinhVienId.Value, LopHocPhanId = ct.LopHocPhanId }
+                             into gj
+                        from ct in gj.DefaultIfEmpty()
+                        where sv.MSSV == mssv
+                        select new
+                        {
+                            sv.MSSV,
+                            HocKyId = hk.Id,
+                            hk.TenHocKy,
+                            hk.NgayBatDau,
+                            mh.MaMonHoc,
+                            mh.TenMonHoc,
+                            mh.SoTinChi,
+                            DiemQuaTrinh = bd.DiemChuyenCan,
+                            DiemCuoiKy = bd.DiemCuoiKy,
+                            HopLe = ct != null
+                        };
+
+            // Nếu có hocKyId thì lọc
+            if (hocKyId.HasValue && hocKyId.Value > 0)
+            {
+                query = query.Where(x => x.HocKyId == hocKyId.Value);
+            }
+
+            var diem = await query
+                .GroupBy(x => new { x.HocKyId, x.TenHocKy, x.NgayBatDau })
+                .Select(g => new
+                {
+                    HocKyId = g.Key.HocKyId,
+                    TenHocKy = g.Key.TenHocKy,
+                    NgayBatDau = g.Key.NgayBatDau,
+                    Diems = g.OrderBy(x => x.MaMonHoc).ToList()
+                })
+                .OrderByDescending(x => x.NgayBatDau)
+                .ToListAsync();
+
+            if (!diem.Any())
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy điểm cho MSSV này"
+                });
+            }
+
+            // Kiểm tra dữ liệu không hợp lệ
+            var diemKhongHopLe = diem.SelectMany(d => d.Diems).Where(d => !d.HopLe).ToList();
+            if (diemKhongHopLe.Any())
+            {
+                return BadRequest(new
+                {
+                    result = false,
+                    code = 400,
+                    message = "Có dữ liệu điểm nhưng sinh viên chưa đăng ký lớp trong ChiTietLopHocPhans",
+                    data = diemKhongHopLe
+                });
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy điểm thành công",
+                soluong = diem.Count,
+                data = diem
+            });
+        }
 
     }
 }

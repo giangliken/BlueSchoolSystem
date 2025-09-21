@@ -1,5 +1,237 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
-@{
-}
+﻿@model IEnumerable<BlueSchoolSystem.Models.ViewModel.DiemSinhVienViewModel>
+<style>
+    /* Card */
+    .card {
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    /* Header */
+    .card-header {
+        background: linear-gradient(90deg, #0dcaf0, #0d9dfd);
+        color: white;
+        font-weight: bold;
+        border-bottom: none !important;
+    }
+
+        .card-header h6 {
+            color: white;
+            margin: 0;
+        }
+
+    /* Dropdown */
+    .form-select {
+        border-radius: 8px;
+        transition: all 0.2s ease-in-out;
+        min-width: 300px;
+        height: 42px;
+        font-size: 1rem;
+    }
+
+        .form-select:hover {
+            box-shadow: 0 0 6px rgba(13,110,253,.3);
+        }
+
+    /* Table */
+    .table-responsive {
+        max-height: 500px;
+        overflow: auto;
+    }
+
+    table.table {
+        border-radius: 8px;
+        overflow: hidden;
+        min-width: 1200px;
+    }
+
+    thead.table-primary {
+        background: linear-gradient(90deg, #0d6efd, #0d9dfd) !important;
+        color: #fff !important;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    /* Sticky columns */
+    th.sticky-col, td.sticky-col {
+        position: sticky;
+        left: 0;
+        background: #f8f9fa !important;
+        z-index: 3;
+        font-weight: 600;
+        border-right: 1px solid #dee2e6;
+    }
+
+    th.sticky-col-2, td.sticky-col-2 {
+        position: sticky;
+        left: 70px; /* chiều rộng STT */
+        background: #f8f9fa !important;
+        z-index: 3;
+        border-right: 1px solid #dee2e6;
+    }
+
+    /* Row hover & alternate */
+    tbody tr:nth-child(even) {
+        background-color: #fafbfc;
+    }
+
+    tbody tr:hover {
+        background-color: #eaf3ff !important;
+    }
+
+    /* STT column */
+    td.sticky-col {
+        text-align: center;
+        font-weight: bold;
+        color: #0d6efd;
+    }
+
+    /* Borders */
+    .table-bordered th, .table-bordered td {
+        border: 1px solid #dee2e6;
+        vertical-align: middle;
+    }
+</style>
+
+<h6>Trang chủ / Học vụ / Xem điểm</h6>
+<div class="card shadow-sm">
+    <div class="card-body">
+
+        <!-- Tabs + Reload -->
+        <div class="d-flex justify-content-between align-items-center">
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tatca-tab" data-bs-toggle="tab" data-bs-target="#tatca" type="button" role="tab">Tất cả</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tichluy-tab" data-bs-toggle="tab" data-bs-target="#tichluy" type="button" role="tab">Tích lũy</button>
+                </li>
+            </ul>
+
+            <a asp-action="XemDiem" class="btn btn-sm btn-outline-primary ms-2">
+                <i class="bi bi-arrow-repeat"></i> Tải lại
+            </a>
+        </div>
+
+        <div class="tab-content mt-3" id="myTabContent">
+            <!-- Tab Tất cả -->
+            <div class="tab-pane fade show active" id="tatca" role="tabpanel" aria-labelledby="tatca-tab">
+                <!-- Bộ lọc chọn học kỳ -->
+                <form method="get" asp-action="XemDiem" class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label for="hocKy" class="form-label">Chọn học kỳ</label>
+                        @Html.DropDownList(
+                                 "hocKy",
+                                 (SelectList)ViewBag.HocKyList,
+                                 new { @class = "form-select", onchange = "this.form.submit();" }
+                                 )
+                    </div>
+                </form>
+
+                @if (ViewBag.Error != null)
+                {
+                    <div class="alert alert-danger">@ViewBag.Error</div>
+                }
+                else if (!Model.Any())
+                {
+                    <div class="alert alert-warning">Chưa có điểm.</div>
+                }
+                else
+                {
+                    <!-- Nhóm điểm theo học kỳ -->
+                    @foreach (var group in Model.GroupBy(m => new { m.HocKyId, m.TenHocKy }))
+                    {
+                        <h6 class="bg-primary text-white p-2">
+                            @group.Key.TenHocKy
+                        </h6>
+
+                        <table class="table table-bordered mb-2">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>STT</th>
+                                    <th>Mã HP</th>
+                                    <th>Tên học phần</th>
+                                    <th>STC</th>
+                                    <th>Điểm kiểm tra 1</th>
+                                    <th>Điểm thi</th>
+                                    <th>Điểm hệ 10</th>
+                                    <th>Điểm hệ 4</th>
+                                    <th>Điểm chữ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var stt = 1;
+                                    foreach (var d in group)
+                                    {
+                                        <tr>
+                                            <td>@stt</td>
+                                            <td>@d.MaMonHoc</td>
+                                            <td>@d.TenMonHoc</td>
+                                            <td>@d.SoTinChi</td>
+                                            <td>@d.DiemQuaTrinh</td>
+                                            <td>@d.DiemCuoiKy</td>
+                                            <td>@d.DiemTongKet</td>
+                                            <td>@d.DiemHe4</td>
+                                            <td>@d.DiemChu</td>
+                                        </tr>
+                                        stt++;
+                                    }
+                                }
+                            </tbody>
+                        </table>
+
+                        <!-- Thống kê dưới mỗi học kỳ -->
+                        <div class="mb-4">
+                            <p>
+                                <strong>Điểm trung bình học kỳ (hệ 4):</strong>
+                                @(group.Any(g => g.DiemHe4.HasValue)
+                                    ? (group.Sum(g => g.DiemHe4.Value * g.SoTinChi) / group.Sum(g => g.SoTinChi)).ToString("0.00")
+                                    : "0.00")
+                            </p>
+                            <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @ViewBag.DiemTBTichLuy</p>
+                            <p><strong>Số tín chỉ đạt:</strong> @group.Where(g => g.DiemHe4 > 0).Sum(g => g.SoTinChi)</p>
+                            <p><strong>Tổng tín chỉ tích lũy:</strong> @ViewBag.TongTinChiTichLuy</p>
+                        </div>
+                    }
+                }
+            </div>
+
+            <!-- Tab Tích lũy -->
+            <div class="tab-pane fade" id="tichluy" role="tabpanel" aria-labelledby="tichluy-tab">
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-primary">
+                            <tr>
+                                <th>STT</th>
+                                <th>Năm học - Học kỳ</th>
+                                <th>Điểm TB học kỳ</th>
+                                <th>Điểm TB tích lũy</th>
+                                <th>Số tín chỉ đạt</th>
+                                <th>Tổng tín chỉ tích lũy</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (ViewBag.TichLuyList != null)
+                            {
+                                var stt = 1;
+                                foreach (var item in ViewBag.TichLuyList)
+                                {
+                                    <tr>
+                                        <td>@stt</td>
+                                        <td>@item.TenHocKy</td>
+                                        <td>@item.DiemTBHocKy</td>
+                                        <td>@item.DiemTBTichLuy</td>
+                                        <td>@item.TinChiDat</td>
+                                        <td>@item.TongTinChiTichLuy</td>
+                                    </tr>
+                                    stt++;
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

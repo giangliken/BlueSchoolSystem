@@ -203,11 +203,211 @@ namespace BlueSchoolSystem.Controllers
         }
 
 
-        //Giao diện Xem điểm
-        public IActionResult XemDiem()
+        // Giao diện Xem điểm
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> XemDiem(string hocKy)
         {
-            return View();
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            // ✅ Lấy MSSV từ token
+            var mssv = User.Identity?.Name ??
+                       User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                       User.FindFirst("username")?.Value;
+
+            if (string.IsNullOrEmpty(mssv))
+            {
+                ViewBag.Error = "Không xác định được MSSV của người dùng.";
+                return View(new List<DiemSinhVienViewModel>());
+            }
+
+            // ✅ Lấy ngày nhập học từ DB
+            var ngayNhapHoc = await _context.SinhViens
+                .Where(s => s.MSSV == mssv)
+                .Select(s => s.NgayNhapHoc)
+                .FirstOrDefaultAsync();
+
+            // ✅ Lấy danh sách học kỳ
+            var hocKyData = await _context.HocKys
+                .Where(hk => hk.NgayBatDau >= ngayNhapHoc)
+                .OrderByDescending(hk => hk.NgayBatDau)
+                .Select(hk => new
+                {
+                    hk.Id,
+                    hk.TenHocKy,
+                    hk.NgayBatDau
+                })
+                .ToListAsync();
+
+            // Nếu chưa chọn thì mặc định học kỳ mới nhất
+            if (string.IsNullOrEmpty(hocKy) && hocKyData.Any())
+            {
+                hocKy = hocKyData.First().Id.ToString();
+            }
+
+            ViewBag.HocKySelected = int.TryParse(hocKy, out var hkId) ? hkId : 0;
+            ViewBag.HocKyList = new SelectList(hocKyData, "Id", "TenHocKy", ViewBag.HocKySelected);
+
+            // ✅ Gọi API lấy toàn bộ điểm sinh viên
+            var response = await client.GetAsync($"api/diemsinhvien/{mssv}");
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không thể lấy điểm từ API.";
+                return View(new List<DiemSinhVienViewModel>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("data", out var dataElement))
+            {
+                ViewBag.Error = "Không tìm thấy dữ liệu điểm.";
+                return View(new List<DiemSinhVienViewModel>());
+            }
+
+            // ✅ Danh sách điểm tất cả học kỳ
+            List<DiemSinhVienViewModel> allDiem = new();
+            if (dataElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var hk in dataElement.EnumerateArray())
+                {
+                    if (hk.TryGetProperty("diems", out var diemsElement) && diemsElement.ValueKind == JsonValueKind.Array)
+                    {
+                        var diemHocKyList = JsonSerializer.Deserialize<List<DiemSinhVienViewModel>>(
+                            diemsElement.GetRawText(),
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                        );
+                        if (diemHocKyList != null) allDiem.AddRange(diemHocKyList);
+                    }
+                }
+            }
+
+            // ✅ Lọc điểm học kỳ đang chọn
+            List<DiemSinhVienViewModel> diemHocKy = new();
+            if (dataElement.ValueKind == JsonValueKind.Array && ViewBag.HocKySelected > 0)
+            {
+                var selectedHocKy = dataElement
+                    .EnumerateArray()
+                    .FirstOrDefault(hk => hk.GetProperty("hocKyId").GetInt32() == ViewBag.HocKySelected);
+
+                if (selectedHocKy.ValueKind != JsonValueKind.Undefined &&
+                    selectedHocKy.TryGetProperty("diems", out var diemsElement) &&
+                    diemsElement.ValueKind == JsonValueKind.Array)
+                {
+                    diemHocKy = JsonSerializer.Deserialize<List<DiemSinhVienViewModel>>(
+                        diemsElement.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    ) ?? new List<DiemSinhVienViewModel>();
+                }
+            }
+
+            // ✅ Tính toán tích lũy đến học kỳ được chọn
+            double tongDiemHe4TichLuy = 0;
+            int tongTinChiTichLuy = 0;
+            int tongTinChiDat = 0;
+
+            if (ViewBag.HocKySelected > 0)
+            {
+                // Lấy danh sách học kỳ <= học kỳ đang chọn
+                var hocKyToiHienTai = hocKyData
+                    .Where(hk => hk.Id <= ViewBag.HocKySelected) // so sánh theo Id
+                    .Select(hk => hk.Id)
+                    .ToHashSet();
+
+                foreach (var d in allDiem)
+                {
+                    if (d.DiemHe4.HasValue && hocKyToiHienTai.Contains(d.HocKyId))
+                    {
+                        tongTinChiTichLuy += d.SoTinChi;
+                        tongDiemHe4TichLuy += d.DiemHe4.Value * d.SoTinChi;
+                        if (d.DiemHe4.Value > 0)
+                            tongTinChiDat += d.SoTinChi;
+                    }
+                }
+            }
+
+            ViewBag.DiemTBTichLuy = tongTinChiTichLuy > 0
+                ? (tongDiemHe4TichLuy / tongTinChiTichLuy).ToString("0.00")
+                : "0.00";
+            ViewBag.TongTinChiDat = tongTinChiDat;
+            ViewBag.TongTinChiTichLuy = tongTinChiTichLuy;
+            ViewBag.TongDiemHe4TichLuy = tongDiemHe4TichLuy.ToString("0.00");
+
+
+
+            // ✅ Danh sách tích lũy theo từng học kỳ
+            var tichLuyList = new List<object>();
+            double tongDiemTichLuy = 0;
+            int tongTinChiTichLuy2 = 0;
+            int tongTinChiDat2 = 0;
+
+            if (dataElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var hk in dataElement.EnumerateArray()
+                         .OrderBy(h => h.GetProperty("hocKyId").GetInt32())) // sắp theo thứ tự học kỳ tăng dần
+                {
+                    var hocKyId = hk.GetProperty("hocKyId").GetInt32();
+                    var tenHocKy = hk.GetProperty("tenHocKy").GetString();
+
+                    if (hk.TryGetProperty("diems", out var diemsElement) &&
+                        diemsElement.ValueKind == JsonValueKind.Array)
+                    {
+                        var diemHocKyList = JsonSerializer.Deserialize<List<DiemSinhVienViewModel>>(
+                            diemsElement.GetRawText(),
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                        ) ?? new List<DiemSinhVienViewModel>();
+
+                        if (diemHocKyList.Any(d => d.DiemHe4.HasValue))
+                        {
+                            // ✅ Tính điểm trung bình học kỳ
+                            var tongTinChiHK = diemHocKyList.Sum(d => d.SoTinChi);
+                            var tongDiemHK = diemHocKyList
+                                .Where(d => d.DiemHe4.HasValue)
+                                .Sum(d => d.DiemHe4.Value * d.SoTinChi);
+
+                            var diemTBHocKy = tongTinChiHK > 0
+                                ? (tongDiemHK / tongTinChiHK).ToString("0.00")
+                                : "0.00";
+
+                            // ✅ Cộng dồn vào tích lũy
+                            tongTinChiTichLuy2 += tongTinChiHK;
+                            tongDiemTichLuy += tongDiemHK;
+                            tongTinChiDat2 += diemHocKyList.Where(d => d.DiemHe4 > 0).Sum(d => d.SoTinChi);
+
+                            var diemTBTichLuy = tongTinChiTichLuy2 > 0
+                                ? (tongDiemTichLuy / tongTinChiTichLuy2).ToString("0.00")
+                                : "0.00";
+
+                            // ✅ Thêm vào danh sách ViewBag
+                            tichLuyList.Add(new
+                            {
+                                TenHocKy = tenHocKy,
+                                DiemTBHocKy = diemTBHocKy,
+                                DiemTBTichLuy = diemTBTichLuy,
+                                TinChiDat = tongTinChiDat2,
+                                TongTinChiTichLuy = tongTinChiTichLuy2
+                            });
+                        }
+                    }
+                }
+            }
+
+            ViewBag.TichLuyList = tichLuyList;
+
+           
+
+            // ✅ Trả về điểm học kỳ đã chọn để hiển thị
+            return View(diemHocKy);
         }
+
         //Giao diện Lớp học phần
         public IActionResult LopHocPhan()
         {
