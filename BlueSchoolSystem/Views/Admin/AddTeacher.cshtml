@@ -1,0 +1,117 @@
+﻿@model BlueSchoolSystem.Models.GiangVien
+@{
+    ViewData["Title"] = "Thêm giảng viên";
+    var token = Context.Session.GetString("access_token");
+    var khoaList = (List<BlueSchoolSystem.Models.Khoa>)ViewBag.KhoaList;
+
+}
+<div class="container mt-4">
+    <div class="card shadow-lg border-0 rounded-3">
+        <div class="card-body">
+            <h3 class="card-title mb-3">
+                <i class="fa-solid fa-user-plus me-2"></i> Thêm giảng viên / cán bộ mới
+            </h3>
+            <hr />
+            <form asp-action="AddTeacher" autocomplete="off">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+                        <label asp-for="MaGiangVien" class="form-label fw-semibold">Mã CB/GV(*)</label>
+                        <input asp-for="MaGiangVien" class="form-control" />
+                              
+                        <span asp-validation-for="MaGiangVien" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="CCCD" class="form-label fw-semibold">CCCD(*)</label>
+                        <input asp-for="CCCD" class="form-control" />
+                        <span asp-validation-for="CCCD" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="HoVaTenDem" class="form-label fw-semibold">Họ và tên đệm(*)</label>
+                        <input asp-for="HoVaTenDem" class="form-control" />
+                        <span asp-validation-for="HoVaTenDem" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="Ten" class="form-label fw-semibold">Tên(*)</label>
+                        <input asp-for="Ten" class="form-control" />
+                        <span asp-validation-for="Ten" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="NgaySinh" class="form-label fw-semibold">Ngày sinh(*)</label>
+                        <input asp-for="NgaySinh" type="date" class="form-control" />
+                        <span asp-validation-for="NgaySinh" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold mb-3">Giới tính(*)</label>
+                        <div class="d-flex align-items-center gap-4">
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="radio" asp-for="GioiTinh" value="true" id="Nam" />
+                                <label class="form-check-label" for="Nam">Nam</label>
+                            </div>
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="radio" asp-for="GioiTinh" value="false" id="Nu" />
+                                <label class="form-check-label" for="Nu">Nữ</label>
+                            </div>
+                        </div>
+                        <span asp-validation-for="GioiTinh" class="text-danger"></span>
+                    </div>
+
+
+                    <div class="col-md-6">
+                        <label asp-for="User.PhoneNumber" class="form-label fw-semibold">Số điện thoại(*)</label>
+                        <input asp-for="User.PhoneNumber" class="form-control" />
+                        <span asp-validation-for="User.PhoneNumber" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="User.Email" class="form-label fw-semibold">Email(*)</label>
+                        <input asp-for="User.Email" class="form-control" />
+                        <span asp-validation-for="User.Email" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="DiaChi" class="form-label fw-semibold">Địa chỉ(*)</label>
+                        <input asp-for="DiaChi" class="form-control" />
+                        <span asp-validation-for="DiaChi" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="KhoaId" class="form-label fw-semibold">Đơn vị công tác (Khoa / Viện) (*)</label>
+                        <select asp-for="KhoaId" class="form-select">
+                            <option value="">-- Chọn nơi công tác --</option>
+                            @foreach (var khoa in khoaList)
+                            {
+                                <option value="@khoa.Id">@khoa.TenKhoa</option>
+                            }
+                        </select>
+                        <span asp-validation-for="KhoaId" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Trạng thái(*)</label>
+                        <input type="text" class="form-control bg-light text-secondary"
+                               value="Đang công tác" readonly tabindex="-1" style="opacity:0.7;pointer-events:none;">
+                        <input type="hidden" name="TrangThaiId" value="@ViewBag.TrangThaiDangCongTacId" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="GhiChu" class="form-label fw-semibold">Ghi chú</label>
+                        <input asp-for="GhiChu" class="form-control" />
+                        <span asp-validation-for="GhiChu" class="text-danger"></span>
+                    </div>
+
+                </div>
+                <div class="d-flex justify-content-between mt-4">
+                    <a asp-action="TeacherManager" class="btn btn-secondary">
+                        <i class="fa-solid fa-arrow-left"></i> Quay lại danh sách
+                    </a>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="fa-solid fa-plus"></i> Thêm mới
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -28,7 +28,8 @@ namespace BlueSchoolSystem.APIControllers
         {
             var giangviens = await _context.GiangViens
                         .Include(gv => gv.Khoa)
-                        
+                        .Include(tt => tt.TrangThai)
+                        .OrderBy(gv => gv.Id)
                         .ToListAsync();
             var tonggiangvien = await _context.GiangViens.CountAsync();
             return Ok(new
@@ -78,6 +79,74 @@ namespace BlueSchoolSystem.APIControllers
                 userId = user.Id
             });
         }
+
+        //Lấy thông tin chi tiết của giảng viên
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpGet("chitietgiangvien/{maGV}")]
+        public async Task<IActionResult> GetGiangVienDetailByMa(string maGV)
+        {
+            try
+            {
+                var gv = await _context.GiangViens
+                    .Include(x => x.User)
+                    .Include(x => x.Khoa)
+                    .Include(x => x.TrangThai)
+                    .FirstOrDefaultAsync(x => x.MaGiangVien.ToLower() == maGV.ToLower());
+
+                if (gv == null)
+                {
+                    return NotFound(new
+                    {
+                        result = false,
+                        message = "Không tìm thấy giảng viên với mã: " + maGV
+                    });
+                }
+
+                var result = new
+                {
+                    result = true,
+                    data = new
+                    {
+                        gv.Id,
+                        gv.MaGiangVien,
+                        gv.HoVaTenDem,
+                        gv.Ten,
+                        gv.CCCD,
+                        gv.NgaySinh,
+                        gv.GioiTinh,
+                        gv.DiaChi,
+                        gv.TrangThaiId,
+                        TrangThai = gv.TrangThai != null ? new { gv.TrangThai.Id, gv.TrangThai.TenTrangThai } : null,
+                        gv.GhiChu,
+                        gv.AvatarUrl,
+                        gv.KhoaId,
+                        Khoa = gv.Khoa != null ? new { gv.Khoa.Id, gv.Khoa.TenKhoa } : null,
+                        User = gv.User != null ? new
+                        {
+                            gv.User.Id,
+                            gv.User.UserName,
+                            gv.User.Email,
+                            gv.User.PhoneNumber
+                        } : null,
+                        gv.CreatedAt,
+                        gv.UpdatedAt
+                    }
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                // Ghi log nếu muốn
+                return StatusCode(500, new
+                {
+                    result = false,
+                    message = "Đã xảy ra lỗi khi lấy thông tin giảng viên.",
+                    error = ex.Message
+                });
+            }
+        }
+
 
         // Lấy lịch giảng dạy của giảng viên
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
