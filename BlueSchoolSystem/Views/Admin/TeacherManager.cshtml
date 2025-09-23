@@ -1,5 +1,95 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+﻿@model IEnumerable<BlueSchoolSystem.Models.GiangVien>
+
+
 @{
+    ViewData["Title"] = "TeacherManager";
+    var token = Context.Session.GetString("access_token");
 }
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<p>
+    <a class="btn btn-primary" asp-action="AddTeacher">
+        <i class="fa-solid fa-user-plus me-2"></i>Thêm mới
+    </a>
+    <a class="btn btn-success" asp-action="ImportStudentListFromExcel">
+        <i class="fa-solid fa-file-import me-2"></i>Nhập từ Excel
+    </a>
+    <button type="button" class="btn btn-warning" id="btnExportExcel">
+        <i class="fa-solid fa-file-excel me-2"></i> Xuất Excel
+    </button>
+    <button type="button" class="btn btn-info" id="btnExportCSV">
+        <i class="fa-solid fa-file-csv me-2"></i> Xuất CSV
+    </button>
+
+
+
+
+</p>
+
+@functions {
+    string GetRowClass(string status)
+    {
+        return status switch
+        {
+            "Đang công tác" => "table-success",
+            "Nghỉ phép" => "table-warning",
+            "Nghỉ việc" => "table-danger text-white",
+            "Tạm ngưng giảng dạy" => "table-secondary",
+            "Đang đào tạo nâng cao" => "table-info",
+            "Đang thử việc" => "table-primary text-white",
+            "Đã nghỉ hưu" => "table-dark text-white",
+            "Hợp đồng hết hạn" => "table-light",
+            _ => ""
+        };
+    }
+}
+
+
+<table class="table table-hover table-striped table-bordered">
+    <thead class="table-dark">
+        <tr>
+            <th class="text-center">STT</th>
+            <th class="text-center">Mã giảng viên</th>
+            <th class="text-center">Họ và tên đệm</th>
+            <th class="text-center">Tên</th>
+            <th class="text-center">Ngày sinh</th>
+            <th class="text-center">Giới tính</th>
+            <th class="text-center">Đơn vị công tác</th>
+            <th class="text-center">Trạng thái</th>
+        </tr>
+    </thead>
+    <tbody>
+        @{
+            int stt = 1;
+        }
+        @foreach (var item in Model)
+        {
+            var status = item.TrangThai?.TenTrangThai ?? "Không rõ";
+            string rowClass = GetRowClass(status);
+            <tr class="table-row @rowClass" style="cursor:pointer;" onclick="window.location='@Url.Action("TeacherDetails", "Admin", new { id = item.Id })'">
+                <td class="text-center">@stt</td>
+                <td class="text-center">@item.MaGiangVien</td>
+                <td>@item.HoVaTenDem</td>
+                <td>@item.Ten</td>
+                <td class="text-center">@item.NgaySinh.ToString("dd/MM/yyyy")</td>
+                <td class="text-center">
+                    @(item.GioiTinh ? "Nam" : "Nữ")
+                </td>
+                <td class="text-center">
+                    @(item.Khoa?.TenKhoa ?? "Chưa có khoa")
+                </td>
+                <td class="text-center">
+                    @(item.TrangThai?.TenTrangThai ?? "Không rõ")
+                </td>
+            </tr>
+            stt++;
+        }
+    </tbody>
+
+</table>

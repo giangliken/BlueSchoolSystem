@@ -16,7 +16,7 @@
         var khoaList = (List<BlueSchoolSystem.Models.Khoa>)ViewBag.KhoaList;
     }
     
-    <div class="col-md-2">
+    <div class="col-md-3">
         <select class="form-select class-select" id="NienKhoaSelect" name="nienKhoa">
             <option value="">-- Tất cả niên khóa --</option>
             @foreach (var year in ViewBag.ListNienKhoa as List<int>)
@@ -56,7 +56,7 @@
 
 
     </div>
-    <div class="col-md-2">
+    <div class="col-md-3">
         <select class="form-select class-select" id="LopSelect" name="maLop">
             <option value="">-- Tất cả các lớp --</option>
             @if (Context.Request.Query["maLop"] == "__null__")
@@ -84,13 +84,15 @@
 
     </div>
 
-    <div class="col-md-2">
-        <button type="submit" class="btn btn-info me-2">
-            <i class="fa-solid fa-magnifying-glass me-1"></i> Tìm kiếm
-        </button>
-        <a asp-action="StudentManager" class="btn btn-secondary">
-            <i class="fa-solid fa-rotate-left me-1"></i> Reset
-        </a>
+    <div class="row">
+        <div class="col-12 d-flex justify-content-end mt-2">
+            <button type="submit" class="btn btn-info me-2">
+                <i class="fa-solid fa-magnifying-glass me-1"></i> Tìm kiếm
+            </button>
+            <a asp-action="StudentManager" class="btn btn-secondary">
+                <i class="fa-solid fa-rotate-left me-1"></i> Reset
+            </a>
+        </div>
     </div>
 </form>
 
@@ -138,36 +140,37 @@
         </tr>
     </thead>
    
-    <tbody>
-        @foreach (var item in Model)
+    @{
+        int stt = 1;
+    }
+    @foreach (var item in Model)
+    {
+        string rowClass = item.TrangThai?.TenTrangThai switch
         {
-            string rowClass = item.TrangThai?.TenTrangThai switch
-            {
-                "Đang học" => "table-success fw-semibold",
-                "Bảo lưu" => "table-warning fw-semibold",
-                "Đã tốt nghiệp" => "table-primary text-white fw-semibold",
-                "Thôi học" => "table-danger text-white fw-semibold",
-                _ => ""
-            };
+            "Đang học" => "table-success fw-semibold",
+            "Bảo lưu" => "table-warning fw-semibold",
+            "Đã tốt nghiệp" => "table-primary text-white fw-semibold",
+            "Thôi học" => "table-danger text-white fw-semibold",
+            _ => ""
+        };
 
-            <tr class="table-row @rowClass" style="cursor:pointer;" onclick="window.location='@Url.Action("StudentDetails", "Admin", new { id = item.Id })'">
-                <td class="text-center">@item.Id</td>
-                <td class="text-center">@item.MSSV</td>
-                <td>@item.HoVaTenDem</td>
-                <td>@item.Ten</td>
-                <td class="text-center">@item.NgaySinh.ToString("dd/MM/yyyy")</td>
-                <td class="text-center">
-                    @(item.GioiTinh ? "Nam" : "Nữ")
-                </td>
-                <td class="text-center">
-                    @(item.Lop?.TenLop ?? "Chưa xếp")
-                </td>
-                <td class="text-center">@item.TrangThai?.TenTrangThai</td>
-            </tr>
-        }
+        <tr class="table-row @rowClass" style="cursor:pointer;" onclick="window.location='@Url.Action("StudentDetails", "Admin", new { id = item.Id })'">
+            <td class="text-center">@stt</td>
+            <td class="text-center">@item.MSSV</td>
+            <td>@item.HoVaTenDem</td>
+            <td>@item.Ten</td>
+            <td class="text-center">@item.NgaySinh.ToString("dd/MM/yyyy")</td>
+            <td class="text-center">
+                @(item.GioiTinh ? "Nam" : "Nữ")
+            </td>
+            <td class="text-center">
+                @(item.Lop?.TenLop ?? "Chưa xếp")
+            </td>
+            <td class="text-center">@item.TrangThai?.TenTrangThai</td>
+        </tr>
+        stt++;
+    }
 
-
-    </tbody>
 </table>
 
 @section Scripts {
