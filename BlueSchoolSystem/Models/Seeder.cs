@@ -76,6 +76,8 @@ namespace BlueSchoolSystem.Models
                 using (var reader = new StreamReader(path))
                 using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                 {
+                    csv.Context.RegisterClassMap<NganhHocMap>();
+
                     var records = csv.GetRecords<NganhHoc>().ToList();
 
                     context.Database.OpenConnection();
