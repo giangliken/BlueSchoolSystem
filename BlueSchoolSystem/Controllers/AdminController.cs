@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using OfficeOpenXml;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -20,15 +21,21 @@ namespace BlueSchoolSystem.Controllers
     {
         private readonly ILogger<AdminController> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration configuration;
+        private readonly string? _apiBaseUrl;
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
             _context = context;
             _userManager = userManager;
+            this.configuration = configuration;
+
+            _apiBaseUrl = configuration["ApiSettings:BaseUrl"];
+
         }
 
         //Giao diện trang chủ của Admin
@@ -51,7 +58,8 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> StudentManager(string? keyword, string? maLop, string? maKhoa, string? nienKhoa)
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             // Lấy token
             var token = HttpContext.Session.GetString("access_token");
@@ -62,6 +70,7 @@ namespace BlueSchoolSystem.Controllers
 
             // Lấy danh sách lớp để đổ vào dropdown
             var classResponse = await client.GetAsync("api/laydanhsachlophoc");
+            
             List<LopHocViewModel> lopList;
             if (classResponse.IsSuccessStatusCode)
             {
@@ -180,7 +189,14 @@ namespace BlueSchoolSystem.Controllers
         //Thêm sinh viên theo cách thủ công
         public async Task<IActionResult> AddStudent()
         {
-            await LoadDropdownData();
+            ViewBag.NganhList = await _context.NganhHocs.ToListAsync();
+            ViewBag.TrangThaiList = new SelectList(
+                await _context.TrangThais
+                    .Where(tt => tt.LoaiTrangThai == "SinhVien")
+                    .ToListAsync(),
+                "Id",
+                "TenTrangThai"
+            );
             var model = new SinhVien
             {
                 GioiTinh = true,
@@ -200,12 +216,9 @@ namespace BlueSchoolSystem.Controllers
             if (!ModelState.IsValid)
             {
                 var errors = ModelState.Values.SelectMany(v => v.Errors);
-                // Đặt breakpoint hoặc log ra đây để biết trường nào lỗi
                 return View(model);
             }
 
-
-            // Map dữ liệu sang API request (CreateStudentWithUserRequest)
             var apiRequest = new CreateStudentWithUserRequest
             {
                 UserName = model.MSSV,
@@ -220,13 +233,13 @@ namespace BlueSchoolSystem.Controllers
 
             var httpClient = new HttpClient();
 
-            // Nếu API cần token thì thêm:
             var token = HttpContext.Session.GetString("access_token");
 
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             var json = JsonConvert.SerializeObject(apiRequest);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
+
 
             var response = await httpClient.PostAsync(apiUrl, content);
 
@@ -241,23 +254,18 @@ namespace BlueSchoolSystem.Controllers
                 // Lấy lỗi trả về từ API
                 var apiError = await response.Content.ReadAsStringAsync();
                 ModelState.AddModelError("", "Có lỗi khi thêm sinh viên: " + apiError);
-                await LoadDropdownData();
+                ViewBag.NganhList = await _context.NganhHocs.ToListAsync();
+                ViewBag.TrangThaiList = new SelectList(
+                    await _context.TrangThais
+                        .Where(tt => tt.LoaiTrangThai == "SinhVien")
+                        .ToListAsync(),
+                    "Id",
+                    "TenTrangThai"
+                );
                 return View(model);
             }
         }
 
-        private async Task LoadDropdownData()
-        {
-            ViewBag.NganhList = await _context.NganhHocs.ToListAsync();
-            ViewBag.TrangThaiList = new SelectList(
-                await _context.TrangThais
-                    .Where(tt => tt.LoaiTrangThai == "SinhVien")
-                    .ToListAsync(),
-                "Id",
-                "TenTrangThai"
-            );
-            // Nếu cần dropdown lớp thì tùy logic filter ngành đã chọn
-        }
 
         //Nhập danh sach sinh viên từ file Excel
         [HttpGet]
@@ -434,12 +442,162 @@ namespace BlueSchoolSystem.Controllers
             return View(sinhVien);
         }
 
-
         //Trang quản lí giảng viên
-        public IActionResult TeacherManager()
+        public async Task<IActionResult> TeacherManager()
         {
-            return View();
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+                
+                // Lấy token
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                // Gọi API
+                HttpResponseMessage response = await client.GetAsync("api/laydanhsachgiangvien");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    // Xử lý khi không lấy được data (ví dụ 401/403/500)
+                    TempData["Error"] = "Không lấy được danh sách giảng viên!";
+                    return View(new List<GiangVien>());
+                }
+
+                // Đọc body
+                var body = await response.Content.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(body);
+                var root = document.RootElement;
+
+                var dataJson = root.GetProperty("data").GetRawText();
+
+                // Parse về model
+                var teachers = JsonConvert.DeserializeObject<List<GiangVien>>(dataJson);
+
+                return View(teachers);
+            }
+            catch (Exception ex)
+            {
+                // Ghi log hoặc xử lý ngoại lệ
+                TempData["Error"] = "Đã có lỗi xảy ra: " + ex.Message;
+                return View(new List<GiangVien>());
+            }
         }
+
+
+        //Thêm giảng viên mới
+        public async Task<IActionResult> AddTeacher()
+        {
+            ViewBag.KhoaList = await _context.Khoas.ToListAsync();
+            var trangThai = await _context.TrangThais
+                .FirstOrDefaultAsync(tt => tt.TenTrangThai == "Đang công tác" && tt.LoaiTrangThai == "GiangVien");
+            ViewBag.TrangThaiDangCongTacId = trangThai?.Id ?? 1;
+            var model = new GiangVien
+            {
+                GioiTinh = true,
+                User = new ApplicationUser()
+            };
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddTeacher(GiangVien model)
+        {
+            try
+            {
+                // Load lại các ViewBag cho View (kể cả khi có lỗi)
+                ViewBag.KhoaList = await _context.Khoas.ToListAsync();
+                var trangThai = await _context.TrangThais
+                    .FirstOrDefaultAsync(tt => tt.TenTrangThai == "Đang công tác" && tt.LoaiTrangThai == "GiangVien");
+                ViewBag.TrangThaiDangCongTacId = trangThai?.Id ?? 1;
+
+                if (!ModelState.IsValid)
+                    return View(model);
+
+                var token = HttpContext.Session.GetString("access_token");
+                // Nếu model.User có tồn tại (tức là từ form nhập), thì dùng lấy info xong set null
+                
+                string email = model.User?.Email;
+                string phone = model.User?.PhoneNumber;
+                model.User = null; 
+
+                var apiRequest = new CreateGiangVienWithUserRequest
+                {
+                    UserName = model.MaGiangVien,
+                    Email = email,
+                    PhoneNumber = phone,
+                    Password = "Abc@123",
+                    GiangVien = model
+                };
+
+
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+                if (!string.IsNullOrEmpty(token))
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var json = JsonConvert.SerializeObject(apiRequest);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                //var jsonDebug = JsonConvert.SerializeObject(requestBody, Formatting.Indented);
+
+                var response = await client.PostAsync("/api/themgiangvien", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    TempData["Success"] = $"Tạo giảng viên thành công! Mã CB/GV là: {model.MaGiangVien}";
+                    return RedirectToAction("TeacherManager");
+                }
+
+                else
+                {
+                    // Parse lỗi trả về, nếu là JSON thì show lỗi đẹp hơn
+                    var error = await response.Content.ReadAsStringAsync();
+                    try
+                    {
+                        // Thử parse lỗi theo kiểu object nếu trả về JSON
+                        dynamic errObj = JsonConvert.DeserializeObject(error);
+                        if (errObj?.errors != null)
+                        {
+                            foreach (var field in errObj.errors)
+                            {
+                                foreach (var msg in field.Value)
+                                {
+                                    ModelState.AddModelError((string)field.Name, (string)msg);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            ModelState.AddModelError("", $"API lỗi: {error}");
+                        }
+                    }
+                    catch
+                    {
+                        // Nếu không parse được thì show lỗi thô
+                        ModelState.AddModelError("", $"API lỗi: {error}");
+                    }
+                    return View(model);
+                }
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("", $"Lỗi không xác định: {ex.Message}");
+                // Load lại ViewBag nếu có lỗi exception bất ngờ (mất mạng, timeout, ...)
+                ViewBag.KhoaList = await _context.Khoas.ToListAsync();
+                var trangThai = await _context.TrangThais
+                    .FirstOrDefaultAsync(tt => tt.TenTrangThai == "Đang công tác" && tt.LoaiTrangThai == "GiangVien");
+                ViewBag.TrangThaiDangCongTacId = trangThai?.Id ?? 1;
+
+                return View(model);
+            }
+        }
+
+
 
         [HttpPost]
         public async Task<IActionResult> ResetPassword(int id, string type)
