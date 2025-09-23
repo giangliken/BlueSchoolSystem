@@ -225,7 +225,7 @@ namespace BlueSchoolSystem.Controllers
             if (string.IsNullOrEmpty(mssv))
             {
                 ViewBag.Error = "Không xác định được MSSV của người dùng.";
-                return View(new List<DiemSinhVienViewModel>());
+                return View(new List<DiemMonHocViewModel>());
             }
 
             // ✅ Lấy ngày nhập học từ DB
@@ -238,12 +238,7 @@ namespace BlueSchoolSystem.Controllers
             var hocKyData = await _context.HocKys
                 .Where(hk => hk.NgayBatDau >= ngayNhapHoc)
                 .OrderByDescending(hk => hk.NgayBatDau)
-                .Select(hk => new
-                {
-                    hk.Id,
-                    hk.TenHocKy,
-                    hk.NgayBatDau
-                })
+                .Select(hk => new { hk.Id, hk.TenHocKy, hk.NgayBatDau })
                 .ToListAsync();
 
             // Nếu chưa chọn thì mặc định học kỳ mới nhất
@@ -260,153 +255,37 @@ namespace BlueSchoolSystem.Controllers
             if (!response.IsSuccessStatusCode)
             {
                 ViewBag.Error = "Không thể lấy điểm từ API.";
-                return View(new List<DiemSinhVienViewModel>());
+                return View(new List<DiemMonHocViewModel>());
             }
 
             var body = await response.Content.ReadAsStringAsync();
-            using var document = JsonDocument.Parse(body);
-            var root = document.RootElement;
+            var diemResponse = JsonSerializer.Deserialize<DiemSinhVienResponseViewModel>(
+                body,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
 
-            if (!root.TryGetProperty("data", out var dataElement))
+            if (diemResponse == null || diemResponse.Data == null || !diemResponse.Data.Any())
             {
                 ViewBag.Error = "Không tìm thấy dữ liệu điểm.";
-                return View(new List<DiemSinhVienViewModel>());
+                return View(new List<DiemMonHocViewModel>());
             }
 
-            // ✅ Danh sách điểm tất cả học kỳ
-            List<DiemSinhVienViewModel> allDiem = new();
-            if (dataElement.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var hk in dataElement.EnumerateArray())
-                {
-                    if (hk.TryGetProperty("diems", out var diemsElement) && diemsElement.ValueKind == JsonValueKind.Array)
-                    {
-                        var diemHocKyList = JsonSerializer.Deserialize<List<DiemSinhVienViewModel>>(
-                            diemsElement.GetRawText(),
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                        );
-                        if (diemHocKyList != null) allDiem.AddRange(diemHocKyList);
-                    }
-                }
-            }
+            // ✅ Lấy điểm học kỳ đang chọn
+            var selectedHocKy = diemResponse.Data
+                .FirstOrDefault(d => d.HocKyId == ViewBag.HocKySelected);
 
-            // ✅ Lọc điểm học kỳ đang chọn
-            List<DiemSinhVienViewModel> diemHocKy = new();
-            if (dataElement.ValueKind == JsonValueKind.Array && ViewBag.HocKySelected > 0)
-            {
-                var selectedHocKy = dataElement
-                    .EnumerateArray()
-                    .FirstOrDefault(hk => hk.GetProperty("hocKyId").GetInt32() == ViewBag.HocKySelected);
+            var diemHocKy = selectedHocKy?.Diems ?? new List<DiemMonHocViewModel>();
 
-                if (selectedHocKy.ValueKind != JsonValueKind.Undefined &&
-                    selectedHocKy.TryGetProperty("diems", out var diemsElement) &&
-                    diemsElement.ValueKind == JsonValueKind.Array)
-                {
-                    diemHocKy = JsonSerializer.Deserialize<List<DiemSinhVienViewModel>>(
-                        diemsElement.GetRawText(),
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                    ) ?? new List<DiemSinhVienViewModel>();
-                }
-            }
-
-            // ✅ Tính toán tích lũy đến học kỳ được chọn
-            double tongDiemHe4TichLuy = 0;
-            int tongTinChiTichLuy = 0;
-            int tongTinChiDat = 0;
-
-            if (ViewBag.HocKySelected > 0)
-            {
-                // Lấy danh sách học kỳ <= học kỳ đang chọn
-                var hocKyToiHienTai = hocKyData
-                    .Where(hk => hk.Id <= ViewBag.HocKySelected) // so sánh theo Id
-                    .Select(hk => hk.Id)
-                    .ToHashSet();
-
-                foreach (var d in allDiem)
-                {
-                    if (d.DiemHe4.HasValue && hocKyToiHienTai.Contains(d.HocKyId))
-                    {
-                        tongTinChiTichLuy += d.SoTinChi;
-                        tongDiemHe4TichLuy += d.DiemHe4.Value * d.SoTinChi;
-                        if (d.DiemHe4.Value > 0)
-                            tongTinChiDat += d.SoTinChi;
-                    }
-                }
-            }
-
-            ViewBag.DiemTBTichLuy = tongTinChiTichLuy > 0
-                ? (tongDiemHe4TichLuy / tongTinChiTichLuy).ToString("0.00")
-                : "0.00";
-            ViewBag.TongTinChiDat = tongTinChiDat;
-            ViewBag.TongTinChiTichLuy = tongTinChiTichLuy;
-            ViewBag.TongDiemHe4TichLuy = tongDiemHe4TichLuy.ToString("0.00");
-
-
-
-            // ✅ Danh sách tích lũy theo từng học kỳ
-            var tichLuyList = new List<object>();
-            double tongDiemTichLuy = 0;
-            int tongTinChiTichLuy2 = 0;
-            int tongTinChiDat2 = 0;
-
-            if (dataElement.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var hk in dataElement.EnumerateArray()
-                         .OrderBy(h => h.GetProperty("hocKyId").GetInt32())) // sắp theo thứ tự học kỳ tăng dần
-                {
-                    var hocKyId = hk.GetProperty("hocKyId").GetInt32();
-                    var tenHocKy = hk.GetProperty("tenHocKy").GetString();
-
-                    if (hk.TryGetProperty("diems", out var diemsElement) &&
-                        diemsElement.ValueKind == JsonValueKind.Array)
-                    {
-                        var diemHocKyList = JsonSerializer.Deserialize<List<DiemSinhVienViewModel>>(
-                            diemsElement.GetRawText(),
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                        ) ?? new List<DiemSinhVienViewModel>();
-
-                        if (diemHocKyList.Any(d => d.DiemHe4.HasValue))
-                        {
-                            // ✅ Tính điểm trung bình học kỳ
-                            var tongTinChiHK = diemHocKyList.Sum(d => d.SoTinChi);
-                            var tongDiemHK = diemHocKyList
-                                .Where(d => d.DiemHe4.HasValue)
-                                .Sum(d => d.DiemHe4.Value * d.SoTinChi);
-
-                            var diemTBHocKy = tongTinChiHK > 0
-                                ? (tongDiemHK / tongTinChiHK).ToString("0.00")
-                                : "0.00";
-
-                            // ✅ Cộng dồn vào tích lũy
-                            tongTinChiTichLuy2 += tongTinChiHK;
-                            tongDiemTichLuy += tongDiemHK;
-                            tongTinChiDat2 += diemHocKyList.Where(d => d.DiemHe4 > 0).Sum(d => d.SoTinChi);
-
-                            var diemTBTichLuy = tongTinChiTichLuy2 > 0
-                                ? (tongDiemTichLuy / tongTinChiTichLuy2).ToString("0.00")
-                                : "0.00";
-
-                            // ✅ Thêm vào danh sách ViewBag
-                            tichLuyList.Add(new
-                            {
-                                TenHocKy = tenHocKy,
-                                DiemTBHocKy = diemTBHocKy,
-                                DiemTBTichLuy = diemTBTichLuy,
-                                TinChiDat = tongTinChiDat2,
-                                TongTinChiTichLuy = tongTinChiTichLuy2
-                            });
-                        }
-                    }
-                }
-            }
-
-            ViewBag.TichLuyList = tichLuyList;
-
-           
+            // ✅ Set ViewBag thống kê từ API
+            ViewBag.DiemTBTichLuy = diemResponse.DiemTBTichLuy;
+            ViewBag.TongTinChiDat = diemResponse.TongTinChiDat;
+            ViewBag.TongTinChiTichLuy = diemResponse.TongTinChiTichLuy;
+            ViewBag.TichLuyList = diemResponse.TichLuyList;
 
             // ✅ Trả về điểm học kỳ đã chọn để hiển thị
             return View(diemHocKy);
         }
+
 
         //Giao diện Lớp học phần
         public IActionResult LopHocPhan()

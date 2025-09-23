@@ -1,4 +1,4 @@
-﻿@model IEnumerable<BlueSchoolSystem.Models.ViewModel.DiemSinhVienViewModel>
+﻿
 <style>
     /* Card */
     .card {
@@ -19,17 +19,30 @@
             margin: 0;
         }
 
-    /* Dropdown */
-    .form-select {
+    /* Custom dropdown */
+    .custom-select {
+        border: 1px solid #0d6efd;
         border-radius: 8px;
-        transition: all 0.2s ease-in-out;
-        min-width: 300px;
-        height: 42px;
+        padding: 6px 10px;
         font-size: 1rem;
+        font-weight: 500;
+        color: #0d6efd;
+        background-color: #fff;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        min-width: 300px; /* ✅ nhỏ lại */
+        height: 42px; /* ✅ vừa phải hơn */
     }
 
-        .form-select:hover {
-            box-shadow: 0 0 6px rgba(13,110,253,.3);
+        .custom-select:focus {
+            outline: none;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, .25);
+            border-color: #0b5ed7;
+        }
+
+        .custom-select:hover {
+            border-color: #0b5ed7;
+            box-shadow: 0 0 6px rgba(13, 110, 253, 0.3);
         }
 
     /* Table */
@@ -91,39 +104,38 @@
         border: 1px solid #dee2e6;
         vertical-align: middle;
     }
+
 </style>
+
+@model IEnumerable<BlueSchoolSystem.Models.ViewModel.DiemMonHocViewModel>
 
 <h6>Trang chủ / Học vụ / Xem điểm</h6>
 <div class="card shadow-sm">
     <div class="card-body">
 
-        <!-- Tabs + Reload -->
-        <div class="d-flex justify-content-between align-items-center">
-            <ul class="nav nav-tabs" id="myTab" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="tatca-tab" data-bs-toggle="tab" data-bs-target="#tatca" type="button" role="tab">Tất cả</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="tichluy-tab" data-bs-toggle="tab" data-bs-target="#tichluy" type="button" role="tab">Tích lũy</button>
-                </li>
-            </ul>
 
-            <a asp-action="XemDiem" class="btn btn-sm btn-outline-primary ms-2">
-                <i class="bi bi-arrow-repeat"></i> Tải lại
-            </a>
-        </div>
 
-        <div class="tab-content mt-3" id="myTabContent">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3" id="diemTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tatca-tab" data-bs-toggle="tab" data-bs-target="#tatca" type="button" role="tab">Tất cả</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tichluy-tab" data-bs-toggle="tab" data-bs-target="#tichluy" type="button" role="tab">Tích lũy</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="diemTabContent">
             <!-- Tab Tất cả -->
-            <div class="tab-pane fade show active" id="tatca" role="tabpanel" aria-labelledby="tatca-tab">
+            <div class="tab-pane fade show active" id="tatca" role="tabpanel">
+
                 <!-- Bộ lọc chọn học kỳ -->
                 <form method="get" asp-action="XemDiem" class="row g-3 mb-3">
                     <div class="col-md-4">
-                        <label for="hocKy" class="form-label">Chọn học kỳ</label>
                         @Html.DropDownList(
                                  "hocKy",
                                  (SelectList)ViewBag.HocKyList,
-                                 new { @class = "form-select", onchange = "this.form.submit();" }
+                                 new { @class = "custom-select", onchange = "this.form.submit();" }
                                  )
                     </div>
                 </form>
@@ -138,67 +150,65 @@
                 }
                 else
                 {
-                    <!-- Nhóm điểm theo học kỳ -->
-                    @foreach (var group in Model.GroupBy(m => new { m.HocKyId, m.TenHocKy }))
-                    {
-                        <h6 class="bg-primary text-white p-2">
-                            @group.Key.TenHocKy
-                        </h6>
+                    <h6 class="bg-primary text-white p-2">
+                        @(((IEnumerable<SelectListItem>)ViewBag.HocKyList)
+                            .FirstOrDefault(x => x.Value == ViewBag.HocKySelected.ToString())?.Text)
+                    </h6>
 
-                        <table class="table table-bordered mb-2">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>STT</th>
-                                    <th>Mã HP</th>
-                                    <th>Tên học phần</th>
-                                    <th>STC</th>
-                                    <th>Điểm kiểm tra 1</th>
-                                    <th>Điểm thi</th>
-                                    <th>Điểm hệ 10</th>
-                                    <th>Điểm hệ 4</th>
-                                    <th>Điểm chữ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @{
-                                    var stt = 1;
-                                    foreach (var d in group)
-                                    {
-                                        <tr>
-                                            <td>@stt</td>
-                                            <td>@d.MaMonHoc</td>
-                                            <td>@d.TenMonHoc</td>
-                                            <td>@d.SoTinChi</td>
-                                            <td>@d.DiemQuaTrinh</td>
-                                            <td>@d.DiemCuoiKy</td>
-                                            <td>@d.DiemTongKet</td>
-                                            <td>@d.DiemHe4</td>
-                                            <td>@d.DiemChu</td>
-                                        </tr>
-                                        stt++;
-                                    }
+                    <table class="table table-bordered mb-2">
+                        <thead class="table-light">
+                            <tr>
+                                <th>STT</th>
+                                <th>Mã HP</th>
+                                <th>Tên học phần</th>
+                                <th>STC</th>
+                                <th>Điểm kiểm tra 1</th>
+                                <th>Điểm thi</th>
+                                <th>Điểm hệ 10</th>
+                                <th>Điểm hệ 4</th>
+                                <th>Điểm chữ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{
+                                var stt = 1;
+                                foreach (var d in Model)
+                                {
+                                    <tr>
+                                        <td>@stt</td>
+                                        <td>@d.MaMonHoc</td>
+                                        <td>@d.TenMonHoc</td>
+                                        <td>@d.SoTinChi</td>
+                                        <td>@d.DiemQuaTrinh</td>
+                                        <td>@d.DiemCuoiKy</td>
+                                        <td>@d.DiemTongKet</td>
+                                        <td>@d.DiemHe4</td>
+                                        <td>@d.DiemChu</td>
+                                    </tr>
+                                    stt++;
                                 }
-                            </tbody>
-                        </table>
+                            }
+                        </tbody>
+                    </table>
 
-                        <!-- Thống kê dưới mỗi học kỳ -->
-                        <div class="mb-4">
-                            <p>
-                                <strong>Điểm trung bình học kỳ (hệ 4):</strong>
-                                @(group.Any(g => g.DiemHe4.HasValue)
-                                    ? (group.Sum(g => g.DiemHe4.Value * g.SoTinChi) / group.Sum(g => g.SoTinChi)).ToString("0.00")
-                                    : "0.00")
-                            </p>
-                            <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @ViewBag.DiemTBTichLuy</p>
-                            <p><strong>Số tín chỉ đạt:</strong> @group.Where(g => g.DiemHe4 > 0).Sum(g => g.SoTinChi)</p>
-                            <p><strong>Tổng tín chỉ tích lũy:</strong> @ViewBag.TongTinChiTichLuy</p>
-                        </div>
-                    }
+                    <!-- Thống kê -->
+                    <div class="mb-4">
+                        <p>
+                            <strong>Điểm trung bình học kỳ (hệ 4):</strong>
+                            @(Model.Any(m => m.DiemHe4.HasValue)
+                                ? (Model.Sum(m => m.DiemHe4.Value * m.SoTinChi) / Model.Sum(m => m.SoTinChi)).ToString("0.00")
+                                : "0.00")
+                        </p>
+                        <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @ViewBag.DiemTBTichLuy</p>
+                        <p><strong>Số tín chỉ đạt:</strong> @Model.Where(m => m.DiemHe4 > 0).Sum(m => m.SoTinChi)</p>
+                        <p><strong>Tổng tín chỉ tích lũy:</strong> @ViewBag.TongTinChiTichLuy</p>
+                    </div>
                 }
             </div>
 
             <!-- Tab Tích lũy -->
-            <div class="tab-pane fade" id="tichluy" role="tabpanel" aria-labelledby="tichluy-tab">
+            <div class="tab-pane fade" id="tichluy" role="tabpanel">
+                <h6 class="bg-primary text-white p-2">Bảng tích lũy</h6>
                 <div class="table-responsive">
                     <table class="table table-bordered">
                         <thead class="table-primary">
@@ -233,5 +243,7 @@
                 </div>
             </div>
         </div>
+
     </div>
 </div>
+
