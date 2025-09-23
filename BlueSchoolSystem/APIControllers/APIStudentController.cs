@@ -461,5 +461,140 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
+        //Hàm chuyển điểm 10 sang điểm 4
+        private double ConvertToHe4(double diem10)
+        {
+            if (diem10 >= 8.5) return 4.0;
+            if (diem10 >= 7.0) return 3.0;
+            if (diem10 >= 5.5) return 2.0;
+            if (diem10 >= 4.0) return 1.0;
+            return 0.0;
+        }
+        //Lấy điểm của sinh viên
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
+        [HttpGet("diemsinhvien/{mssv}")]
+        public async Task<IActionResult> GetDiemByMSSV(string mssv, [FromQuery] int? hocKyId)
+        {
+            var mssvFromToken = User.FindFirst("username")?.Value;
+            if (mssvFromToken == null)
+            {
+                return Unauthorized(new { result = false, code = 401, message = "Không lấy được MSSV từ token" });
+            }
+            if (mssvFromToken != mssv)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { result = false, code = 403, message = "Bạn không có quyền truy cập điểm của sinh viên khác" });
+            }
+
+            // ✅ Truy vấn điểm
+            var query = from bd in _context.BangDiems
+                        join sv in _context.SinhViens on bd.SinhVienId equals sv.Id
+                        join lhp in _context.LopHocPhans on bd.LopHocPhanId equals lhp.Id
+                        join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                        join hk in _context.HocKys on lhp.HocKyId equals hk.Id
+                        where sv.MSSV == mssv
+                        select new
+                        {
+                            sv.MSSV,
+                            HocKyId = hk.Id,
+                            hk.TenHocKy,
+                            hk.NgayBatDau,
+                            mh.MaMonHoc,
+                            mh.TenMonHoc,
+                            mh.SoTinChi,
+                            DiemCuoiKy = bd.DiemCuoiKy,
+                            DiemQuaTrinh = bd.DiemChuyenCan
+
+                        };
+
+            if (hocKyId.HasValue && hocKyId.Value > 0)
+            {
+                query = query.Where(x => x.HocKyId == hocKyId.Value);
+            }
+
+            var diem = await query
+                .GroupBy(x => new { x.HocKyId, x.TenHocKy, x.NgayBatDau })
+                .Select(g => new
+                {
+                    HocKyId = g.Key.HocKyId,
+                    TenHocKy = g.Key.TenHocKy,
+                    NgayBatDau = g.Key.NgayBatDau,
+                    Diems = g.OrderBy(x => x.MaMonHoc).ToList()
+                })
+                .OrderBy(x => x.NgayBatDau)
+                .ToListAsync();
+
+            if (!diem.Any())
+            {
+                return NotFound(new { result = false, code = 404, message = "Không tìm thấy điểm cho MSSV này" });
+            }
+
+            // ✅ Tính toán tích lũy toàn bộ
+            double tongDiemHe4TichLuy = 0;
+            int tongTinChiTichLuy = 0;
+            int tongTinChiDat = 0;
+            var allDiem = diem.SelectMany(d => d.Diems).ToList();
+
+            foreach (var d in allDiem)
+            {
+                if (d.DiemCuoiKy.HasValue)
+                {
+                    double diemHe4 = ConvertToHe4(d.DiemCuoiKy.Value);
+                    tongTinChiTichLuy += d.SoTinChi;
+                    tongDiemHe4TichLuy += diemHe4 * d.SoTinChi;
+                    if (diemHe4 > 0) tongTinChiDat += d.SoTinChi;
+                }
+            }
+
+            // ✅ Danh sách tích lũy theo từng học kỳ
+            var tichLuyList = new List<object>();
+            double tongDiemTichLuy = 0;
+            int tongTinChiTichLuy2 = 0;
+            int tongTinChiDat2 = 0;
+
+            foreach (var hk in diem.OrderBy(d => d.HocKyId))
+            {
+                var diemHocKyList = hk.Diems.Where(d => d.DiemCuoiKy.HasValue).ToList();
+                if (diemHocKyList.Any())
+                {
+                    var tongTinChiHK = diemHocKyList.Sum(d => d.SoTinChi);
+                    var tongDiemHK = diemHocKyList.Sum(d => ConvertToHe4(d.DiemCuoiKy.Value) * d.SoTinChi);
+
+                    var diemTBHocKy = tongTinChiHK > 0 ? (tongDiemHK / tongTinChiHK).ToString("0.00") : "0.00";
+
+                    // cộng dồn
+                    tongTinChiTichLuy2 += tongTinChiHK;
+                    tongDiemTichLuy += tongDiemHK;
+                    tongTinChiDat2 += diemHocKyList.Where(d => ConvertToHe4(d.DiemCuoiKy.Value) > 0).Sum(d => d.SoTinChi);
+
+                    var diemTBTichLuy = tongTinChiTichLuy2 > 0 ? (tongDiemTichLuy / tongTinChiTichLuy2).ToString("0.00") : "0.00";
+
+                    tichLuyList.Add(new
+                    {
+                        hk.TenHocKy,
+                        DiemTBHocKy = diemTBHocKy,
+                        DiemTBTichLuy = diemTBTichLuy,
+                        TinChiDat = tongTinChiDat2,
+                        TongTinChiTichLuy = tongTinChiTichLuy2
+                    });
+                }
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy điểm thành công",
+                soluong = diem.Count,
+                data = diem,
+                // ✅ Bổ sung phần tổng hợp
+                tongTinChiTichLuy,
+                tongTinChiDat,
+                DiemTBTichLuy = tongTinChiTichLuy > 0 ? (tongDiemHe4TichLuy / tongTinChiTichLuy).ToString("0.00") : "0.00",
+                tichLuyList
+            });
+        }
+
+
+
     }
 }

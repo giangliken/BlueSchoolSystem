@@ -203,11 +203,90 @@ namespace BlueSchoolSystem.Controllers
         }
 
 
-        //Giao diện Xem điểm
-        public IActionResult XemDiem()
+        // Giao diện Xem điểm
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> XemDiem(string hocKy)
         {
-            return View();
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            // ✅ Lấy MSSV từ token
+            var mssv = User.Identity?.Name ??
+                       User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                       User.FindFirst("username")?.Value;
+
+            if (string.IsNullOrEmpty(mssv))
+            {
+                ViewBag.Error = "Không xác định được MSSV của người dùng.";
+                return View(new List<DiemMonHocViewModel>());
+            }
+
+            // ✅ Lấy ngày nhập học từ DB
+            var ngayNhapHoc = await _context.SinhViens
+                .Where(s => s.MSSV == mssv)
+                .Select(s => s.NgayNhapHoc)
+                .FirstOrDefaultAsync();
+
+            // ✅ Lấy danh sách học kỳ
+            var hocKyData = await _context.HocKys
+                .Where(hk => hk.NgayBatDau >= ngayNhapHoc)
+                .OrderByDescending(hk => hk.NgayBatDau)
+                .Select(hk => new { hk.Id, hk.TenHocKy, hk.NgayBatDau })
+                .ToListAsync();
+
+            // Nếu chưa chọn thì mặc định học kỳ mới nhất
+            if (string.IsNullOrEmpty(hocKy) && hocKyData.Any())
+            {
+                hocKy = hocKyData.First().Id.ToString();
+            }
+
+            ViewBag.HocKySelected = int.TryParse(hocKy, out var hkId) ? hkId : 0;
+            ViewBag.HocKyList = new SelectList(hocKyData, "Id", "TenHocKy", ViewBag.HocKySelected);
+
+            // ✅ Gọi API lấy toàn bộ điểm sinh viên
+            var response = await client.GetAsync($"api/diemsinhvien/{mssv}");
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không thể lấy điểm từ API.";
+                return View(new List<DiemMonHocViewModel>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var diemResponse = JsonSerializer.Deserialize<DiemSinhVienResponseViewModel>(
+                body,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
+
+            if (diemResponse == null || diemResponse.Data == null || !diemResponse.Data.Any())
+            {
+                ViewBag.Error = "Không tìm thấy dữ liệu điểm.";
+                return View(new List<DiemMonHocViewModel>());
+            }
+
+            // ✅ Lấy điểm học kỳ đang chọn
+            var selectedHocKy = diemResponse.Data
+                .FirstOrDefault(d => d.HocKyId == ViewBag.HocKySelected);
+
+            var diemHocKy = selectedHocKy?.Diems ?? new List<DiemMonHocViewModel>();
+
+            // ✅ Set ViewBag thống kê từ API
+            ViewBag.DiemTBTichLuy = diemResponse.DiemTBTichLuy;
+            ViewBag.TongTinChiDat = diemResponse.TongTinChiDat;
+            ViewBag.TongTinChiTichLuy = diemResponse.TongTinChiTichLuy;
+            ViewBag.TichLuyList = diemResponse.TichLuyList;
+
+            // ✅ Trả về điểm học kỳ đã chọn để hiển thị
+            return View(diemHocKy);
         }
+
+
         //Giao diện Lớp học phần
         public IActionResult LopHocPhan()
         {
