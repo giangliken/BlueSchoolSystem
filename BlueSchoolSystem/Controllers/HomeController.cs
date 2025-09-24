@@ -213,11 +213,8 @@ namespace BlueSchoolSystem.Controllers
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
-            {
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
 
-            // ✅ Lấy MSSV từ token
             var mssv = User.Identity?.Name ??
                        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
                        User.FindFirst("username")?.Value;
@@ -228,7 +225,6 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<DiemMonHocViewModel>());
             }
 
-            // ✅ Gọi API lấy toàn bộ điểm sinh viên
             var response = await client.GetAsync($"api/diemsinhvien/{mssv}");
             if (!response.IsSuccessStatusCode)
             {
@@ -248,36 +244,71 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<DiemMonHocViewModel>());
             }
 
-            // ✅ Danh sách học kỳ từ API
+            // --- danh sách học kỳ (tăng dần theo NgayBatDau)
             var hocKyData = diemResponse.Data
+                .Select(d => new { d.HocKyId, d.TenHocKy, d.NgayBatDau })
                 .OrderByDescending(d => d.NgayBatDau)
-                .Select(d => new { d.HocKyId, d.TenHocKy })
                 .ToList();
 
-            // Nếu chưa chọn thì mặc định học kỳ mới nhất
+            // mặc định học kỳ mới nhất 
             if (string.IsNullOrEmpty(hocKy) && hocKyData.Any())
-            {
                 hocKy = hocKyData.First().HocKyId.ToString();
+
+            var selectedId = int.TryParse(hocKy, out var hkId) ? hkId : 0;
+            ViewBag.HocKySelected = selectedId;
+
+            // build select list và thêm "Tất cả" ở cuối
+            var selectItems = hocKyData
+                .Select(d => new { Value = d.HocKyId.ToString(), Text = d.TenHocKy })
+                .ToList();
+            selectItems.Add(new { Value = "0", Text = "Tất cả" });
+            ViewBag.HocKyList = new SelectList(selectItems, "Value", "Text", selectedId.ToString());
+
+            // nếu chọn "Tất cả" -> build ViewBag.DiemTatCaHocKy (mỗi phần tử có thêm thống kê từ TichLuyList)
+            if (selectedId == 0)
+            {
+                var tichLuyList = diemResponse.TichLuyList ?? new List<TichLuyHocKyViewModel>();
+
+                var tatCaHocKy = diemResponse.Data
+                    .OrderBy(d => d.NgayBatDau)
+                    .Select(d => new
+                    {
+                        d.HocKyId,
+                        d.TenHocKy,
+                        d.NgayBatDau,
+                        Diems = d.Diems,
+                        DiemTBHocKy = tichLuyList.FirstOrDefault(t => t.TenHocKy == d.TenHocKy)?.DiemTBHocKy ?? 0.0,
+                        DiemTBTichLuy = tichLuyList.FirstOrDefault(t => t.TenHocKy == d.TenHocKy)?.DiemTBTichLuy ?? 0.0,
+                        TinChiDat = tichLuyList.FirstOrDefault(t => t.TenHocKy == d.TenHocKy)?.TinChiDat ?? 0,
+                        TongTinChiTichLuy = tichLuyList.FirstOrDefault(t => t.TenHocKy == d.TenHocKy)?.TongTinChiTichLuy ?? 0
+                    })
+                    .ToList();
+
+                ViewBag.DiemTatCaHocKy = tatCaHocKy;
+                ViewBag.TichLuyList = diemResponse.TichLuyList;
+
+                // trả model rỗng vì view sẽ dùng ViewBag.DiemTatCaHocKy để render nhiều bảng
+                return View(new List<DiemMonHocViewModel>());
             }
 
-            ViewBag.HocKySelected = int.TryParse(hocKy, out var hkId) ? hkId : 0;
-            ViewBag.HocKyList = new SelectList(hocKyData, "HocKyId", "TenHocKy", ViewBag.HocKySelected);
+            // Nếu chỉ 1 học kỳ
+            var selectedHocKy = diemResponse.Data.FirstOrDefault(d => d.HocKyId == selectedId);
+            var model = selectedHocKy?.Diems ?? new List<DiemMonHocViewModel>();
+            ViewBag.SelectedHocKyName = selectedHocKy?.TenHocKy;
 
-            // ✅ Lấy điểm học kỳ đang chọn
-            var selectedHocKy = diemResponse.Data
-                .FirstOrDefault(d => d.HocKyId == ViewBag.HocKySelected);
+            var tichLuyHienTai = diemResponse.TichLuyList?.FirstOrDefault(t => t.TenHocKy == selectedHocKy?.TenHocKy);
+            if (tichLuyHienTai != null)
+            {
+                ViewBag.DiemTBHocKy = tichLuyHienTai.DiemTBHocKy;
+                ViewBag.DiemTBTichLuy = tichLuyHienTai.DiemTBTichLuy;
+                ViewBag.TongTinChiTichLuy = tichLuyHienTai.TongTinChiTichLuy;
+                ViewBag.TongTinChiDat = tichLuyHienTai.TinChiDat;
+            }
 
-            var diemHocKy = selectedHocKy?.Diems ?? new List<DiemMonHocViewModel>();
-
-            // ✅ Set ViewBag thống kê từ API
-            ViewBag.DiemTBTichLuy = diemResponse.DiemTBTichLuy;
-            ViewBag.TongTinChiDat = diemResponse.TongTinChiDat;
-            ViewBag.TongTinChiTichLuy = diemResponse.TongTinChiTichLuy;
             ViewBag.TichLuyList = diemResponse.TichLuyList;
-
-            // ✅ Trả về điểm học kỳ đã chọn để hiển thị
-            return View(diemHocKy);
+            return View(model);
         }
+
 
 
 

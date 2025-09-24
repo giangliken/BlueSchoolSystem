@@ -1,12 +1,10 @@
-﻿
-<style>
-    /* Card */
-    .card {
+﻿<style>
+    /* Card */ .card {
         border-radius: 12px;
         overflow: hidden;
     }
-
     /* Header */
+
     .card-header {
         background: linear-gradient(90deg, #0dcaf0, #0d9dfd);
         color: white;
@@ -18,8 +16,8 @@
             color: white;
             margin: 0;
         }
-
     /* Custom dropdown */
+
     .custom-select {
         border: 1px solid #0d6efd;
         border-radius: 8px;
@@ -44,8 +42,8 @@
             border-color: #0b5ed7;
             box-shadow: 0 0 6px rgba(13, 110, 253, 0.3);
         }
-
     /* Table */
+
     .table-responsive {
         max-height: 500px;
         overflow: auto;
@@ -64,8 +62,8 @@
         top: 0;
         z-index: 2;
     }
-
     /* Sticky columns */
+
     th.sticky-col, td.sticky-col {
         position: sticky;
         left: 0;
@@ -82,8 +80,8 @@
         z-index: 3;
         border-right: 1px solid #dee2e6;
     }
-
     /* Row hover & alternate */
+
     tbody tr:nth-child(even) {
         background-color: #fafbfc;
     }
@@ -91,29 +89,31 @@
     tbody tr:hover {
         background-color: #eaf3ff !important;
     }
-
     /* STT column */
+
     td.sticky-col {
         text-align: center;
         font-weight: bold;
         color: #0d6efd;
     }
-
     /* Borders */
+
     .table-bordered th, .table-bordered td {
         border: 1px solid #dee2e6;
         vertical-align: middle;
     }
-
 </style>
-
 @model IEnumerable<BlueSchoolSystem.Models.ViewModel.DiemMonHocViewModel>
+@using BlueSchoolSystem.Models.ViewModel
+
+@{
+    var hocKySelected = ViewBag.HocKySelected as int? ?? 0;
+    var diemTatCa = ViewBag.DiemTatCaHocKy as IEnumerable<dynamic>; // mỗi item chứa: TenHocKy, Diems, DiemTBHocKy, DiemTBTichLuy, TinChiDat, TongTinChiTichLuy
+}
 
 <h6>Trang chủ / Học vụ / Xem điểm</h6>
 <div class="card shadow-sm">
     <div class="card-body">
-
-
 
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-3" id="diemTab" role="tablist">
@@ -144,66 +144,113 @@
                 {
                     <div class="alert alert-danger">@ViewBag.Error</div>
                 }
-                else if (!Model.Any())
+                else if ((Model == null || !Model.Any()) && (diemTatCa == null || !diemTatCa.Any()))
                 {
                     <div class="alert alert-warning">Chưa có điểm.</div>
                 }
                 else
                 {
-                    <h6 class="bg-primary text-white p-2">
-                        @(((IEnumerable<SelectListItem>)ViewBag.HocKyList)
-                            .FirstOrDefault(x => x.Value == ViewBag.HocKySelected.ToString())?.Text)
-                    </h6>
+                    @* Nếu chọn "Tất cả" *@
+                    if (hocKySelected == 0 && diemTatCa != null)
+                    {
+                        foreach (var hk in diemTatCa)
+                        {
+                            <h6 class="bg-primary text-white p-2">@hk.TenHocKy</h6>
 
-                    <table class="table table-bordered mb-2">
-                        <thead class="table-light">
-                            <tr>
-                                <th>STT</th>
-                                <th>Mã HP</th>
-                                <th>Tên học phần</th>
-                                <th>STC</th>
-                                <th>Điểm kiểm tra 1</th>
-                                <th>Điểm thi</th>
-                                <th>Điểm hệ 10</th>
-                                <th>Điểm hệ 4</th>
-                                <th>Điểm chữ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @{
-                                var stt = 1;
-                                foreach (var d in Model)
-                                {
+                            <table class="table table-bordered mb-3">
+                                <thead class="table-light">
                                     <tr>
-                                        <td>@stt</td>
-                                        <td>@d.MaMonHoc</td>
-                                        <td>@d.TenMonHoc</td>
-                                        <td>@d.SoTinChi</td>
-                                        <td>@d.DiemQuaTrinh</td>
-                                        <td>@d.DiemCuoiKy</td>
-                                        <td>@d.DiemTongKet</td>
-                                        <td>@d.DiemHe4</td>
-                                        <td>@d.DiemChu</td>
+                                        <th style="width: 60px;">STT</th>
+                                        <th style="width: 100px;">Mã HP</th>
+                                        <th style="width: 300px;">Tên học phần</th>
+                                        <th style="width: 70px;">STC</th>
+                                        <th style="width: 130px;">Điểm quá trình</th>
+                                        <th style="width: 130px;">Điểm thi</th>
+                                        <th style="width: 120px;">Điểm hệ 10</th>
+                                        <th style="width: 120px;">Điểm hệ 4</th>
+                                        <th style="width: 100px;">Điểm chữ</th>
                                     </tr>
-                                    stt++;
-                                }
-                            }
-                        </tbody>
-                    </table>
+                                </thead>
+                                <tbody>
+                                    @{
+                                        int stt = 1;
+                                        foreach (var d in hk.Diems)
+                                        {
+                                            <tr>
+                                                <td>@stt</td>
+                                                <td>@d.MaMonHoc</td>
+                                                <td>@d.TenMonHoc</td>
+                                                <td>@d.SoTinChi</td>
+                                                <td>@(d.DiemChuyenCan)</td>
+                                                <td>@(d.DiemCuoiKy)</td>
+                                                <td>@(d.DiemTongKet)</td>
+                                                <td>@(d.DiemHe4)</td>
+                                                <td>@(d.DiemChu)</td>
+                                            </tr>
+                                            stt++;
+                                        }
+                                    }
+                                </tbody>
+                            </table>
 
-                    <!-- Thống kê -->
-                    <div class="mb-4">
-                        <p>
-                            <strong>Điểm trung bình học kỳ (hệ 4):</strong>
-                            @(Model.Any(m => m.DiemHe4.HasValue)
-                                ? (Model.Sum(m => m.DiemHe4.Value * m.SoTinChi) / Model.Sum(m => m.SoTinChi)).ToString("0.00")
-                                : "0.00")
-                        </p>
-                        <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @ViewBag.DiemTBTichLuy</p>
-                        <p><strong>Số tín chỉ đạt:</strong> @Model.Where(m => m.DiemHe4 > 0).Sum(m => m.SoTinChi)</p>
-                        <p><strong>Tổng tín chỉ tích lũy:</strong> @ViewBag.TongTinChiTichLuy</p>
-                    </div>
+                            <div class="mb-4">
+                                <p><strong>Điểm trung bình học kỳ (hệ 4):</strong> @((hk.DiemTBHocKy ?? 0).ToString("0.00"))</p>
+                                <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @((hk.DiemTBTichLuy ?? 0).ToString("0.00"))</p>
+                                <p><strong>Số tín chỉ đạt:</strong> @(hk.TinChiDat ?? 0)</p>
+                                <p><strong>Tổng tín chỉ tích lũy:</strong> @(hk.TongTinChiTichLuy ?? 0)</p>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @* Nếu chọn 1 học kỳ *@
+                        <h6 class="bg-primary text-white p-2">@ViewBag.SelectedHocKyName</h6>
+
+                        <table class="table table-bordered mb-2">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 60px;">STT</th>
+                                    <th style="width: 100px;">Mã HP</th>
+                                    <th style="width: 300px;">Tên học phần</th>
+                                    <th style="width: 70px;">STC</th>
+                                    <th style="width: 130px;">Điểm quá trình</th>
+                                    <th style="width: 130px;">Điểm thi</th>
+                                    <th style="width: 120px;">Điểm hệ 10</th>
+                                    <th style="width: 120px;">Điểm hệ 4</th>
+                                    <th style="width: 100px;">Điểm chữ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    int stt = 1;
+                                    foreach (var d in Model)
+                                    {
+                                        <tr>
+                                            <td>@stt</td>
+                                            <td>@d.MaMonHoc</td>
+                                            <td>@d.TenMonHoc</td>
+                                            <td>@d.SoTinChi</td>
+                                            <td>@(d.DiemChuyenCan)</td>
+                                            <td>@(d.DiemCuoiKy)</td>
+                                            <td>@(d.DiemTongKet)</td>
+                                            <td>@(d.DiemHe4)</td>
+                                            <td>@(d.DiemChu)</td>
+                                        </tr>
+                                        stt++;
+                                    }
+                                }
+                            </tbody>
+                        </table>
+
+                        <div class="mb-4">
+                            <p><strong>Điểm trung bình học kỳ (hệ 4):</strong> @(ViewBag.DiemTBHocKy ?? "0.00")</p>
+                            <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @(ViewBag.DiemTBTichLuy ?? "0.00")</p>
+                            <p><strong>Số tín chỉ đạt :</strong> @(ViewBag.TongTinChiDat ?? 0)</p>
+                            <p><strong>Tổng tín chỉ tích lũy:</strong> @(ViewBag.TongTinChiTichLuy ?? 0)</p>
+                        </div>
+                    }
                 }
+
             </div>
 
             <!-- Tab Tích lũy -->
@@ -224,18 +271,18 @@
                         <tbody>
                             @if (ViewBag.TichLuyList != null)
                             {
-                                var stt = 1;
+                                var stt2 = 1;
                                 foreach (var item in ViewBag.TichLuyList)
                                 {
                                     <tr>
-                                        <td>@stt</td>
+                                        <td>@stt2</td>
                                         <td>@item.TenHocKy</td>
                                         <td>@item.DiemTBHocKy</td>
                                         <td>@item.DiemTBTichLuy</td>
                                         <td>@item.TinChiDat</td>
                                         <td>@item.TongTinChiTichLuy</td>
                                     </tr>
-                                    stt++;
+                                    stt2++;
                                 }
                             }
                         </tbody>
@@ -246,4 +293,3 @@
 
     </div>
 </div>
-
