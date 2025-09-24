@@ -228,28 +228,6 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<DiemMonHocViewModel>());
             }
 
-            // ✅ Lấy ngày nhập học từ DB
-            var ngayNhapHoc = await _context.SinhViens
-                .Where(s => s.MSSV == mssv)
-                .Select(s => s.NgayNhapHoc)
-                .FirstOrDefaultAsync();
-
-            // ✅ Lấy danh sách học kỳ
-            var hocKyData = await _context.HocKys
-                .Where(hk => hk.NgayBatDau >= ngayNhapHoc)
-                .OrderByDescending(hk => hk.NgayBatDau)
-                .Select(hk => new { hk.Id, hk.TenHocKy, hk.NgayBatDau })
-                .ToListAsync();
-
-            // Nếu chưa chọn thì mặc định học kỳ mới nhất
-            if (string.IsNullOrEmpty(hocKy) && hocKyData.Any())
-            {
-                hocKy = hocKyData.First().Id.ToString();
-            }
-
-            ViewBag.HocKySelected = int.TryParse(hocKy, out var hkId) ? hkId : 0;
-            ViewBag.HocKyList = new SelectList(hocKyData, "Id", "TenHocKy", ViewBag.HocKySelected);
-
             // ✅ Gọi API lấy toàn bộ điểm sinh viên
             var response = await client.GetAsync($"api/diemsinhvien/{mssv}");
             if (!response.IsSuccessStatusCode)
@@ -270,6 +248,21 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<DiemMonHocViewModel>());
             }
 
+            // ✅ Danh sách học kỳ từ API
+            var hocKyData = diemResponse.Data
+                .OrderByDescending(d => d.NgayBatDau)
+                .Select(d => new { d.HocKyId, d.TenHocKy })
+                .ToList();
+
+            // Nếu chưa chọn thì mặc định học kỳ mới nhất
+            if (string.IsNullOrEmpty(hocKy) && hocKyData.Any())
+            {
+                hocKy = hocKyData.First().HocKyId.ToString();
+            }
+
+            ViewBag.HocKySelected = int.TryParse(hocKy, out var hkId) ? hkId : 0;
+            ViewBag.HocKyList = new SelectList(hocKyData, "HocKyId", "TenHocKy", ViewBag.HocKySelected);
+
             // ✅ Lấy điểm học kỳ đang chọn
             var selectedHocKy = diemResponse.Data
                 .FirstOrDefault(d => d.HocKyId == ViewBag.HocKySelected);
@@ -285,6 +278,7 @@ namespace BlueSchoolSystem.Controllers
             // ✅ Trả về điểm học kỳ đã chọn để hiển thị
             return View(diemHocKy);
         }
+
 
 
         //Giao diện Lớp học phần
