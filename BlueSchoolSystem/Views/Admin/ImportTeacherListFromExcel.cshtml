@@ -1,0 +1,151 @@
+﻿@{
+    ViewData["Title"] = "Nhập danh sách giảng viên từ Excel";
+}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+    .table-responsive.preview-wrapper {
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #previewTable {
+        min-width: 1200px;
+        table-layout: auto;
+    }
+
+        #previewTable th, #previewTable td {
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+</style>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>
+        @Html.Raw(TempData["Success"])
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@Html.Raw(TempData["Error"])</div>
+}
+
+<div class="container mt-4">
+    <div class="card shadow-lg border-0 rounded-3">
+        <div class="card-body">
+            <h3 class="card-title mb-3">
+                <i class="fa-solid fa-file-import me-2"></i> Nhập danh sách giảng viên từ Excel
+            </h3>
+            <hr />
+            <form id="excelForm" enctype="multipart/form-data" method="post">
+                <div class="mb-3">
+                    <input type="file" id="excelFile" name="excelFile" class="form-control" accept=".xlsx,.xls" required />
+                </div>
+                <button type="button" class="btn btn-info" onclick="previewExcel()">
+                    <i class="fa-solid fa-eye me-2"></i> Xem trước
+                </button>
+                <button type="submit" class="btn btn-success">
+                    <i class="fa-solid fa-upload me-2"></i> Upload & Import
+                </button>
+            </form>
+            <div class="mt-3 text-primary">
+                <b>Lưu ý:</b> File Excel phải đúng format mẫu.
+                <a asp-action="DownloadTeacherExcelTemplate"
+                   class="fw-bold text-decoration-underline"
+                   style="cursor:pointer;">
+                    Tải Format mẫu tại đây
+                </a>
+            </div>
+
+            <div class="table-responsive preview-wrapper">
+                <div id="totalRecords" class="mt-2 fw-bold text-primary"></div>
+                <table id="previewTable" class="table table-hover table-striped table-bordered mt-3">
+                    <thead class="table-dark text-nowrap">
+                        <tr>
+                            <th class="text-center">Mã giảng viên</th>
+                            <th class="text-center">CCCD</th>
+                            <th class="text-center">Họ và tên đệm</th>
+                            <th class="text-center">Tên</th>
+                            <th class="text-center">Ngày sinh</th>
+                            <th class="text-center">Giới tính</th>
+                            <th class="text-center">Số điện thoại</th>
+                            <th class="text-center">Email</th>
+                            <th class="text-center">Địa chỉ</th>
+                            <th class="text-center">Đơn vị (Khoa/Viện)</th>
+                            <th class="text-center">Ghi chú</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dữ liệu sẽ được render ở đây -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Convert Excel serial date về dạng dd/MM/yyyy
+    function excelDateToJSDate(serial) {
+        var utc_days = Math.floor(serial - 25569);
+        var utc_value = utc_days * 86400;
+        var date_info = new Date(utc_value * 1000);
+        return date_info.getDate().toString().padStart(2, '0') + '/' +
+               (date_info.getMonth() + 1).toString().padStart(2, '0') + '/' +
+               date_info.getFullYear();
+    }
+
+    function previewExcel() {
+        var fileInput = document.getElementById('excelFile');
+        var tableBody = document.querySelector('#previewTable tbody');
+        tableBody.innerHTML = '';
+        document.getElementById('totalRecords').textContent = '';
+
+        if (fileInput.files.length === 0) {
+            alert('Vui lòng chọn file Excel!');
+            return;
+        }
+
+        var file = fileInput.files[0];
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var data = new Uint8Array(e.target.result);
+            var workbook = XLSX.read(data, { type: 'array' });
+            var sheet = workbook.Sheets[workbook.SheetNames[0]];
+            var json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+            let totalRecords = 0;
+
+                for (var i = 1; i < json.length; i++) {
+        var row = json[i];
+        var tr = document.createElement('tr');
+        for (var j = 0; j < 11; j++) { // Chỉ còn 11 cột!
+            var td = document.createElement('td');
+            var cell = row[j] ? String(row[j]) : '';
+            // Cột ngày sinh (index 4)
+            if (j === 4 && !isNaN(cell) && cell !== "") {
+                var serial = Number(cell);
+                if (serial > 20000 && serial < 90000) {
+                    cell = excelDateToJSDate(serial);
+                }
+            }
+            cell = cell.replace(/\r?\n|\r/g, ' ');
+            cell = cell.replace(/\s+/g, ' ').trim();
+            td.classList.add('text-center', 'text-nowrap');
+            td.textContent = cell;
+            if (cell.length > 0) td.setAttribute('title', cell);
+            tr.appendChild(td);
+        }
+        tableBody.appendChild(tr);
+        totalRecords++;
+    }
+
+            document.getElementById('totalRecords').textContent = `Tổng số bản ghi: ${totalRecords}`;
+        };
+        reader.readAsArrayBuffer(file);
+    }
+</script>

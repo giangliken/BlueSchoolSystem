@@ -1,0 +1,247 @@
+﻿@model BlueSchoolSystem.Models.GiangVien
+
+@{
+    ViewData["Title"] = "Chi tiết giảng viên";
+    var token = Context.Session.GetString("access_token");
+}
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i>
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-exclamation me-2"></i>
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Warning"] != null)
+{
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+        @TempData["Warning"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-person-badge me-2"></i>Thông tin giảng viên</h4>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        @if (!string.IsNullOrEmpty(Model.AvatarUrl))
+                        {
+                            <img src="@Model.AvatarUrl" class="rounded-circle border"
+                                 style="width: 150px; height: 150px; object-fit: cover; border: 2px solid #ccc;" />
+                        }
+                        else
+                        {
+                            <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center"
+                                 style="width: 150px; height: 150px; border: 2px solid #ccc;">
+                                <span>Avatar</span>
+                            </div>
+                        }
+                        <h5>Ảnh đại diện</h5>
+                    </div>
+
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <strong>Mã CB/GV:</strong> @Model.MaGiangVien
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Họ tên:</strong>
+                            <span id="hoten-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.HoVaTenDem @Model.Ten
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                        onclick="editField('hoten', '@Model.MaGiangVien', '@Model.HoVaTenDem', '@Model.Ten')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Giới tính:</strong>
+                            <span id="gioitinh-val" class="d-inline-flex align-items-center ms-2">
+                                @(Model.GioiTinh ? "Nam" : "Nữ")
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                        onclick="editGender('@Model.MaGiangVien', '@Model.GioiTinh')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Ngày sinh:</strong>
+                            <span id="ngaysinh-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.NgaySinh.ToString("dd/MM/yyyy")
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                        onclick="editNgaySinh('@Model.MaGiangVien', '@Model.NgaySinh.ToString("yyyy-MM-dd")')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>CCCD:</strong>
+                            <span id="cccd-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.CCCD
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                        onclick="editCCCD('@Model.MaGiangVien', '@Model.CCCD')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Số điện thoại:</strong>
+                            <span id="phone-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.User?.PhoneNumber
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                        onclick="editPhone('@Model.MaGiangVien', '@Model.User?.PhoneNumber')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Email:</strong>
+                            <span id="email-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.User?.Email
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                        onclick="editEmail('@Model.MaGiangVien', '@Model.User?.Email')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Địa chỉ:</strong>
+                            <span id="diachi-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.DiaChi
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                        onclick="editDiaChi('@Model.MaGiangVien', '@Model.DiaChi')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <strong>Khoa/Viện:</strong>
+                            @(Model.Khoa?.TenKhoa ?? "Chưa thuộc khoa/viện")
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Trạng thái:</strong>
+                            <span id="trangthai-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.TrangThai?.TenTrangThai
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                        onclick="editTrangThai('@Model.MaGiangVien', '@Model.TrangThaiId', '@(Model.TrangThai?.TenTrangThai ?? "Chưa xác định")')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Ghi chú:</strong>
+                            <span id="ghichu-val" class="d-inline-flex align-items-center ms-2">
+                                @Model.GhiChu
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                        onclick="editGhiChu('@Model.MaGiangVien', '@Model.GhiChu')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <strong>Tài khoản:</strong>
+                            @Model.User?.UserName
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <strong>Ngày tạo:</strong>
+                            @Model.CreatedAt.ToString("HH:mm dd/MM/yyyy")
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <strong>Cập nhật gần nhất:</strong>
+                            @Model.UpdatedAt.ToString("HH:mm dd/MM/yyyy")
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-footer bg-light text-center">
+                    <form asp-action="ResetPassword" asp-route-id="@Model.Id" asp-route-type="GiangVien" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fa-solid fa-key me-2"></i>
+                            Cấp lại mật khẩu
+                        </button>
+                    </form>
+                    <a asp-action="TeacherManager" class="btn btn-secondary">
+                        <i class="fa-solid fa-arrow-left me-2"></i>Quay lại
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.__accessToken = @Html.Raw(Json.Serialize(token));
+    </script>
+    <script>
+        // ==== Copy toàn bộ các hàm JS của StudentDetails xuống đây ====
+        // => Chỉ thay đổi tên endpoint API thành giangvien, ví dụ:
+        // PUT /api/suathongtingiangvien/{maGiangVien}
+        // => Field truyền vào vẫn giữ giống bên trên nhưng property đổi tên theo model GiangVien
+
+        // ... Toàn bộ hàm editField, editGender, editNgaySinh, editCCCD, editPhone, editEmail, editDiaChi, editTrangThai, editGhiChu
+        // ... Copy từ file StudentDetails, chỉ sửa mỗi API endpoint, biến MSSV -> MaGiangVien, label, v.v.
+
+        // Ví dụ:
+        function editField(field, maGiangVien, hoVaTenDem, ten) {
+            // ... logic như Student, đổi url
+            let html = `
+                <input type="text" id="hoten-dem" value="${hoVaTenDem}" style="width:120px;" />
+                <input type="text" id="hoten-ten" value="${ten}" style="width:80px;" />
+                <button class="btn btn-sm btn-success ms-1" onclick="saveField('${field}', '${maGiangVien}')">Lưu</button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="cancelEditField('${field}', '${hoVaTenDem}', '${ten}')">Hủy</button>
+            `;
+            document.getElementById('hoten-val').innerHTML = html;
+        }
+        function saveField(field, maGiangVien) {
+            const hoVaTenDem = document.getElementById('hoten-dem').value;
+            const ten = document.getElementById('hoten-ten').value;
+            var token = window.__accessToken;
+            fetch(`/api/suathongtingiangvien/${maGiangVien}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    HoVaTenDem: hoVaTenDem,
+                    Ten: ten
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('hoten-val').innerHTML = `${hoVaTenDem} ${ten}`;
+                    } else {
+                        alert('Lỗi: ' + data.message);
+                    }
+                });
+        }
+        function cancelEditField(field, hoVaTenDem, ten) {
+            document.getElementById('hoten-val').innerHTML = `${hoVaTenDem} ${ten}`;
+        }
+        // ... Và tương tự với các function khác: editGender, saveGender, cancelGender,... v.v. chỉ đổi endpoint
+        // Copy giống bên StudentDetails, đổi chỗ fetch() gọi sang /api/suathongtingiangvien/{maGiangVien}
+    </script>
+    <script>
+        // Mảng trạng thái lấy động từ ViewBag
+        const trangThaiOptions = [
+            @foreach (var item in ViewBag.TrangThaiList)
+            {
+                    <text>{id: @item.Id, label: "@item.TenTrangThai" },</text>
+            }
+        ];
+    </script>
+}
