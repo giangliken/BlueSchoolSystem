@@ -42,11 +42,68 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpGet("timkiemgiangvien")]
+        public async Task<IActionResult> TimKiemGiangVien(string? keyword, string? maKhoa, int? trangThaiId)
+        {
+            var query = _context.GiangViens
+                .Include(gv => gv.Khoa)
+                .Include(gv => gv.TrangThai)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                var kw = keyword.ToLower();
+                query = query.Where(gv =>
+                    gv.MaGiangVien.ToLower().Contains(kw) ||
+                    gv.HoVaTenDem.ToLower().Contains(kw) ||
+                    gv.Ten.ToLower().Contains(kw));
+            }
+
+            if (!string.IsNullOrEmpty(maKhoa))
+            {
+                query = query.Where(gv => gv.Khoa != null && gv.Khoa.MaKhoa == maKhoa);
+            }
+
+            if (trangThaiId.HasValue && trangThaiId.Value > 0)
+            {
+                query = query.Where(gv => gv.TrangThaiId == trangThaiId.Value);
+            }
+
+            var data = await query.OrderBy(gv => gv.Id).ToListAsync();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy dữ liệu thành công",
+                soluonggiangvien = data.Count,
+                data = data
+            });
+        }
+
+
+
         //Thêm giảng viên
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPost("themgiangvien")]
         public async Task<IActionResult> AddGiangVien([FromBody] CreateGiangVienWithUserRequest request)
         {
+            if (string.IsNullOrWhiteSpace(request.UserName)
+                || string.IsNullOrWhiteSpace(request.Email)
+                || string.IsNullOrWhiteSpace(request.Password)
+                || request.GiangVien == null
+                || string.IsNullOrWhiteSpace(request.GiangVien.HoVaTenDem)
+                || string.IsNullOrWhiteSpace(request.GiangVien.Ten)
+                || string.IsNullOrWhiteSpace(request.GiangVien.CCCD)
+                || string.IsNullOrWhiteSpace(request.GiangVien.DiaChi)
+                || request.GiangVien.KhoaId == null
+                || request.GiangVien.NgaySinh == DateTime.MinValue
+            )
+            {
+                return BadRequest("Thiếu thông tin bắt buộc. Dữ liệu không hợp lệ.");
+            }
+
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
             // 1. Tạo user
