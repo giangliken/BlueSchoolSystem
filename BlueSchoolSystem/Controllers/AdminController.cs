@@ -552,6 +552,7 @@ namespace BlueSchoolSystem.Controllers
                 if (!ModelState.IsValid)
                     return View(model);
 
+
                 var token = HttpContext.Session.GetString("access_token");
                 // Nếu model.User có tồn tại (tức là từ form nhập), thì dùng lấy info xong set null
                 
@@ -650,7 +651,7 @@ namespace BlueSchoolSystem.Controllers
             }
 
             var teachers = new List<GiangVien>();
-            var userInfos = new List<(string Email, string Phone)>(); // <-- Lưu email, phone tách ra
+            var userInfos = new List<(string Email, string Phone)>(); 
             var importErrors = new List<string>();
 
             using (var stream = new MemoryStream())
@@ -661,7 +662,7 @@ namespace BlueSchoolSystem.Controllers
                     var worksheet = package.Workbook.Worksheets[0];
                     int rowCount = worksheet.Dimension.Rows;
 
-                    // Map mã khoa -> KhoaId
+                    
                     var allKhoa = _context.Khoas
                         .Select(k => new { k.Id, k.MaKhoa })
                         .ToList()
@@ -761,9 +762,22 @@ namespace BlueSchoolSystem.Controllers
                 }
             }
 
+            //if (importErrors.Count > 0)
+            //{
+            //    ViewBag.ImportErrors = importErrors;
+            //    // Nếu muốn: truyền lại file mẫu để user download, hoặc danh sách lỗi
+            //    return View("ImportTeacherListFromExcel"); // Tên view upload Excel
+            //}
+
             string importResult = $"Nhập thành công {successCount}/{teachers.Count} giảng viên!";
             if (importErrors.Count > 0)
+            {
                 importResult += "<br/>Dữ liệu không hợp lệ:<br/>" + string.Join("<br/>", importErrors);
+                TempData["Error"] = "Dữ liệu đầu vào không đúng";
+
+                return View("ImportTeacherListFromExcel"); // Tên view upload Excel
+
+            }
             if (errors.Count > 0)
                 importResult += "<br/>Lỗi import:<br/>" + string.Join("<br/>", errors);
 
