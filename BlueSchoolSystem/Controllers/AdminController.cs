@@ -419,69 +419,103 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Xem thông tin chi tiết sinh viên
-        public async Task<IActionResult> StudentDetails(int? id)
+        public async Task<IActionResult> StudentDetails(string mssv)
         {
-            if (id == null) return NotFound();
+            if (string.IsNullOrEmpty(mssv))
+            {
+                TempData["Error"] = "Không tìm thấy sinh viên với MSSV này!";
+                return RedirectToAction("StudentManager");
+            }
 
             var sinhVien = await _context.SinhViens
                 .Include(s => s.Lop)
                     .ThenInclude(l => l.Nganh)
                         .ThenInclude(n => n.Khoa)
                 .Include(s => s.User)
-                .Include(tt =>tt.TrangThai)
-                .FirstOrDefaultAsync(m => m.Id == id);
+                .Include(tt => tt.TrangThai)
+                .FirstOrDefaultAsync(m => m.MSSV == mssv);
 
-            if (sinhVien == null) return NotFound();
+            if (sinhVien == null)
+            {
+                TempData["Error"] = $"Không tìm thấy sinh viên với MSSV: {mssv}";
+                return RedirectToAction("StudentManager");
+            }
 
-            ViewBag.TrangThaiList = _context.TrangThais
-               .Where(t => t.LoaiTrangThai == "SinhVien")
-               .Select(t => new { t.Id, t.TenTrangThai })
-               .ToList();
-
+            ViewBag.TrangThaiList = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "SinhVien")
+                .ToListAsync();
 
             return View(sinhVien);
         }
 
         //Trang quản lí giảng viên
-        public async Task<IActionResult> TeacherManager()
+        public async Task<IActionResult> TeacherManager(string? keyword, string? maKhoa, int? trangThaiId)
         {
             try
             {
                 var client = _httpClientFactory.CreateClient();
                 client.BaseAddress = new Uri(_apiBaseUrl);
-                
-                // Lấy token
+
                 var token = HttpContext.Session.GetString("access_token");
                 if (!string.IsNullOrEmpty(token))
-                {
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                // Lấy list khoa để fill dropdown filter
+                var facultyRes = await client.GetAsync("api/laydanhsachkhoa");
+                if (facultyRes.IsSuccessStatusCode)
+                {
+                    var facultyJson = await facultyRes.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(facultyJson);
+                    var data = doc.RootElement.GetProperty("data");
+                    var khoaList = JsonConvert.DeserializeObject<List<Khoa>>(data.GetRawText());
+                    ViewBag.KhoaList = khoaList;
+                }
+                else
+                {
+                    ViewBag.KhoaList = new List<Khoa>();
                 }
 
+                ViewBag.TrangThaiList = await _context.TrangThais
+                    .Where(x => x.LoaiTrangThai == "GiangVien")
+                    .ToListAsync();
+
+                string url = "api/timkiemgiangvien?";
+                if (!string.IsNullOrEmpty(keyword))
+                    url += "keyword=" + Uri.EscapeDataString(keyword) + "&";
+                if (!string.IsNullOrEmpty(maKhoa))
+                    url += "maKhoa=" + Uri.EscapeDataString(maKhoa) + "&";
+                if (trangThaiId.HasValue && trangThaiId > 0)
+                    url += "trangThaiId=" + trangThaiId + "&";
+                url = url.TrimEnd('&', '?');
+
                 // Gọi API
-                HttpResponseMessage response = await client.GetAsync("api/laydanhsachgiangvien");
+                HttpResponseMessage response = await client.GetAsync(
+                    (string.IsNullOrEmpty(keyword) && string.IsNullOrEmpty(maKhoa) && !trangThaiId.HasValue)
+                        ? "api/laydanhsachgiangvien"
+                        : url
+                );
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    // Xử lý khi không lấy được data (ví dụ 401/403/500)
                     TempData["Error"] = "Không lấy được danh sách giảng viên!";
                     return View(new List<GiangVien>());
                 }
 
-                // Đọc body
                 var body = await response.Content.ReadAsStringAsync();
                 using var document = JsonDocument.Parse(body);
                 var root = document.RootElement;
-
                 var dataJson = root.GetProperty("data").GetRawText();
-
-                // Parse về model
                 var teachers = JsonConvert.DeserializeObject<List<GiangVien>>(dataJson);
+
+                // Truyền lại filter cho view
+                ViewBag.Keyword = keyword;
+                ViewBag.MaKhoa = maKhoa;
+                ViewBag.TrangThaiId = trangThaiId;
 
                 return View(teachers);
             }
             catch (Exception ex)
             {
-                // Ghi log hoặc xử lý ngoại lệ
                 TempData["Error"] = "Đã có lỗi xảy ra: " + ex.Message;
                 return View(new List<GiangVien>());
             }
@@ -543,7 +577,7 @@ namespace BlueSchoolSystem.Controllers
                 var json = JsonConvert.SerializeObject(apiRequest);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                //var jsonDebug = JsonConvert.SerializeObject(requestBody, Formatting.Indented);
+                //var jsonDebug = JsonConvert.SerializeObject(apiRequest, Formatting.Indented);
 
                 var response = await client.PostAsync("/api/themgiangvien", content);
 
@@ -598,11 +632,222 @@ namespace BlueSchoolSystem.Controllers
         }
 
 
+        //Nhập danh sách giảng viên từ file excel
+        [HttpGet]
+        public IActionResult ImportTeacherListFromExcel()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportTeacherListFromExcel(IFormFile excelFile)
+        {
+            if (excelFile == null || excelFile.Length == 0)
+            {
+                TempData["Error"] = "Vui lòng chọn file Excel.";
+                return View();
+            }
+
+            var teachers = new List<GiangVien>();
+            var userInfos = new List<(string Email, string Phone)>(); // <-- Lưu email, phone tách ra
+            var importErrors = new List<string>();
+
+            using (var stream = new MemoryStream())
+            {
+                await excelFile.CopyToAsync(stream);
+                using (var package = new ExcelPackage(stream))
+                {
+                    var worksheet = package.Workbook.Worksheets[0];
+                    int rowCount = worksheet.Dimension.Rows;
+
+                    // Map mã khoa -> KhoaId
+                    var allKhoa = _context.Khoas
+                        .Select(k => new { k.Id, k.MaKhoa })
+                        .ToList()
+                        .ToDictionary(x => x.MaKhoa.Trim().ToUpper(), x => x.Id);
+
+                    // Lấy trạng thái "Đang công tác"
+                    var trangThai = await _context.TrangThais
+                        .FirstOrDefaultAsync(tt => tt.TenTrangThai == "Đang công tác" && tt.LoaiTrangThai == "GiangVien");
+                    int trangThaiDangCongTacId = trangThai?.Id ?? 1;
+
+                    for (int row = 2; row <= rowCount; row++)
+                    {
+                        string maGiangVien = worksheet.Cells[row, 1].Text.Trim();
+                        string email = worksheet.Cells[row, 8].Text.Trim();
+                        string phone = worksheet.Cells[row, 7].Text.Trim();
+                        string maKhoa = worksheet.Cells[row, 10].Text.Trim().ToUpper();
+
+                        // Check thiếu thông tin bắt buộc
+                        if (string.IsNullOrEmpty(maGiangVien) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(maKhoa))
+                        {
+                            importErrors.Add($"Dòng {row}: Thiếu mã giảng viên, email hoặc mã khoa.");
+                            continue;
+                        }
+                        // Check mã khoa hợp lệ
+                        if (!allKhoa.TryGetValue(maKhoa, out int khoaId))
+                        {
+                            importErrors.Add($"Dòng {row}: Mã khoa \"{maKhoa}\" không hợp lệ.");
+                            continue;
+                        }
+                        // Check mã giảng viên (username) đã tồn tại chưa (tùy nhu cầu, check DB)
+                        bool exists = _context.Users.Any(u => u.UserName == maGiangVien);
+                        if (exists)
+                        {
+                            importErrors.Add($"Dòng {row}: Mã giảng viên \"{maGiangVien}\" đã tồn tại.");
+                            continue;
+                        }
+
+                        var gv = new GiangVien
+                        {
+                            MaGiangVien = maGiangVien,
+                            CCCD = worksheet.Cells[row, 2].Text.Trim(),
+                            HoVaTenDem = worksheet.Cells[row, 3].Text.Trim(),
+                            Ten = worksheet.Cells[row, 4].Text.Trim(),
+                            NgaySinh = ParseExcelDate(worksheet.Cells[row, 5].Value),
+                            GioiTinh = worksheet.Cells[row, 6].Text.Trim().ToLower() == "nam",
+                            DiaChi = worksheet.Cells[row, 9].Text.Trim(),
+                            KhoaId = khoaId,
+                            TrangThaiId = trangThaiDangCongTacId,
+                            GhiChu = worksheet.Cells[row, 11].Text.Trim(),
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now,
+                            // **KHÔNG set User!**
+                        };
+                        teachers.Add(gv);
+                        userInfos.Add((email, phone));
+                    }
+                }
+            }
+
+            // Gửi từng giảng viên qua API
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var errors = new List<string>();
+            int successCount = 0;
+            for (int i = 0; i < teachers.Count; i++)
+            {
+                var gv = teachers[i];
+                var (email, phone) = userInfos[i];
+
+                var apiRequest = new CreateGiangVienWithUserRequest
+                {
+                    UserName = gv.MaGiangVien,
+                    Email = email,
+                    PhoneNumber = phone,
+                    Password = "Abc@123",
+                    GiangVien = gv
+                };
+                // Đảm bảo KHÔNG có User lồng bên trong:
+                apiRequest.GiangVien.User = null;
+
+                var json = JsonConvert.SerializeObject(apiRequest);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = await client.PostAsync("api/themgiangvien", content);
+
+                if (response.IsSuccessStatusCode)
+                    successCount++;
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    errors.Add($"{gv.MaGiangVien}: {apiError}");
+                }
+            }
+
+            string importResult = $"Nhập thành công {successCount}/{teachers.Count} giảng viên!";
+            if (importErrors.Count > 0)
+                importResult += "<br/>Dữ liệu không hợp lệ:<br/>" + string.Join("<br/>", importErrors);
+            if (errors.Count > 0)
+                importResult += "<br/>Lỗi import:<br/>" + string.Join("<br/>", errors);
+
+            TempData["Success"] = importResult;
+
+            return RedirectToAction("TeacherManager");
+        }
+
+        //Mẫu excel nhập DS giảng viên
+        public IActionResult DownloadTeacherExcelTemplate()
+        {
+            var headers = new string[]
+            {
+        "Mã giảng viên",      // 1
+        "CCCD",               // 2
+        "Họ và tên đệm",      // 3
+        "Tên",                // 4
+        "Ngày sinh",          // 5
+        "Giới tính",          // 6 (Nam/Nữ)
+        "Số điện thoại",      // 7
+        "Email",              // 8
+        "Địa chỉ",            // 9
+        "Mã khoa",            // 10
+        "Ghi chú"             // 11 mới
+            };
+
+            using (var package = new ExcelPackage())
+            {
+                var ws = package.Workbook.Worksheets.Add("GiangVien_Template");
+
+                // Ghi header
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    ws.Cells[1, i + 1].Value = headers[i];
+                    ws.Cells[1, i + 1].Style.Font.Bold = true;
+                }
+
+
+                ws.Cells[ws.Dimension.Address].AutoFitColumns();
+
+                var stream = new MemoryStream(package.GetAsByteArray());
+                string fileName = "MauNhapDSGiangVien.xlsx";
+                return File(stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+        }
+
+
+        // Xem thông tin chi tiết giảng viên
+        public async Task<IActionResult> TeacherDetails(string maGiangVien)
+        {
+            if (string.IsNullOrEmpty(maGiangVien))
+            {
+                TempData["Error"] = "Không xác định được mã giảng viên.";
+                return RedirectToAction("TeacherManager");
+            }
+
+            var giangVien = await _context.GiangViens
+                .Include(gv => gv.Khoa)
+                .Include(gv => gv.User)
+                .Include(gv => gv.TrangThai)
+                .FirstOrDefaultAsync(g => g.MaGiangVien == maGiangVien);
+
+            if (giangVien == null)
+            {
+                TempData["Error"] = $"Không tìm thấy giảng viên với mã: {maGiangVien}";
+                return RedirectToAction("TeacherManager");
+            }
+
+            ViewBag.TrangThaiList = await _context.TrangThais
+                .Where(x => x.LoaiTrangThai == "GiangVien")
+                .ToListAsync();
+
+            return View(giangVien);
+        }
+
+
+
 
         [HttpPost]
         public async Task<IActionResult> ResetPassword(int id, string type)
         {
             ApplicationUser user = null;
+            string nameInfo = "";
+            string codeInfo = "";
 
             if (type == "SinhVien")
             {
@@ -610,6 +855,11 @@ namespace BlueSchoolSystem.Controllers
                     .Include(sv => sv.User)
                     .FirstOrDefaultAsync(sv => sv.Id == id);
                 user = sinhVien?.User;
+                if (sinhVien != null)
+                {
+                    codeInfo = sinhVien.MSSV;
+                    nameInfo = $"{sinhVien.HoVaTenDem} {sinhVien.Ten}";
+                }
             }
             else if (type == "GiangVien")
             {
@@ -617,6 +867,11 @@ namespace BlueSchoolSystem.Controllers
                     .Include(gv => gv.User)
                     .FirstOrDefaultAsync(gv => gv.Id == id);
                 user = giangVien?.User;
+                if (giangVien != null)
+                {
+                    codeInfo = giangVien.MaGiangVien;
+                    nameInfo = $"{giangVien.HoVaTenDem} {giangVien.Ten}";
+                }
             }
 
             if (user == null)
@@ -625,16 +880,17 @@ namespace BlueSchoolSystem.Controllers
             var result = await ResetPasswordToDefaultAsync(user.Id);
 
             if (result)
-                TempData["Success"] = "Đã reset lại mật khẩu thành công!";
+                TempData["Success"] = $"Đã reset lại mật khẩu thành công cho {(type == "SinhVien" ? "sinh viên" : "giảng viên")}: Tài khoản: {codeInfo} - Họ tên: {nameInfo}";
             else
                 TempData["Error"] = "Có lỗi xảy ra khi reset mật khẩu!";
 
             // Redirect về đúng trang chi tiết
             if (type == "SinhVien")
-                return RedirectToAction("StudentDetails", new { id = id });
+                return RedirectToAction("StudentDetails", new { mssv = codeInfo });
             else
-                return RedirectToAction("TeacherDetails", "GiangVien", new { id = id });
+                return RedirectToAction("TeacherDetails", new { maGiangVien = codeInfo });
         }
+
 
         //Hàm cấp lại mật khẩu tài khoản sinh viên
         public async Task<bool> ResetPasswordToDefaultAsync(string userId, string defaultPassword = "Abc@123")
