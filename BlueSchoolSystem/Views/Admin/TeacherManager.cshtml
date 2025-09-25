@@ -12,25 +12,101 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 }
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
 
-<p>
+
+@{
+    var khoaList = (List<BlueSchoolSystem.Models.Khoa>)ViewBag.KhoaList;
+    var trangThaiList = (List<BlueSchoolSystem.Models.TrangThai>)ViewBag.TrangThaiList;
+}
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-2">
+        <input type="text" name="keyword" class="form-control" placeholder="Tìm theo họ tên, Mã CB/GV..." value="@ViewBag.Keyword" />
+    </div>
+    <div class="col-md-3">
+        <select class="form-select class-select" id="KhoaSelect" name="maKhoa">
+            <option value="">-- Tất cả các đơn vị --</option>
+            @foreach (var khoa in khoaList)
+            {
+                if (Context.Request.Query["maKhoa"] == khoa.MaKhoa)
+                {
+                    <option value="@khoa.MaKhoa" selected>@khoa.TenKhoa</option>
+                }
+                else
+                {
+                    <option value="@khoa.MaKhoa">@khoa.TenKhoa</option>
+                }
+            }
+        </select>
+
+    </div>
+
+    <div class="col-md-3">
+    <select class="form-select" id="TrangThaiSelect" name="trangThaiId">
+        <option value="">-- Tất cả trạng thái --</option>
+        @foreach (var tt in trangThaiList)
+        {
+            if (Context.Request.Query["trangThaiId"] == tt.Id.ToString())
+            {
+                <option value="@tt.Id" selected>@tt.TenTrangThai</option>
+            }
+            else
+            {
+                <option value="@tt.Id">@tt.TenTrangThai</option>
+            }
+        }
+    </select>
+</div>
+
+    
+
+    <div class="col-auto">
+        <button type="submit" class="btn btn-info me-2">
+            <i class="fa-solid fa-magnifying-glass me-1"></i> Tìm kiếm
+        </button>
+        <a asp-action="TeacherManager" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate-left me-1"></i> Reset
+        </a>
+    </div>
+</form>
+
+
+<div class="d-flex align-items-center gap-2 flex-wrap">
     <a class="btn btn-primary" asp-action="AddTeacher">
         <i class="fa-solid fa-user-plus me-2"></i>Thêm mới
     </a>
-    <a class="btn btn-success" asp-action="ImportStudentListFromExcel">
+    <a class="btn btn-success" asp-action="ImportTeacherListFromExcel">
         <i class="fa-solid fa-file-import me-2"></i>Nhập từ Excel
     </a>
-    <button type="button" class="btn btn-warning" id="btnExportExcel">
-        <i class="fa-solid fa-file-excel me-2"></i> Xuất Excel
+    <div class="dropdown d-inline-block">
+        <button class="btn btn-warning dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fa-solid fa-download me-2"></i> Xuất File
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+            <li>
+                <a class="dropdown-item" href="#" id="btnExportExcel">
+                    <i class="fa-solid fa-file-excel me-2 text-success"></i> Xuất Excel
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="#" id="btnExportCSV">
+                    <i class="fa-solid fa-file-csv me-2 text-info"></i> Xuất CSV
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div><b>Tổng số:</b> @Model.Count() dòng</div>
+    <button type="button" class="btn btn-dark" id="btnPrint">
+        <i class="fa-solid fa-print me-2"></i> In danh sách
     </button>
-    <button type="button" class="btn btn-info" id="btnExportCSV">
-        <i class="fa-solid fa-file-csv me-2"></i> Xuất CSV
-    </button>
-
-
-
-
-</p>
+</div>
 
 @functions {
     string GetRowClass(string status)
@@ -51,7 +127,7 @@
 }
 
 
-<table class="table table-hover table-striped table-bordered">
+<table class="table table-hover table-striped table-bordered" id="tableGV">
     <thead class="table-dark">
         <tr>
             <th class="text-center">STT</th>
@@ -72,7 +148,8 @@
         {
             var status = item.TrangThai?.TenTrangThai ?? "Không rõ";
             string rowClass = GetRowClass(status);
-            <tr class="table-row @rowClass" style="cursor:pointer;" onclick="window.location='@Url.Action("TeacherDetails", "Admin", new { id = item.Id })'">
+            <tr class="table-row @rowClass" style="cursor:pointer;"
+                onclick="window.location='@Url.Action("TeacherDetails", "Admin", new { maGiangVien = item.MaGiangVien })'">
                 <td class="text-center">@stt</td>
                 <td class="text-center">@item.MaGiangVien</td>
                 <td>@item.HoVaTenDem</td>
@@ -93,3 +170,121 @@
     </tbody>
 
 </table>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <script>
+        // Xuất Excel
+        document.getElementById('btnExportExcel').addEventListener('click', function () {
+            var table = document.getElementById('tableGV');
+            var wb = XLSX.utils.table_to_book(table, { sheet: "Danh sách giảng viên" });
+            XLSX.writeFile(wb, 'DanhSachGiangVien.xlsx');
+        });
+
+        // Xuất CSV
+        document.getElementById('btnExportCSV').addEventListener('click', function () {
+            var table = document.getElementById('tableGV');
+            var ws = XLSX.utils.table_to_sheet(table);
+            var csv = XLSX.utils.sheet_to_csv(ws);
+            var blob = new Blob([csv], { type: 'text/csv' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'DanhSachGiangVien.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+    <script>
+        document.getElementById('btnPrint').addEventListener('click', function () {
+            // Clone lại bảng để xử lý style
+            var table = document.getElementById('tableGV').cloneNode(true);
+            // Xóa hết class và style thừa
+            table.className = '';
+            table.querySelectorAll('tr, th, td, thead, tbody').forEach(function (el) {
+                el.className = '';
+                el.removeAttribute('style');
+            });
+
+            var printStyle = `
+                <style>
+                    body {
+                        background: #fff !important;
+                        margin: 0;
+                        padding: 0;
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                    }
+                    .print-header {
+                        text-align: center;
+                        margin-bottom: 8px;
+                        margin-top: 8px;
+                    }
+                    .print-header h2 {
+                        font-size: 20px;
+                        font-weight: 700;
+                        margin: 0;
+                        letter-spacing: 2px;
+                        color: #111;
+                    }
+                    .print-subinfo {
+                        text-align: right;
+                        margin-bottom: 12px;
+                        font-size: 12px;
+                        color: #444;
+                    }
+                    table {
+                        margin: 0 auto;
+                        width: 97%;
+                        border-collapse: collapse !important;
+                        background: #fff !important;
+                        font-size: 12px !important;
+                        box-shadow: 0 2px 10px #eee;
+                        border-radius: 12px;
+                        overflow: hidden;
+                    }
+                    th, td {
+                        border: 1px solid #222 !important;
+                        padding: 6px 8px;
+                        text-align: center;
+                        background: #fff !important;
+                        color: #000 !important;
+                    }
+                    th {
+                        background: #f3f3f3 !important;
+                        color: #222 !important;
+                        font-size: 13px !important;
+                        font-weight: 600;
+                        letter-spacing: 1px;
+                    }
+                    tr:nth-child(even) td {
+                        background: #fafbfc !important;
+                    }
+                    tr:hover td {
+                        background: #eee !important;
+                    }
+                </style>
+            `;
+
+            // Tạo header thời gian in
+            var now = new Date();
+            var dateStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + now.toLocaleDateString('vi-VN');
+            var subinfo = `<div class="print-subinfo">In lúc: ${dateStr}</div>`;
+
+            // Render ra giao diện in
+            document.body.innerHTML = `
+                <div class="print-header">
+                    <div style="font-size:13px; font-weight:500; color:#555; letter-spacing:1px; margin-bottom:2px;">BLUESCHOOL EMS</div>
+                    <h2>DANH SÁCH GIẢNG VIÊN</h2>
+                </div>
+                ${subinfo}
+                ${printStyle}
+                ${table.outerHTML}
+            `;
+
+            window.print();
+            window.location.reload();
+        });
+    </script>
+
+}

@@ -5,7 +5,13 @@
     var token = Context.Session.GetString("access_token");
 
 }
-
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
 
 <form asp-action="StudentManager" method="get" class="row mb-3">
     <div class="col-md-3">
@@ -97,24 +103,32 @@
 </form>
 
 
-<p>
+<div class="d-flex align-items-center gap-2 flex-wrap">
     <a class="btn btn-primary" asp-action="AddStudent">
         <i class="fa-solid fa-user-plus me-2"></i>Thêm mới
     </a>
     <a class="btn btn-success" asp-action="ImportStudentListFromExcel">
         <i class="fa-solid fa-file-import me-2"></i>Nhập từ Excel
     </a>
-    <button type="button" class="btn btn-warning" id="btnExportExcel">
-        <i class="fa-solid fa-file-excel me-2"></i> Xuất Excel
-    </button>
-    <button type="button" class="btn btn-info" id="btnExportCSV">
-        <i class="fa-solid fa-file-csv me-2"></i> Xuất CSV
-    </button>
-   
+    <div class="dropdown d-inline-block">
+        <button class="btn btn-warning dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fa-solid fa-download me-2"></i> Xuất File
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+            <li>
+                <a class="dropdown-item" href="#" id="btnExportExcel">
+                    <i class="fa-solid fa-file-excel me-2 text-success"></i> Xuất Excel
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="#" id="btnExportCSV">
+                    <i class="fa-solid fa-file-csv me-2 text-info"></i> Xuất CSV
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
 
-
-
-</p>
 
 
 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -154,7 +168,7 @@
             _ => ""
         };
 
-        <tr class="table-row @rowClass" style="cursor:pointer;" onclick="window.location='@Url.Action("StudentDetails", "Admin", new { id = item.Id })'">
+        <tr class="table-row @rowClass" style="cursor:pointer;" onclick="window.location='@Url.Action("StudentDetails", "Admin", new { mssv = item.MSSV })'">
             <td class="text-center">@stt</td>
             <td class="text-center">@item.MSSV</td>
             <td>@item.HoVaTenDem</td>
@@ -243,23 +257,102 @@
         });
     </script>
     <script>
-        document.getElementById('btnPrint').addEventListener('click', function () {
-            var printContents = document.querySelector('table.table').outerHTML;
-            var originalContents = document.body.innerHTML;
+              document.getElementById('btnPrint').addEventListener('click', function () {
+            // Clone lại bảng
+            var table = document.querySelector('table.table').cloneNode(true);
 
-            // Tạo 1 document mới chỉ chứa table
-            document.body.innerHTML = `
-                <div style="text-align:center; margin-bottom:16px;">
-                    <h2>Danh sách sinh viên</h2>
-                </div>
-                ${printContents}
+            // Xóa hết class và style dư thừa
+            table.className = '';
+            table.querySelectorAll('tr, th, td, thead, tbody').forEach(function (el) {
+                el.className = '';
+                el.removeAttribute('style');
+            });
+
+            // Tạo style cho bản in
+            var printStyle = `
+                <style>
+                    body {
+                        background: #fff !important;
+                        margin: 0;
+                        padding: 0;
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                    }
+                    .print-header {
+                        text-align: center;
+                        margin-bottom: 8px;
+                        margin-top: 8px;
+                    }
+                    .print-header h2 {
+                        font-size: 20px;
+                        font-weight: 700;
+                        margin: 0;
+                        letter-spacing: 2px;
+                        color: #111;
+                    }
+                    .print-subinfo {
+                        text-align: right;
+                        margin-bottom: 12px;
+                        font-size: 12px;
+                        color: #444;
+                    }
+                    table {
+                        margin: 0 auto;
+                        width: 97%;
+                        border-collapse: collapse !important;
+                        background: #fff !important;
+                        font-size: 12px !important;
+                        box-shadow: 0 2px 10px #eee;
+                        border-radius: 12px;
+                        overflow: hidden;
+                    }
+                    th, td {
+                        border: 1px solid #222 !important;
+                        padding: 6px 8px;
+                        text-align: center;
+                        background: #fff !important;
+                        color: #000 !important;
+                    }
+                    th {
+                        background: #f3f3f3 !important;
+                        color: #222 !important;
+                        font-size: 13px !important;
+                        font-weight: 600;
+                        letter-spacing: 1px;
+                    }
+                    tr:nth-child(even) td {
+                        background: #fafbfc !important;
+                    }
+                    tr:hover td {
+                        background: #eee !important;
+                    }
+                </style>
             `;
-            window.print();
 
-            // Sau khi in xong thì load lại trang (trả về như cũ)
+            // Tạo header thời gian in
+            var now = new Date();
+            var dateStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + now.toLocaleDateString('vi-VN');
+            var subinfo = `<div class="print-subinfo">In lúc: ${dateStr}</div>`;
+
+            // Render UI in đẹp
+            document.body.innerHTML = `
+                <div class="print-header">
+                    <div style="font-size:13px; font-weight:500; color:#555; letter-spacing:1px; margin-bottom:2px;">BLUESCHOOL EMS</div>
+                    <h2>DANH SÁCH SINH VIÊN</h2>
+                </div>
+                ${subinfo}
+                ${printStyle}
+                ${table.outerHTML}
+            `;
+
+            window.print();
             window.location.reload();
         });
+
+
     </script>
+
+
+
 
 }
 

@@ -49,34 +49,4 @@
 </table>
 <p style="color:black"><i>*Nếu thông tin khoa viện có sai sót thì liên hệ quản trị viên hệ thống</i></p>
 @section Scripts {
-    <script>
-        async function checkServerConnection() {
-            try {
-                const response = await fetch('/api/test', { method: 'GET' });
-
-                if (!response.ok) {
-                    throw new Error("Bad response");
-                }
-
-                // Nếu kết nối lại được thì ẩn modal (nếu đang mở)
-                const modalEl = document.getElementById('connectionModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) {
-                    modal.hide();
-                }
-            } catch (error) {
-                console.error("Không thể kết nối đến máy chủ:", error);
-
-                // Hiển thị modal cảnh báo
-                const modalEl = document.getElementById('connectionModal');
-                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                modal.show();
-            }
-        }
-
-        // Gọi khi trang load và mỗi 15 giây sau đó
-        checkServerConnection();
-        setInterval(checkServerConnection, 10000);
-
-    </script>
 }

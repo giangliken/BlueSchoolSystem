@@ -42,11 +42,66 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpGet("timkiemgiangvien")]
+        public async Task<IActionResult> TimKiemGiangVien(string? keyword, string? maKhoa, int? trangThaiId)
+        {
+            var query = _context.GiangViens
+                .Include(gv => gv.Khoa)
+                .Include(gv => gv.TrangThai)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                var kw = keyword.ToLower();
+                query = query.Where(gv =>
+                    gv.MaGiangVien.ToLower().Contains(kw) ||
+                    gv.HoVaTenDem.ToLower().Contains(kw) ||
+                    gv.Ten.ToLower().Contains(kw));
+            }
+
+            if (!string.IsNullOrEmpty(maKhoa))
+            {
+                query = query.Where(gv => gv.Khoa != null && gv.Khoa.MaKhoa == maKhoa);
+            }
+
+            if (trangThaiId.HasValue && trangThaiId.Value > 0)
+            {
+                query = query.Where(gv => gv.TrangThaiId == trangThaiId.Value);
+            }
+
+            var data = await query.OrderBy(gv => gv.Id).ToListAsync();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy dữ liệu thành công",
+                soluonggiangvien = data.Count,
+                data = data
+            });
+        }
+
         //Thêm giảng viên
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPost("themgiangvien")]
         public async Task<IActionResult> AddGiangVien([FromBody] CreateGiangVienWithUserRequest request)
         {
+            if (string.IsNullOrWhiteSpace(request.UserName)
+                || string.IsNullOrWhiteSpace(request.Email)
+                || string.IsNullOrWhiteSpace(request.Password)
+                || request.GiangVien == null
+                || string.IsNullOrWhiteSpace(request.GiangVien.HoVaTenDem)
+                || string.IsNullOrWhiteSpace(request.GiangVien.Ten)
+                || string.IsNullOrWhiteSpace(request.GiangVien.CCCD)
+                || string.IsNullOrWhiteSpace(request.GiangVien.DiaChi)
+                || request.GiangVien.KhoaId == null
+                || request.GiangVien.NgaySinh == DateTime.MinValue
+            )
+            {
+                return BadRequest("Thiếu thông tin bắt buộc. Dữ liệu không hợp lệ.");
+            }
+
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
             // 1. Tạo user
@@ -79,6 +134,59 @@ namespace BlueSchoolSystem.APIControllers
                 userId = user.Id
             });
         }
+
+        //Sửa thông tin giảng viên
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPut("suathongtingiangvien/{maGiangVien}")]
+        public async Task<IActionResult> UpdateGiangVien(string maGiangVien, [FromBody] UpdateGiangVienRequest model)
+        {
+            var giangVien = await _context.GiangViens
+                .Include(gv => gv.User)
+                .FirstOrDefaultAsync(gv => gv.MaGiangVien == maGiangVien);
+
+            if (giangVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy giảng viên." });
+
+            // Update từng field nếu truyền vào (patch)
+            if (!string.IsNullOrEmpty(model.HoVaTenDem)) giangVien.HoVaTenDem = model.HoVaTenDem;
+            if (!string.IsNullOrEmpty(model.Ten)) giangVien.Ten = model.Ten;
+            if (model.GioiTinh != null) giangVien.GioiTinh = model.GioiTinh.Value;
+            if (model.NgaySinh != null) giangVien.NgaySinh = model.NgaySinh.Value;
+            if (!string.IsNullOrEmpty(model.CCCD)) giangVien.CCCD = model.CCCD;
+            if (!string.IsNullOrEmpty(model.DiaChi)) giangVien.DiaChi = model.DiaChi;
+            if (model.TrangThaiId != null) giangVien.TrangThaiId = model.TrangThaiId.Value;
+            if (!string.IsNullOrEmpty(model.GhiChu)) giangVien.GhiChu = model.GhiChu;
+            giangVien.UpdatedAt = DateTime.Now;
+
+            // Update user info nếu có
+            if (giangVien.User != null)
+            {
+                if (!string.IsNullOrEmpty(model.Email)) giangVien.User.Email = model.Email;
+                if (!string.IsNullOrEmpty(model.PhoneNumber)) giangVien.User.PhoneNumber = model.PhoneNumber;
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                return Ok(new 
+                {
+                    result = true,
+                    code = 200,
+                    message = "Cập nhật thông tin Cán bộ - Giảng viên thành công!",
+                });
+            }
+            catch (DbUpdateException dbEx)
+            {
+                // Có thể ghi log dbEx.Message vô file/server nếu muốn
+                return BadRequest(new { result = false, message = "Không thể cập nhật dữ liệu. Vui lòng thử lại!" });
+            }
+            catch (Exception ex)
+            {
+                // Ghi log ex.Message nếu cần
+                return StatusCode(500, new { result = false, message = "Lỗi hệ thống! " + ex.Message });
+            }
+        }
+
 
         //Lấy thông tin chi tiết của giảng viên
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]

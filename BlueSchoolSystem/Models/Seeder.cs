@@ -34,6 +34,7 @@ namespace BlueSchoolSystem.Models
                 var user = new ApplicationUser
                 {
                     UserName = "admin",
+                    PhoneNumber = "0123456789",
                     Email = adminEmail,
                     EmailConfirmed = true
                 };
