@@ -185,18 +185,9 @@
     <script>
         window.__accessToken = @Html.Raw(Json.Serialize(token));
     </script>
+
     <script>
-        // ==== Copy toàn bộ các hàm JS của StudentDetails xuống đây ====
-        // => Chỉ thay đổi tên endpoint API thành giangvien, ví dụ:
-        // PUT /api/suathongtingiangvien/{maGiangVien}
-        // => Field truyền vào vẫn giữ giống bên trên nhưng property đổi tên theo model GiangVien
-
-        // ... Toàn bộ hàm editField, editGender, editNgaySinh, editCCCD, editPhone, editEmail, editDiaChi, editTrangThai, editGhiChu
-        // ... Copy từ file StudentDetails, chỉ sửa mỗi API endpoint, biến MSSV -> MaGiangVien, label, v.v.
-
-        // Ví dụ:
-        function editField(field, maGiangVien, hoVaTenDem, ten) {
-            // ... logic như Student, đổi url
+           function editField(field, maGiangVien, hoVaTenDem, ten) {
             let html = `
                 <input type="text" id="hoten-dem" value="${hoVaTenDem}" style="width:120px;" />
                 <input type="text" id="hoten-ten" value="${ten}" style="width:80px;" />
@@ -205,6 +196,7 @@
             `;
             document.getElementById('hoten-val').innerHTML = html;
         }
+
         function saveField(field, maGiangVien) {
             const hoVaTenDem = document.getElementById('hoten-dem').value;
             const ten = document.getElementById('hoten-ten').value;
@@ -223,20 +215,356 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.result) {
-                        document.getElementById('hoten-val').innerHTML = `${hoVaTenDem} ${ten}`;
+                        document.getElementById('hoten-val').innerHTML = `${hoVaTenDem} ${ten}` +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editField('hoten', '${maGiangVien}', '${hoVaTenDem}', '${ten}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
                     } else {
                         alert('Lỗi: ' + data.message);
                     }
                 });
         }
+
         function cancelEditField(field, hoVaTenDem, ten) {
-            document.getElementById('hoten-val').innerHTML = `${hoVaTenDem} ${ten}`;
+            document.getElementById('hoten-val').innerHTML = `${hoVaTenDem} ${ten}` +
+                `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editField('hoten', '${field}', '${hoVaTenDem}', '${ten}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
         }
-        // ... Và tương tự với các function khác: editGender, saveGender, cancelGender,... v.v. chỉ đổi endpoint
-        // Copy giống bên StudentDetails, đổi chỗ fetch() gọi sang /api/suathongtingiangvien/{maGiangVien}
+
+            function editGender(maGiangVien, gioiTinh) {
+            let html = `
+                <select id="gender-input" class="form-select form-select-sm" style="width:100px;display:inline-block;">
+                    <option value="true" ${gioiTinh === "True" || gioiTinh === "true" || gioiTinh === true ? 'selected' : ''}>Nam</option>
+                    <option value="false" ${gioiTinh === "False" || gioiTinh === "false" || gioiTinh === false ? 'selected' : ''}>Nữ</option>
+                </select>
+                <button class="btn btn-sm btn-success ms-1" onclick="saveGender('${maGiangVien}')">Lưu</button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="cancelGender('${maGiangVien}', '${gioiTinh}')">Hủy</button>
+            `;
+            document.getElementById('gioitinh-val').innerHTML = html;
+        }
+
+        function saveGender(maGiangVien) {
+            const gioiTinh = document.getElementById('gender-input').value === "true";
+            var token = window.__accessToken;
+            fetch(`/api/suathongtingiangvien/${maGiangVien}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    GioiTinh: gioiTinh
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('gioitinh-val').innerHTML = (gioiTinh ? "Nam" : "Nữ") +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editGender('${maGiangVien}', '${gioiTinh}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        alert('Lỗi: ' + data.message);
+                    }
+                });
+        }
+
+        function cancelGender(maGiangVien, oldValue) {
+            let genderLabel = (oldValue === "True" || oldValue === "true" || oldValue === true) ? "Nam" : "Nữ";
+            document.getElementById('gioitinh-val').innerHTML = genderLabel +
+                `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editGender('${maGiangVien}', '${oldValue}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+            function editNgaySinh(maGiangVien, ngaysinh) {
+            let html = `
+                <input type="date" id="ngaysinh-input" value="${ngaysinh}" class="form-control form-control-sm" style="width:150px;display:inline-block;" />
+                <button class="btn btn-sm btn-success ms-1" onclick="saveNgaySinh('${maGiangVien}')">Lưu</button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="cancelNgaySinh('${maGiangVien}', '${ngaysinh}')">Hủy</button>
+                <span id="ngaysinh-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+            `;
+            document.getElementById('ngaysinh-val').innerHTML = html;
+        }
+
+        function saveNgaySinh(maGiangVien) {
+            const ngaysinh = document.getElementById('ngaysinh-input').value;
+            const errSpan = document.getElementById('ngaysinh-error');
+            if (!ngaysinh) {
+                errSpan.innerText = "Ngày sinh không được bỏ trống!";
+                return;
+            }
+
+            const dob = new Date(ngaysinh);
+            const today = new Date();
+            const age = today.getFullYear() - dob.getFullYear();
+            const m = today.getMonth() - dob.getMonth();
+            const d = today.getDate() - dob.getDate();
+            let is18 = (age > 18) || (age === 18 && (m > 0 || (m === 0 && d >= 0)));
+
+            if (dob >= today) {
+                errSpan.innerText = "Ngày sinh phải nhỏ hơn hiện tại!";
+                return;
+            }
+            if (!is18) {
+                errSpan.innerText = "Giảng viên phải đủ 18 tuổi trở lên!";
+                return;
+            }
+
+            var token = window.__accessToken;
+            fetch(`/api/suathongtingiangvien/${maGiangVien}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    NgaySinh: ngaysinh
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        const date = new Date(ngaysinh);
+                        const formatted = date.toLocaleDateString('vi-VN');
+                        document.getElementById('ngaysinh-val').innerHTML = formatted +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editNgaySinh('${maGiangVien}', '${ngaysinh}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelNgaySinh(maGiangVien, ngaysinh) {
+            const date = new Date(ngaysinh);
+            document.getElementById('ngaysinh-val').innerHTML =
+                date.toLocaleDateString('vi-VN') +
+                `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editNgaySinh('${maGiangVien}', '${ngaysinh}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+            function editCCCD(maGiangVien, cccd) {
+            let html = `
+                <input type="text" id="cccd-input" value="${cccd}" class="form-control form-control-sm" style="width:160px;display:inline-block;" maxlength="12"/>
+                <button class="btn btn-sm btn-success ms-1" onclick="saveCCCD('${maGiangVien}')">Lưu</button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="cancelCCCD('${maGiangVien}', '${cccd}')">Hủy</button>
+                <span id="cccd-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+            `;
+            document.getElementById('cccd-val').innerHTML = html;
+        }
+
+        function saveCCCD(maGiangVien) {
+            const cccd = document.getElementById('cccd-input').value.trim();
+            const errSpan = document.getElementById('cccd-error');
+            if (!/^\d{12}$/.test(cccd)) {
+                errSpan.innerText = "CCCD phải gồm đúng 12 số!";
+                return;
+            }
+            var token = window.__accessToken;
+            fetch(`/api/suathongtingiangvien/${maGiangVien}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    CCCD: cccd
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('cccd-val').innerHTML = cccd +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editCCCD('${maGiangVien}', '${cccd}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelCCCD(maGiangVien, cccd) {
+            document.getElementById('cccd-val').innerHTML =
+                cccd + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editCCCD('${maGiangVien}', '${cccd}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+            function editPhone(maGiangVien, phone) {
+            let html = `
+                <input type="text" id="phone-input" value="${phone ?? ''}" class="form-control form-control-sm" style="width:140px;display:inline-block;" maxlength="10"/>
+                <button class="btn btn-sm btn-success ms-1" onclick="savePhone('${maGiangVien}')">Lưu</button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="cancelPhone('${maGiangVien}', '${phone ?? ''}')">Hủy</button>
+                <span id="phone-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+            `;
+            document.getElementById('phone-val').innerHTML = html;
+        }
+
+        function savePhone(maGiangVien) {
+            const phone = document.getElementById('phone-input').value.trim();
+            const errSpan = document.getElementById('phone-error');
+            if (!/^0\d{9}$/.test(phone)) {
+                errSpan.innerText = "Số điện thoại phải gồm đúng 10 số và bắt đầu bằng 0!";
+                return;
+            }
+            var token = window.__accessToken;
+            fetch(`/api/suathongtingiangvien/${maGiangVien}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    PhoneNumber: phone
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('phone-val').innerHTML = phone +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editPhone('${maGiangVien}', '${phone}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelPhone(maGiangVien, phone) {
+            document.getElementById('phone-val').innerHTML =
+                phone + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editPhone('${maGiangVien}', '${phone}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+            function editEmail(maGiangVien, email) {
+            let html = `
+                <input type="email" id="email-input" value="${email ?? ''}" class="form-control form-control-sm" style="width:200px;display:inline-block;" />
+                <button class="btn btn-sm btn-success ms-1" onclick="saveEmail('${maGiangVien}')">Lưu</button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="cancelEmail('${maGiangVien}', '${email ?? ''}')">Hủy</button>
+                <span id="email-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+            `;
+            document.getElementById('email-val').innerHTML = html;
+        }
+
+        function saveEmail(maGiangVien) {
+            const email = document.getElementById('email-input').value.trim();
+            const errSpan = document.getElementById('email-error');
+            // Validate email nếu cần, ở đây bỏ qua
+            var token = window.__accessToken;
+            fetch(`/api/suathongtingiangvien/${maGiangVien}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    Email: email
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('email-val').innerHTML = email +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editEmail('${maGiangVien}', '${email}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelEmail(maGiangVien, email) {
+            document.getElementById('email-val').innerHTML =
+                email + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editEmail('${maGiangVien}', '${email}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+                function editDiaChi(maGiangVien, diachi) {
+            let html = `
+                <input type="text" id="diachi-input" value="${diachi ?? ''}" class="form-control form-control-sm" style="width:230px;display:inline-block;" maxlength="150" />
+                <button class="btn btn-sm btn-success ms-1" onclick="saveDiaChi('${maGiangVien}')">Lưu</button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="cancelDiaChi('${maGiangVien}', '${diachi ?? ''}')">Hủy</button>
+                <span id="diachi-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+            `;
+            document.getElementById('diachi-val').innerHTML = html;
+        }
+
+        function saveDiaChi(maGiangVien) {
+            const diachi = document.getElementById('diachi-input').value.trim();
+            const errSpan = document.getElementById('diachi-error');
+
+            // Optional: validate bắt buộc nhập
+            if (!diachi) {
+                errSpan.innerText = "Địa chỉ không được để trống!";
+                return;
+            }
+            if (diachi.length > 150) {
+                errSpan.innerText = "Địa chỉ tối đa 150 ký tự!";
+                return;
+            }
+
+            var token = window.__accessToken;
+            fetch(`/api/suathongtingiangvien/${maGiangVien}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    DiaChi: diachi
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('diachi-val').innerHTML = diachi +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editDiaChi('${maGiangVien}', '${diachi}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelDiaChi(maGiangVien, diachi) {
+            document.getElementById('diachi-val').innerHTML =
+                diachi + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editDiaChi('${maGiangVien}', '${diachi}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
+                // ===== Trạng thái =====
+        function editTrangThai(maGiangVien, trangThaiId, tenTrangThai) {
+            let optionsHtml = trangThaiOptions.map(opt =>
+                `<option value="${opt.id}" ${parseInt(trangThaiId) === opt.id ? "selected" : ""}>${opt.label}</option>`
+            ).join('');
+            let html = `
+                <select id="trangthai-input" class="form-select form-select-sm" style="width:160px;display:inline-block;">
+                    ${optionsHtml}
+                </select>
+                <button class="btn btn-sm btn-success ms-1" onclick="saveTrangThai('${maGiangVien}')">Lưu</button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="cancelTrangThai('${maGiangVien}', '${trangThaiId}', '${tenTrangThai}')">Hủy</button>
+                <span id="trangthai-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+            `;
+            document.getElementById('trangthai-val').innerHTML = html;
+        }
+
+        function saveTrangThai(maGiangVien) {
+            const trangThaiId = document.getElementById('trangthai-input').value;
+            const errSpan = document.getElementById('trangthai-error');
+            var token = window.__accessToken;
+
+            fetch(`/api/suathongtingiangvien/${maGiangVien}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    TrangThaiId: parseInt(trangThaiId)
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        const label = trangThaiOptions.find(x => x.id == trangThaiId)?.label ?? "";
+                        document.getElementById('trangthai-val').innerHTML = label +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editTrangThai('${maGiangVien}', '${trangThaiId}', '${label}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelTrangThai(maGiangVien, trangThaiId, tenTrangThai) {
+            document.getElementById('trangthai-val').innerHTML =
+                tenTrangThai + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editTrangThai('${maGiangVien}', '${trangThaiId}', '${tenTrangThai}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
     </script>
     <script>
-        // Mảng trạng thái lấy động từ ViewBag
+
         const trangThaiOptions = [
             @foreach (var item in ViewBag.TrangThaiList)
             {

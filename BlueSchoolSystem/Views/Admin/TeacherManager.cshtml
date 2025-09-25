@@ -74,24 +74,32 @@
 </form>
 
 
-<p>
+<div class="d-flex align-items-center gap-2 flex-wrap">
     <a class="btn btn-primary" asp-action="AddTeacher">
         <i class="fa-solid fa-user-plus me-2"></i>Thêm mới
     </a>
     <a class="btn btn-success" asp-action="ImportTeacherListFromExcel">
         <i class="fa-solid fa-file-import me-2"></i>Nhập từ Excel
     </a>
-    <button type="button" class="btn btn-warning" id="btnExportExcel">
-        <i class="fa-solid fa-file-excel me-2"></i> Xuất Excel
-    </button>
-    <button type="button" class="btn btn-info" id="btnExportCSV">
-        <i class="fa-solid fa-file-csv me-2"></i> Xuất CSV
-    </button>
+    <div class="dropdown d-inline-block">
+        <button class="btn btn-warning dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fa-solid fa-download me-2"></i> Xuất File
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+            <li>
+                <a class="dropdown-item" href="#" id="btnExportExcel">
+                    <i class="fa-solid fa-file-excel me-2 text-success"></i> Xuất Excel
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="#" id="btnExportCSV">
+                    <i class="fa-solid fa-file-csv me-2 text-info"></i> Xuất CSV
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
 
-
-
-
-</p>
 
 <div class="d-flex justify-content-between align-items-center mb-2">
     <div><b>Tổng số:</b> @Model.Count() dòng</div>
