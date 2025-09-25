@@ -504,45 +504,42 @@ namespace BlueSchoolSystem.APIControllers
         private List<TichLuyHocKyViewModel> TinhTichLuyTheoHocKy(List<DiemHocKyViewModel> diem)
         {
             var tichLuyList = new List<TichLuyHocKyViewModel>();
-            double tongDiemTichLuy = 0;
-            int tongTinChiTichLuy = 0;
+            double tongDiemTichLuy = 0;       
+            int tongTinChiTichLuy = 0;        
 
             foreach (var hk in diem.OrderBy(d => d.HocKyId))
             {
-                // chỉ lấy những môn có điểm tổng kết
                 var diemHocKyList = hk.Diems.Where(d => d.DiemTongKet.HasValue).ToList();
-                if (diemHocKyList.Any())
+                if (!diemHocKyList.Any()) continue;
+
+                // GPA học kỳ: tính trên tất cả môn (kể cả rớt) 
+                var tongTinChiHocKyForGPA = diemHocKyList.Sum(d => d.SoTinChi);
+                var tongDiemHocKyForGPA = diemHocKyList.Sum(d => ConvertToHe4(d.DiemTongKet.Value) * d.SoTinChi);
+                var diemTBHocKy = tongTinChiHocKyForGPA > 0 ? tongDiemHocKyForGPA / tongTinChiHocKyForGPA : 0.0;
+
+                // TÍCH LŨY: cộng cả môn (kể cả rớt) vào tử số và mẫu số
+                tongTinChiTichLuy += tongTinChiHocKyForGPA;
+                tongDiemTichLuy += tongDiemHocKyForGPA;
+
+                var diemTBTichLuy = tongTinChiTichLuy > 0 ? tongDiemTichLuy / tongTinChiTichLuy : 0.0;
+
+                // Tín chỉ đạt của học kỳ: chỉ những môn có he4 >= 1.0
+                var tinChiDatHocKy = diemHocKyList.Where(d => ConvertToHe4(d.DiemTongKet.Value) >= 1.0)
+                                                  .Sum(d => d.SoTinChi);
+
+                tichLuyList.Add(new TichLuyHocKyViewModel
                 {
-                    // ✅ chỉ lấy môn hợp lệ (>= D) để cộng tín chỉ tích lũy
-                    var monHopLe = diemHocKyList.Where(d => ConvertToHe4(d.DiemTongKet.Value) >= 1.0).ToList();
-
-                    var tongTinChiHK = monHopLe.Sum(d => d.SoTinChi);
-                    var tongDiemHK = monHopLe.Sum(d => ConvertToHe4(d.DiemTongKet.Value) * d.SoTinChi);
-
-                    // GPA học kỳ: tính theo toàn bộ môn có điểm (kể cả rớt)
-                    var tongTinChiHocKyForGPA = diemHocKyList.Sum(d => d.SoTinChi);
-                    var tongDiemHocKyForGPA = diemHocKyList.Sum(d => ConvertToHe4(d.DiemTongKet.Value) * d.SoTinChi);
-                    var diemTBHocKy = tongTinChiHocKyForGPA > 0 ? tongDiemHocKyForGPA / tongTinChiHocKyForGPA : 0.0;
-
-                    // ✅ cộng dồn tích lũy (chỉ tính môn hợp lệ)
-                    tongTinChiTichLuy += tongTinChiHK;
-                    tongDiemTichLuy += tongDiemHK;
-
-                    var diemTBTichLuy = tongTinChiTichLuy > 0 ? tongDiemTichLuy / tongTinChiTichLuy : 0.0;
-
-                    tichLuyList.Add(new TichLuyHocKyViewModel
-                    {
-                        TenHocKy = hk.TenHocKy,
-                        DiemTBHocKy = Math.Round(diemTBHocKy, 2),
-                        DiemTBTichLuy = Math.Round(diemTBTichLuy, 2),
-                        TinChiDat = tongTinChiHK,            // ✅ chỉ tín chỉ đạt của học kỳ hiện tại
-                        TongTinChiTichLuy = tongTinChiTichLuy
-                    });
-                }
+                    TenHocKy = hk.TenHocKy,
+                    DiemTBHocKy = Math.Round(diemTBHocKy, 2),
+                    DiemTBTichLuy = Math.Round(diemTBTichLuy, 2),
+                    TinChiDat = tinChiDatHocKy,
+                    TongTinChiTichLuy = tongTinChiTichLuy
+                });
             }
 
             return tichLuyList;
         }
+
 
 
         // ✅ Lấy điểm của sinh viên
