@@ -106,10 +106,12 @@
 </style>
 @model IEnumerable<BlueSchoolSystem.Models.ViewModel.DiemMonHocViewModel>
 @using BlueSchoolSystem.Models.ViewModel
+@using System.Globalization
 
 @{
     var hocKySelected = ViewBag.HocKySelected as int? ?? 0;
     var diemTatCa = ViewBag.DiemTatCaHocKy as IEnumerable<dynamic>; // mỗi item chứa: TenHocKy, Diems, DiemTBHocKy, DiemTBTichLuy, TinChiDat, TongTinChiTichLuy
+    var format = CultureInfo.InvariantCulture;
 }
 
 <h6>Trang chủ / Học vụ / Xem điểm</h6>
@@ -182,10 +184,10 @@
                                                 <td>@d.MaMonHoc</td>
                                                 <td>@d.TenMonHoc</td>
                                                 <td>@d.SoTinChi</td>
-                                                <td>@(d.DiemChuyenCan)</td>
-                                                <td>@(d.DiemCuoiKy)</td>
-                                                <td>@(d.DiemTongKet)</td>
-                                                <td>@(d.DiemHe4)</td>
+                                                <td>@(d.DiemChuyenCan?.ToString("0.0", format))</td>
+                                                <td>@(d.DiemCuoiKy?.ToString("0.0", format))</td>
+                                                <td>@(d.DiemTongKet?.ToString("0.0", format))</td>
+                                                <td>@(d.DiemHe4?.ToString("0.0", format))</td>
                                                 <td>@(d.DiemChu)</td>
                                             </tr>
                                             stt++;
@@ -195,8 +197,8 @@
                             </table>
 
                             <div class="mb-4">
-                                <p><strong>Điểm trung bình học kỳ (hệ 4):</strong> @((hk.DiemTBHocKy ?? 0).ToString("0.00"))</p>
-                                <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @((hk.DiemTBTichLuy ?? 0).ToString("0.00"))</p>
+                                <p><strong>Điểm trung bình học kỳ (hệ 4):</strong> @((hk.DiemTBHocKy ?? 0).ToString("0.00", format))</p>
+                                <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @((hk.DiemTBTichLuy ?? 0).ToString("0.00", format))</p>
                                 <p><strong>Số tín chỉ đạt:</strong> @(hk.TinChiDat ?? 0)</p>
                                 <p><strong>Tổng tín chỉ tích lũy:</strong> @(hk.TongTinChiTichLuy ?? 0)</p>
                             </div>
@@ -231,10 +233,10 @@
                                             <td>@d.MaMonHoc</td>
                                             <td>@d.TenMonHoc</td>
                                             <td>@d.SoTinChi</td>
-                                            <td>@(d.DiemChuyenCan)</td>
-                                            <td>@(d.DiemCuoiKy)</td>
-                                            <td>@(d.DiemTongKet)</td>
-                                            <td>@(d.DiemHe4)</td>
+                                            <td>@(d.DiemChuyenCan?.ToString("0.0", format))</td>
+                                            <td>@(d.DiemCuoiKy?.ToString("0.0", format))</td>
+                                            <td>@(d.DiemTongKet?.ToString("0.0", format))</td>
+                                            <td>@(d.DiemHe4?.ToString("0.0", format))</td>
                                             <td>@(d.DiemChu)</td>
                                         </tr>
                                         stt++;
@@ -244,8 +246,8 @@
                         </table>
 
                         <div class="mb-4">
-                            <p><strong>Điểm trung bình học kỳ (hệ 4):</strong> @(ViewBag.DiemTBHocKy ?? "0.00")</p>
-                            <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @(ViewBag.DiemTBTichLuy ?? "0.00")</p>
+                            <p><strong>Điểm trung bình học kỳ (hệ 4):</strong> @((ViewBag.DiemTBHocKy ?? 0).ToString("0.00", format))</p>
+                            <p><strong>Điểm trung bình tích lũy (hệ 4):</strong> @((ViewBag.DiemTBTichLuy ?? 0).ToString("0.00", format))</p>
                             <p><strong>Số tín chỉ đạt :</strong> @(ViewBag.TongTinChiDat ?? 0)</p>
                             <p><strong>Tổng tín chỉ tích lũy:</strong> @(ViewBag.TongTinChiTichLuy ?? 0)</p>
                         </div>
@@ -278,8 +280,8 @@
                                     <tr>
                                         <td>@stt2</td>
                                         <td>@item.TenHocKy</td>
-                                        <td>@item.DiemTBHocKy</td>
-                                        <td>@item.DiemTBTichLuy</td>
+                                        <td>@(item.DiemTBHocKy?.ToString("0.00", format))</td>
+                                        <td>@(item.DiemTBTichLuy?.ToString("0.00", format))</td>
                                         <td>@item.TinChiDat</td>
                                         <td>@item.TongTinChiTichLuy</td>
                                     </tr>
