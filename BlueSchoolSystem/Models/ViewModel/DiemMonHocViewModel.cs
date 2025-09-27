@@ -13,7 +13,7 @@
         {
             get
             {
-                if (SoTinChi == 0) return 0; // không tích lũy
+                if (SoTinChi == 0) return null; // không tích lũy
 
                 if (SoTinChi == 1)
                 {

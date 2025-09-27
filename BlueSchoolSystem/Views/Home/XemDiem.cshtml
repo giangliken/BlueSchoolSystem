@@ -103,6 +103,29 @@
         border: 1px solid #dee2e6;
         vertical-align: middle;
     }
+    /* Căn giữa dữ liệu trong bảng */
+    .table td, .table th {
+        text-align: center;
+        vertical-align: middle;
+    }
+
+        /* Riêng cột Tên môn học thì căn trái */
+        .table td.ten-monhoc, .table th.ten-monhoc {
+            text-align: left;
+        }
+
+    /* Điều chỉnh lại độ rộng cột */
+    th.stt-col, td.stt-col {
+        width: 30px; /* nhỏ hơn */
+    }
+
+    th.ma-col, td.ma-col {
+        width: 80px; /* vừa phải */
+    }
+
+    th.ten-col, td.ten-col {
+        width: 200px; /* tăng thêm */
+    }
 </style>
 @model IEnumerable<BlueSchoolSystem.Models.ViewModel.DiemMonHocViewModel>
 @using BlueSchoolSystem.Models.ViewModel
@@ -163,9 +186,9 @@
                             <table class="table table-bordered mb-3">
                                 <thead class="table-light">
                                     <tr>
-                                        <th style="width:40px;">STT</th>
-                                        <th style="width:40px;">Mã học phần</th>
-                                        <th style="width:140px;">Tên học phần</th>
+                                        <th class="stt-col">STT</th>
+                                        <th class="ma-col">Mã học phần</th>
+                                        <th class="ten-col ten-monhoc">Tên học phần</th>
                                         <th style="width:50px;">STC</th>
                                         <th style="width:80px;">Điểm quá trình</th>
                                         <th style="width:50px;">Điểm thi</th>
@@ -180,9 +203,9 @@
                                         foreach (var d in hk.Diems)
                                         {
                                             <tr>
-                                                <td>@stt</td>
-                                                <td>@d.MaMonHoc</td>
-                                                <td>@d.TenMonHoc</td>
+                                                <td class="stt-col">@stt</td>
+                                                <td class="ma-col">@d.MaMonHoc</td>
+                                                <td class="ten-col ten-monhoc">@d.TenMonHoc</td>
                                                 <td>@d.SoTinChi</td>
                                                 <td>@(d.DiemChuyenCan?.ToString("0.0", format))</td>
                                                 <td>@(d.DiemCuoiKy?.ToString("0.0", format))</td>
@@ -212,9 +235,9 @@
                         <table class="table table-bordered mb-2">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width:40px;">STT</th>
-                                    <th style="width:40px;">Mã môn học</th>
-                                    <th style="width:110px;">Tên môn học</th>
+                                        <th class="stt-col">STT</th>
+                                        <th class="ma-col">Mã học phần</th>
+                                        <th class="ten-col ten-monhoc">Tên học phần</th>
                                     <th style="width:50px;">STC</th>
                                     <th style="width:80px;">Điểm quá trình</th>
                                     <th style="width:50px;">Điểm thi</th>
@@ -229,9 +252,9 @@
                                     foreach (var d in Model)
                                     {
                                         <tr>
-                                            <td>@stt</td>
-                                            <td>@d.MaMonHoc</td>
-                                            <td>@d.TenMonHoc</td>
+                                                <td class="stt-col">@stt</td>
+                                                <td class="ma-col">@d.MaMonHoc</td>
+                                                <td class="ten-col ten-monhoc">@d.TenMonHoc</td>
                                             <td>@d.SoTinChi</td>
                                             <td>@(d.DiemChuyenCan?.ToString("0.0", format))</td>
                                             <td>@(d.DiemCuoiKy?.ToString("0.0", format))</td>
