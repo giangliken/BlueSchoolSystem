@@ -461,16 +461,138 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
-        //Hàm chuyển điểm 10 sang điểm 4
+        // ✅ Hàm chuyển đổi điểm 10 → thang 4
         private double ConvertToHe4(double diem10)
         {
             if (diem10 >= 8.5) return 4.0;
+            if (diem10 >= 7.8) return 3.5;
             if (diem10 >= 7.0) return 3.0;
+            if (diem10 >= 6.3) return 2.5;
             if (diem10 >= 5.5) return 2.0;
+            if (diem10 >= 4.8) return 1.5;
             if (diem10 >= 4.0) return 1.0;
+            if (diem10 >= 3.0) return 0.5;
+            if (diem10 >= 0) return 0;
             return 0.0;
         }
-        //Lấy điểm của sinh viên
+
+
+        //  Hàm tính tổng hợp toàn bộ điểm
+        private (double tongDiemHe4TichLuy, int tongTinChiTichLuy, int tongTinChiDat)
+    TinhTongHop(IEnumerable<DiemMonHocViewModel> allDiem)
+        {
+            double tongDiemHe4TichLuy = 0;
+            int tongTinChiTichLuy = 0;
+            int tongTinChiDat = 0;
+
+            foreach (var d in allDiem)
+            {
+                if (d.SoTinChi <= 0) continue;
+
+                // Điểm 10 để chuyển sang thang 4
+
+
+                double diem10;
+                if (d.SoTinChi > 1)
+                {
+                    diem10 = d.DiemTongKet ?? 0;
+                }
+                else
+                {
+                    diem10 = d.DiemChuyenCan ?? 0;
+                }
+
+                double diemHe4 = diem10 >= 0 ? ConvertToHe4(diem10) : 0;
+
+                //  Tích lũy: chỉ cộng nếu đạt (>= 1.0) và đủ điểm
+                if (diemHe4 >= 1.0 &&
+                    !((d.SoTinChi > 1 && (!d.DiemChuyenCan.HasValue || !d.DiemCuoiKy.HasValue)) ||
+                      (d.SoTinChi == 1 && !d.DiemChuyenCan.HasValue)))
+                {
+                    tongTinChiTichLuy += d.SoTinChi;
+                    tongDiemHe4TichLuy += diemHe4 * d.SoTinChi;
+                    tongTinChiDat += d.SoTinChi;
+                }
+            }
+
+            return (tongDiemHe4TichLuy, tongTinChiTichLuy, tongTinChiDat);
+        }
+
+
+        //  Hàm tính tích lũy theo từng học kỳ
+        private List<TichLuyHocKyViewModel> TinhTichLuyTheoHocKy(List<DiemHocKyViewModel> diem)
+        {
+            var tichLuyList = new List<TichLuyHocKyViewModel>();
+            double tongDiemTichLuy = 0;
+            int tongTinChiTichLuy = 0;
+
+            foreach (var hk in diem.OrderBy(d => d.HocKyId))
+            {
+                // ✅ Lấy tất cả môn để tính GPA học kỳ
+                var diemHocKyList = hk.Diems
+                    .Where(d => d.SoTinChi > 0)
+                    .Select(d =>
+                    {
+                        double diem10;
+                        if (d.SoTinChi > 1)
+                        {
+                            diem10 = d.DiemTongKet ?? 0; 
+                        }
+                        else
+                        {
+                            diem10 = d.DiemChuyenCan ?? 0;
+                        }
+
+                        return new
+                        {
+                            d.SoTinChi,
+                            d.DiemChuyenCan,
+                            d.DiemCuoiKy,
+                            d.DiemTongKet,
+                            DiemHe4 = ConvertToHe4(diem10),
+                            DuDiem = (d.SoTinChi > 1 && d.DiemChuyenCan.HasValue && d.DiemCuoiKy.HasValue)
+                                     || (d.SoTinChi == 1 && d.DiemChuyenCan.HasValue)
+                        };
+                    })
+                    .ToList();
+
+                if (!diemHocKyList.Any()) continue;
+
+                // ✅ GPA học kỳ (tính tất cả, kể cả rớt, thiếu điểm coi là 0)
+                var tongTinChiHocKy = diemHocKyList.Sum(d => d.SoTinChi);
+                var tongDiemHocKy = diemHocKyList.Sum(d => d.DiemHe4 * d.SoTinChi);
+                var diemTBHocKy = tongTinChiHocKy > 0 ? tongDiemHocKy / tongTinChiHocKy : 0.0;
+
+                // ✅ Tích lũy: chỉ tính môn ĐẠT (>= 1.0) và có đủ điểm
+                var monDat = diemHocKyList
+                    .Where(d => d.DiemHe4 >= 1.0 && d.DuDiem)
+                    .ToList();
+
+                var tongTinChiHocKyDat = monDat.Sum(d => d.SoTinChi);
+                var tongDiemHocKyDat = monDat.Sum(d => d.DiemHe4 * d.SoTinChi);
+
+                tongTinChiTichLuy += tongTinChiHocKyDat;
+                tongDiemTichLuy += tongDiemHocKyDat;
+
+                var diemTBTichLuy = tongTinChiTichLuy > 0 ? tongDiemTichLuy / tongTinChiTichLuy : 0.0;
+
+                tichLuyList.Add(new TichLuyHocKyViewModel
+                {
+                    TenHocKy = hk.TenHocKy,
+                    DiemTBHocKy = Math.Round(diemTBHocKy, 2, MidpointRounding.AwayFromZero),     // GPA học kỳ (kể cả thiếu điểm = 0)
+                    DiemTBTichLuy = Math.Round(diemTBTichLuy, 2, MidpointRounding.AwayFromZero), // GPA tích lũy (chỉ môn đạt)
+                    TinChiDat = tongTinChiHocKyDat,
+                    TongTinChiTichLuy = tongTinChiTichLuy
+                });
+            }
+
+            return tichLuyList;
+        }
+
+
+
+
+        // ✅ Lấy điểm của sinh viên
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
         [HttpGet("diemsinhvien/{mssv}")]
         public async Task<IActionResult> GetDiemByMSSV(string mssv, [FromQuery] int? hocKyId)
@@ -494,15 +616,14 @@ namespace BlueSchoolSystem.APIControllers
                         where sv.MSSV == mssv
                         select new
                         {
-                            sv.MSSV,
                             HocKyId = hk.Id,
                             hk.TenHocKy,
                             hk.NgayBatDau,
                             mh.MaMonHoc,
                             mh.TenMonHoc,
                             mh.SoTinChi,
-                            DiemCuoiKy = bd.DiemCuoiKy,
-                            DiemQuaTrinh = bd.DiemChuyenCan
+                            DiemChuyenCan = bd.DiemChuyenCan,
+                            DiemCuoiKy = bd.DiemCuoiKy
 
                         };
 
@@ -513,14 +634,23 @@ namespace BlueSchoolSystem.APIControllers
 
             var diem = await query
                 .GroupBy(x => new { x.HocKyId, x.TenHocKy, x.NgayBatDau })
-                .Select(g => new
+                .Select(g => new DiemHocKyViewModel
                 {
                     HocKyId = g.Key.HocKyId,
                     TenHocKy = g.Key.TenHocKy,
                     NgayBatDau = g.Key.NgayBatDau,
-                    Diems = g.OrderBy(x => x.MaMonHoc).ToList()
+                    Diems = g.OrderBy(x => x.MaMonHoc)
+                             .Select(x => new DiemMonHocViewModel
+                             {
+                                 MaMonHoc = x.MaMonHoc,
+                                 TenMonHoc = x.TenMonHoc,
+                                 SoTinChi = x.SoTinChi,
+                                 DiemChuyenCan = x.DiemChuyenCan,
+                                 DiemCuoiKy = x.DiemCuoiKy
+
+                             }).ToList()
                 })
-                .OrderBy(x => x.NgayBatDau)
+                .OrderByDescending(x => x.NgayBatDau)
                 .ToListAsync();
 
             if (!diem.Any())
@@ -528,70 +658,26 @@ namespace BlueSchoolSystem.APIControllers
                 return NotFound(new { result = false, code = 404, message = "Không tìm thấy điểm cho MSSV này" });
             }
 
-            // ✅ Tính toán tích lũy toàn bộ
-            double tongDiemHe4TichLuy = 0;
-            int tongTinChiTichLuy = 0;
-            int tongTinChiDat = 0;
             var allDiem = diem.SelectMany(d => d.Diems).ToList();
+            var (tongDiemHe4TichLuy, tongTinChiTichLuy, tongTinChiDat) = TinhTongHop(allDiem);
+            var tichLuyList = TinhTichLuyTheoHocKy(diem);
 
-            foreach (var d in allDiem)
+            var response = new DiemSinhVienResponseViewModel
             {
-                if (d.DiemCuoiKy.HasValue)
-                {
-                    double diemHe4 = ConvertToHe4(d.DiemCuoiKy.Value);
-                    tongTinChiTichLuy += d.SoTinChi;
-                    tongDiemHe4TichLuy += diemHe4 * d.SoTinChi;
-                    if (diemHe4 > 0) tongTinChiDat += d.SoTinChi;
-                }
-            }
+                Result = true,
+                Code = 200,
+                Message = "Lấy điểm thành công",
+                SoLuong = diem.Count,
+                Data = diem,
+                TongTinChiTichLuy = tongTinChiTichLuy,
+                TongTinChiDat = tongTinChiDat,
+                DiemTBTichLuy = tongTinChiTichLuy > 0
+                    ? (tongDiemHe4TichLuy / tongTinChiTichLuy).ToString("0.00")
+                    : "0.00",
+                TichLuyList = tichLuyList
+            };
 
-            // ✅ Danh sách tích lũy theo từng học kỳ
-            var tichLuyList = new List<object>();
-            double tongDiemTichLuy = 0;
-            int tongTinChiTichLuy2 = 0;
-            int tongTinChiDat2 = 0;
-
-            foreach (var hk in diem.OrderBy(d => d.HocKyId))
-            {
-                var diemHocKyList = hk.Diems.Where(d => d.DiemCuoiKy.HasValue).ToList();
-                if (diemHocKyList.Any())
-                {
-                    var tongTinChiHK = diemHocKyList.Sum(d => d.SoTinChi);
-                    var tongDiemHK = diemHocKyList.Sum(d => ConvertToHe4(d.DiemCuoiKy.Value) * d.SoTinChi);
-
-                    var diemTBHocKy = tongTinChiHK > 0 ? (tongDiemHK / tongTinChiHK).ToString("0.00") : "0.00";
-
-                    // cộng dồn
-                    tongTinChiTichLuy2 += tongTinChiHK;
-                    tongDiemTichLuy += tongDiemHK;
-                    tongTinChiDat2 += diemHocKyList.Where(d => ConvertToHe4(d.DiemCuoiKy.Value) > 0).Sum(d => d.SoTinChi);
-
-                    var diemTBTichLuy = tongTinChiTichLuy2 > 0 ? (tongDiemTichLuy / tongTinChiTichLuy2).ToString("0.00") : "0.00";
-
-                    tichLuyList.Add(new
-                    {
-                        hk.TenHocKy,
-                        DiemTBHocKy = diemTBHocKy,
-                        DiemTBTichLuy = diemTBTichLuy,
-                        TinChiDat = tongTinChiDat2,
-                        TongTinChiTichLuy = tongTinChiTichLuy2
-                    });
-                }
-            }
-
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = "Lấy điểm thành công",
-                soluong = diem.Count,
-                data = diem,
-                // ✅ Bổ sung phần tổng hợp
-                tongTinChiTichLuy,
-                tongTinChiDat,
-                DiemTBTichLuy = tongTinChiTichLuy > 0 ? (tongDiemHe4TichLuy / tongTinChiTichLuy).ToString("0.00") : "0.00",
-                tichLuyList
-            });
+            return Ok(response);
         }
 
 
