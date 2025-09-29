@@ -160,9 +160,11 @@
                     <div class="col-md-4">
                         @Html.DropDownList(
                                  "hocKy",
-                                 (SelectList)ViewBag.HocKyList,
+                                 ViewBag.HocKyList as SelectList ?? new SelectList(Enumerable.Empty<SelectListItem>()),
+                                 "Chọn học kỳ",
                                  new { @class = "custom-select", onchange = "this.form.submit();" }
                                  )
+
                     </div>
                 </form>
 
