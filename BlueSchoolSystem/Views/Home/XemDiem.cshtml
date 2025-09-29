@@ -160,15 +160,19 @@
                     <div class="col-md-4">
                         @Html.DropDownList(
                                  "hocKy",
-                                 (SelectList)ViewBag.HocKyList,
+                                 ViewBag.HocKyList as SelectList ?? new SelectList(Enumerable.Empty<SelectListItem>()),
+                                 "Chọn học kỳ",
                                  new { @class = "custom-select", onchange = "this.form.submit();" }
                                  )
+
                     </div>
                 </form>
 
                 @if (ViewBag.Error != null)
                 {
-                    <div class="alert alert-danger">@ViewBag.Error</div>
+                    <div class="alert alert-danger text-center">
+                        @ViewBag.Error
+                    </div>
                 }
                 else if ((Model == null || !Model.Any()) && (diemTatCa == null || !diemTatCa.Any()))
                 {
