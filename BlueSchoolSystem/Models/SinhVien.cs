@@ -59,9 +59,10 @@ namespace BlueSchoolSystem.Models
             UpdatedAt = DateTime.Now;
         }
 
-        public ICollection<DiemDanh> DiemDanhs { get; set; } = new List<DiemDanh>();
-
         public ICollection<BangDiem> BangDiems { get; set; } = new List<BangDiem>();
+
+        public List<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; } = new();
+
 
     }
 }
