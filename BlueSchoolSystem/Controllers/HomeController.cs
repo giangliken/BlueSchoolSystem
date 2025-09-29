@@ -228,7 +228,7 @@ namespace BlueSchoolSystem.Controllers
             var response = await client.GetAsync($"api/diemsinhvien/{mssv}");
             if (!response.IsSuccessStatusCode)
             {
-                ViewBag.Error = "Không thể lấy điểm từ API.";
+                ViewBag.Error = "Không có dữ liệu điểm trong Cơ sở dữ liệu";
                 return View(new List<DiemMonHocViewModel>());
             }
 

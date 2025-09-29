@@ -170,7 +170,9 @@
 
                 @if (ViewBag.Error != null)
                 {
-                    <div class="alert alert-danger">@ViewBag.Error</div>
+                    <div class="alert alert-danger text-center">
+                        @ViewBag.Error
+                    </div>
                 }
                 else if ((Model == null || !Model.Any()) && (diemTatCa == null || !diemTatCa.Any()))
                 {
