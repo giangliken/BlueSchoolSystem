@@ -51,7 +51,7 @@ namespace BlueSchoolSystem.Models
                 .HasOne(bd => bd.SinhVien)
                 .WithMany(sv => sv.BangDiems)
                 .HasForeignKey(bd => bd.SinhVienId)
-                .OnDelete(DeleteBehavior.Restrict); // Không cascade
+                .OnDelete(DeleteBehavior.Restrict); 
 
             builder.Entity<BangDiem>()
                 .HasOne(bd => bd.LopHocPhan)
@@ -66,10 +66,10 @@ namespace BlueSchoolSystem.Models
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<ChiTietDiemDanh>()
-            .HasOne(ct => ct.SinhVien)
-            .WithMany(sv => sv.ChiTietDiemDanhs)
-            .HasForeignKey(ct => ct.SinhVienId)
-            .OnDelete(DeleteBehavior.Restrict);
+                .HasOne(ct => ct.SinhVien)
+                .WithMany(sv => sv.ChiTietDiemDanhs)
+                .HasForeignKey(ct => ct.SinhVienId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<ChiTietDiemDanh>()
                 .HasOne(ct => ct.DiemDanh)
@@ -77,25 +77,18 @@ namespace BlueSchoolSystem.Models
                 .HasForeignKey(ct => ct.DiemDanhId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-
             builder.Entity<DiemDanh>()
-            .HasOne(dd => dd.TrangThai)
-            .WithMany()
-            .HasForeignKey(dd => dd.TrangThaiId)
-            .OnDelete(DeleteBehavior.Restrict); // Quan trọng!
+                .HasOne(dd => dd.TrangThai)
+                .WithMany()
+                .HasForeignKey(dd => dd.TrangThaiId)
+                .OnDelete(DeleteBehavior.Restrict); 
 
             builder.Entity<LichThi>()
                    .HasOne(l => l.TrangThai)
                    .WithMany()
                    .HasForeignKey(l => l.TrangThaiId)
-                   .OnDelete(DeleteBehavior.Restrict); // hoặc NoAction
-
+                   .OnDelete(DeleteBehavior.Restrict); 
 
         }
-
-
-
-
-
     }
 }
