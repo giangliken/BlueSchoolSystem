@@ -592,7 +592,7 @@ namespace BlueSchoolSystem.APIControllers
 
 
 
-        // ✅ Lấy điểm của sinh viên
+        //  Lấy điểm của sinh viên
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
         [HttpGet("diemsinhvien/{mssv}")]
         public async Task<IActionResult> GetDiemByMSSV(string mssv, [FromQuery] int? hocKyId)
@@ -680,6 +680,77 @@ namespace BlueSchoolSystem.APIControllers
             return Ok(response);
         }
 
+        // Lấy danh sách lớp học phần theo MSSV
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
+        [HttpGet("lophocphansinhvien/{mssv}")]
+        public async Task<IActionResult> GetLopHocPhanByMSSV(string mssv)
+        {
+            // MSSV từ token
+            var mssvFromToken = User.FindFirst("username")?.Value;
+            if (mssvFromToken == null)
+            {
+                return Unauthorized(new
+                {
+                    result = false,
+                    code = 401,
+                    message = "Không lấy được MSSV từ token"
+                });
+            }
+
+            if (mssvFromToken != mssv)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    result = false,
+                    code = 403,
+                    message = "Bạn không có quyền truy cập lớp học phần của sinh viên khác"
+                });
+            }
+
+            //  Truy vấn dữ liệu tương tự SQL bạn viết
+            var query = from ct in _context.ChiTietLopHocPhans
+                        join sv in _context.SinhViens on ct.SinhVienId equals sv.Id
+                        join lhp in _context.LopHocPhans on ct.LopHocPhanId equals lhp.Id
+                        join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                        join hk in _context.HocKys on lhp.HocKyId equals hk.Id
+                        where sv.MSSV == mssv
+                        group new { mh, lhp } by new { hk.Id, hk.TenHocKy, hk.NgayBatDau } into g
+                        orderby g.Key.Id
+                        select new
+                        {
+                            HocKyId = g.Key.Id,
+                            TenHocKy = g.Key.TenHocKy,
+                            NgayBatDau = g.Key.NgayBatDau,
+                            DanhSachMon = g.Select(x => new
+                            {
+                                x.mh.MaMonHoc,
+                                x.mh.TenMonHoc,
+                                x.mh.SoTinChi,
+                                x.lhp.MaLopHocPhan
+                            }).ToList()
+                        };
+
+            var data = await query.ToListAsync();
+
+            if (!data.Any())
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy lớp học phần cho MSSV này"
+                });
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy danh sách lớp học phần thành công",
+                soluongHocKy = data.Count,
+                data
+            });
+        }
 
 
     }
