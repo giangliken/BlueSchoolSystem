@@ -10,7 +10,7 @@ namespace BlueSchoolSystem.Models
         public virtual GiangVien? GiangViens { get; set; }
         [Required(ErrorMessage =("Số điện thoại là bắt buộc"))]
         [RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại phải có 10 số và bắt đầu bằng 0.")]
-        public string PhoneNumber { get; set; }
+        public override string PhoneNumber { get; set; }
 
         [Required(ErrorMessage =("Email là bắt buộc"))]
         [EmailAddress(ErrorMessage = "Email không hợp lệ.")]
