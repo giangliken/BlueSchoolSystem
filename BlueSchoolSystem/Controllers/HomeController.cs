@@ -312,10 +312,60 @@ namespace BlueSchoolSystem.Controllers
 
 
 
-        //Giao diện Lớp học phần
-        public IActionResult LopHocPhan()
+        // Giao diện Lớp học phần
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> LopHocPhan(string hocKy)
         {
-            return View();
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var mssv = User.Identity?.Name ??
+                       User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                       User.FindFirst("username")?.Value;
+
+            if (string.IsNullOrEmpty(mssv))
+            {
+                ViewBag.Error = "Không xác định được MSSV của người dùng.";
+                return View(new List<LopHocPhanHocKyViewModel>()); // ✅ fix: đúng type
+            }
+
+            var response = await client.GetAsync($"api/lophocphansinhvien/{mssv}");
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không có dữ liệu lớp học phần trong Cơ sở dữ liệu";
+                return View(new List<LopHocPhanHocKyViewModel>()); // ✅ fix: đúng type
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var lopResponse = JsonSerializer.Deserialize<LopHocPhanResponseViewModel>(
+                body,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
+
+            if (lopResponse == null || lopResponse.Data == null || !lopResponse.Data.Any())
+            {
+                ViewBag.Error = "Không tìm thấy dữ liệu lớp học phần.";
+                return View(new List<LopHocPhanHocKyViewModel>()); // ✅ fix: đúng type
+            }
+
+            // Lấy 3 học kỳ mới nhất từ API
+            var model = lopResponse.Data?
+                .OrderByDescending(d => d.NgayBatDau)
+                .Take(3)
+                .Select(hk => new LopHocPhanHocKyViewModel
+                {
+                    HocKyId = hk.HocKyId,
+                    TenHocKy = hk.TenHocKy,
+                    NgayBatDau = hk.NgayBatDau,
+                    DanhSachMon = hk.DanhSachMon ?? new List<LopHocPhanMonHocViewModel>()
+                }).ToList() ?? new List<LopHocPhanHocKyViewModel>();
+
+            return View(model);
         }
 
         //Giao diện đăng ký học phần
