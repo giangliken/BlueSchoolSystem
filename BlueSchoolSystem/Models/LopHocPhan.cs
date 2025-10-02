@@ -23,7 +23,7 @@
         public TrangThai? TrangThai { get; set; } // Trạng thái lớp học phần
 
         public ICollection<BangDiem> BangDiems { get; set; }
-        public ICollection<DiemDanh> DiemDanhs { get; set; } = new List<DiemDanh>();
+
 
         //Học kì
         public int HocKyId { get; set; } // Mã học kỳ liên kết
