@@ -726,6 +726,7 @@ namespace BlueSchoolSystem.APIControllers
                                 x.mh.MaMonHoc,
                                 x.mh.TenMonHoc,
                                 x.mh.SoTinChi,
+                                LopHocPhanId = x.lhp.Id,
                                 x.lhp.MaLopHocPhan
                             }).ToList()
                         };
@@ -749,6 +750,70 @@ namespace BlueSchoolSystem.APIControllers
                 message = "Lấy danh sách lớp học phần thành công",
                 soluongHocKy = data.Count,
                 data
+            });
+        }
+
+        // Lấy các buổi điểm danh theo mssv và id lớp học phần
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
+        [HttpGet("lophocphansinhvien/{mssv}/lop/{lopHocPhanId}/diemdanh")]
+        public async Task<IActionResult> GetDiemDanhByLop(string mssv, int lopHocPhanId)
+        {
+            // MSSV từ token
+            var mssvFromToken = User.FindFirst("username")?.Value;
+            if (mssvFromToken == null)
+                return Unauthorized(new {
+                    result = false, 
+                    code = 401, 
+                    message = "Không lấy được MSSV từ token" 
+                });
+
+            if (mssvFromToken != mssv)
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                { 
+                    result = false, 
+                    code = 403, 
+                    message = "Không có quyền truy cập" 
+                });
+
+            // ✅ Kiểm tra sinh viên có thuộc lớp học phần không
+            var isExist = await _context.ChiTietLopHocPhans
+                .Include(ct => ct.SinhVien)
+                .AnyAsync(ct => ct.LopHocPhanId == lopHocPhanId && ct.SinhVien.MSSV == mssv);
+
+            if (!isExist)
+                return NotFound(new { result = false, code = 404, message = "Sinh viên không thuộc lớp học phần này" });
+
+            // ✅ Lấy danh sách điểm danh
+            var query = from dd in _context.DiemDanhs
+                        join tt in _context.TrangThais on dd.TrangThaiId equals tt.Id into tts
+                        from tt in tts.DefaultIfEmpty()
+                        join ct in _context.ChiTietLopHocPhans on dd.ChiTietLopHocPhanId equals ct.Id
+                        join sv in _context.SinhViens on ct.SinhVienId equals sv.Id
+                        where sv.MSSV == mssv && ct.LopHocPhanId == lopHocPhanId
+                        orderby dd.Ngay
+                        select new
+                        {
+                            dd.Ngay,
+                            TenTrangThai = tt.TenTrangThai,
+                            dd.GhiChu
+                        };
+
+            var data = await query.ToListAsync();
+
+            if (!data.Any())
+                return NotFound(new
+                { 
+                    result = false, 
+                    code = 404, 
+                    message = "Không có dữ liệu điểm danh" 
+                });
+
+            return Ok(new
+            { 
+                result = true, 
+                code = 200, 
+                message = "Lấy danh sách điểm danh thành công", 
+                soluong = data.Count, data 
             });
         }
 
