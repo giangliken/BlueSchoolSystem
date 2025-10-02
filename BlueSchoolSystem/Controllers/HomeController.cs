@@ -368,6 +368,55 @@ namespace BlueSchoolSystem.Controllers
             return View(model);
         }
 
+        // Hiện buổi điểm danh
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> BuoiDiemDanh(int lopHocPhanId, string tenMonHoc)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            // Lấy access token từ session
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            // Lấy MSSV từ claims
+            var mssv = User.Identity?.Name
+                       ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                       ?? User.FindFirst("username")?.Value;
+
+            if (string.IsNullOrEmpty(mssv))
+            {
+                ViewBag.Error = "Không xác định được MSSV của người dùng.";
+                return View(new List<DiemDanhViewModel>());
+            }
+
+            // Gọi API backend
+            var apiUrl = $"api/lophocphansinhvien/{mssv}/lop/{lopHocPhanId}/diemdanh";
+            var response = await client.GetAsync(apiUrl);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không có dữ liệu điểm danh.";
+                return View(new List<DiemDanhViewModel>());
+            }
+
+            // Deserialize dữ liệu
+            var body = await response.Content.ReadAsStringAsync();
+            var apiResponse = JsonSerializer.Deserialize<DiemDanhResponse<List<DiemDanhViewModel>>>(
+                 body,
+                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+             );
+
+            var model = apiResponse?.Data ?? new List<DiemDanhViewModel>();
+            ViewBag.TenMonHoc = tenMonHoc;
+            return View(model);
+        }
+
+
         //Giao diện đăng ký học phần
         public IActionResult DangKyLopHP()
         {
