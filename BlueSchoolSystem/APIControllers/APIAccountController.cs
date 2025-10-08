@@ -69,6 +69,19 @@ namespace BlueSchoolSystem.APIControllers
                 var token = GenerateJwtToken(user, roles);
                 HttpContext.Session.SetString("access_token", token);
 
+                // Tạo refresh token mới
+                string refreshTokenValue = Guid.NewGuid().ToString("N");
+                var refreshToken = new RefreshToken
+                {
+                    Token = refreshTokenValue,
+                    UserId = user.Id,
+                    ExpiryDate = DateTime.UtcNow.AddDays(7), // hạn 7 ngày
+                    IsRevoked = false
+                };
+                _context.RefreshTokens.Add(refreshToken);
+                await _context.SaveChangesAsync();
+
+
                 //Nếu người dùng đăng nhập bằng tài khoản Admin
                 if (role == SD.Role_Admin)
                 {
@@ -78,6 +91,8 @@ namespace BlueSchoolSystem.APIControllers
                         code = 200,
                         message = "Đăng nhập thành công",
                         token = token,
+                        refresh_token = refreshTokenValue,
+
                         user = new
                         {
                             username = user.UserName,
@@ -97,6 +112,8 @@ namespace BlueSchoolSystem.APIControllers
                         code = 200,
                         message = "Đăng nhập thành công",
                         token = token,
+                        refresh_token = refreshTokenValue,
+
                         user = new
                         {
                             username = user.UserName,
@@ -119,6 +136,8 @@ namespace BlueSchoolSystem.APIControllers
                         code = 200,
                         message = "Đăng nhập thành công",
                         token = token,
+                        refresh_token = refreshTokenValue,
+
                         user = new
                         {
                             username = user.UserName,
@@ -141,6 +160,7 @@ namespace BlueSchoolSystem.APIControllers
                 message = "Mật khẩu không đúng" 
             });
         }
+
 
 
         private string GenerateJwtToken(ApplicationUser user, IList<string> roles)
@@ -173,6 +193,40 @@ namespace BlueSchoolSystem.APIControllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+        public class RefreshTokenRequest
+        {
+            public string RefreshToken { get; set; }
+        }
+
+        [HttpPost("refresh-token")]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+        {
+            var refreshToken = await _context.RefreshTokens
+                .Include(rt => rt.User)
+                .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken && !rt.IsRevoked && rt.ExpiryDate > DateTime.UtcNow);
+
+            if (refreshToken == null)
+                return Unauthorized(new { message = "Refresh token không hợp lệ hoặc đã hết hạn" });
+
+            // Tạo access token mới
+            var user = refreshToken.User;
+            var roles = await _userManager.GetRolesAsync(user);
+            var newAccessToken = GenerateJwtToken(user, roles);
+
+            // Cấp lại refresh token mới (hoặc dùng lại token cũ nếu muốn đơn giản)
+            string newRefreshTokenValue = Guid.NewGuid().ToString("N");
+            refreshToken.Token = newRefreshTokenValue;
+            refreshToken.ExpiryDate = DateTime.UtcNow.AddDays(7);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                token = newAccessToken,
+                refresh_token = newRefreshTokenValue
+            });
+        }
+
 
         //Gửi OTP khôi phục mật khẩu
         [HttpPost("gui-otp")]

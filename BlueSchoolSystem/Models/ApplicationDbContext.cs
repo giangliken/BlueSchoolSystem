@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+﻿using BlueSchoolSystem.Models.ViewModel;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection.Emit;
 
@@ -11,7 +12,9 @@ namespace BlueSchoolSystem.Models
         }
 
         //bảng lưu trữ hoạt động người dùng
+        
         public DbSet<ActivityLog> ActivityLogs { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<PasswordResetOTP> PasswordResetOTPs { get; set; } // Bảng lưu trữ mã OTP để đặt lại mật khẩu
         public DbSet<SinhVien> SinhViens { get; set; } // Bảng sinh viên
         public DbSet<LopHoc> LopHocs { get; set; } // Bảng lớp học
