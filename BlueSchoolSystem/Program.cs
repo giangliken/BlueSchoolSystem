@@ -56,6 +56,11 @@ builder.Services.AddCors(options =>
 
 });
 
+
+builder.Services.Configure<GoogleAuthSettings>(
+    builder.Configuration.GetSection("Authentication:Google"));
+
+
 // Cấu hình JwtSettings
 var jwtSettingsSection = builder.Configuration.GetSection("JwtSettings");
 builder.Services.Configure<JwtSettings>(jwtSettingsSection);
