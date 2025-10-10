@@ -28,5 +28,10 @@
         //Học kì
         public int HocKyId { get; set; } // Mã học kỳ liên kết
         public HocKy? HocKy { get; set; } // Học kỳ liên kết
+
+        public int? NganhHocId { get; set; }
+        public NganhHoc? NganhHoc { get; set; }
+        public ICollection<ChiTietLopHocPhan> ChiTietLopHocPhans { get; set; } = new List<ChiTietLopHocPhan>();
+        public ICollection<DangKyHocPhan> DangKyHocPhans { get; set; } = new List<DangKyHocPhan>();
     }
 }

@@ -33,6 +33,8 @@ namespace BlueSchoolSystem.Models
         public DbSet<BangDiem> BangDiems { get; set; } // Bảng điểm
         public DbSet<DangKyHocPhan> DangKyHocPhans { get; set; } // Bảng đăng ký học phần
         public DbSet<HocKy> HocKys { get; set; } // Bảng học kỳ
+        public DbSet<ChuongTrinhDaoTao> ChuongTrinhDaoTaos { get; set; }// Bảng chương trình đào tạo
+        public DbSet<MonHocTienQuyet> MonHocTienQuyets { get; set; }// Bảng môn học tiên quyết
 
         //Table lưu trạng thái của hệ thống
         public DbSet<TrangThai> TrangThais { get; set; } // Bảng trạng thái của hệ thống
@@ -90,8 +92,74 @@ namespace BlueSchoolSystem.Models
                    .HasOne(l => l.TrangThai)
                    .WithMany()
                    .HasForeignKey(l => l.TrangThaiId)
-                   .OnDelete(DeleteBehavior.Restrict); 
+                   .OnDelete(DeleteBehavior.Restrict);
 
+            // ChuongTrinhDaoTao
+            builder.Entity<ChuongTrinhDaoTao>()
+                .HasOne(ct => ct.NganhHoc)
+                .WithMany(n => n.ChuongTrinhDaoTaos)
+                .HasForeignKey(ct => ct.NganhHocId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ChuongTrinhDaoTao>()
+                .HasOne(ct => ct.MonHoc)
+                .WithMany(m => m.ChuongTrinhDaoTaos)
+                .HasForeignKey(ct => ct.MonHocId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // DangKyHocPhan
+            builder.Entity<DangKyHocPhan>()
+                .HasOne(dk => dk.SinhVien)
+                .WithMany(sv => sv.DangKyHocPhans)
+                .HasForeignKey(dk => dk.SinhVienId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DangKyHocPhan>()
+                .HasOne(dk => dk.LopHocPhan)
+                .WithMany(lhp => lhp.DangKyHocPhans)
+                .HasForeignKey(dk => dk.HocPhanId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ChiTietLopHocPhan
+            builder.Entity<ChiTietLopHocPhan>()
+                .HasOne(ct => ct.SinhVien)
+                .WithMany(sv => sv.ChiTietLopHocPhans)
+                .HasForeignKey(ct => ct.SinhVienId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<ChiTietLopHocPhan>()
+                .HasOne(ct => ct.LopHocPhan)
+                .WithMany(lhp => lhp.ChiTietLopHocPhans)
+                .HasForeignKey(ct => ct.LopHocPhanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // MonHocTienQuyet
+            builder.Entity<MonHocTienQuyet>()
+                .HasOne(m => m.MonHoc)
+                .WithMany(mh => mh.MonHocTienQuyet)
+                .HasForeignKey(m => m.MonHocId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<MonHocTienQuyet>()
+                .HasOne(m => m.MonHocBatBuoc)
+                .WithMany(mh => mh.LaTienQuyetCua)
+                .HasForeignKey(m => m.MonHocTienQuyetId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Index / Unique constraints
+            builder.Entity<MonHoc>().HasIndex(m => m.MaMonHoc).IsUnique();
+            builder.Entity<NganhHoc>().HasIndex(n => n.MaNganh).IsUnique();
+            builder.Entity<LopHoc>().HasIndex(l => l.MaLop).IsUnique();
+            builder.Entity<SinhVien>().HasIndex(s => s.MSSV).IsUnique();
+
+            // Tránh duplicate enrollment
+            builder.Entity<ChiTietLopHocPhan>()
+                .HasIndex(ct => new { ct.LopHocPhanId, ct.SinhVienId })
+                .IsUnique();
+
+            builder.Entity<DangKyHocPhan>()
+                .HasIndex(dk => new { dk.HocPhanId, dk.SinhVienId })
+                .IsUnique();
         }
     }
 }
