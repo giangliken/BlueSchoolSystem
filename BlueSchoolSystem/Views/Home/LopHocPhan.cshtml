@@ -1,317 +1,234 @@
 ﻿<style>
-    /* Card */ .card {
+    /* ✅ Thêm viền bao quanh toàn trang */
+    .lop-hoc-phan-container {
+        border: 1.5px solid #dee2e6;
         border-radius: 12px;
-        overflow: hidden;
-    }
-    /* Header */
-
-    .card-header {
-        background: linear-gradient(90deg, #0dcaf0, #0d9dfd);
-        color: white;
-        font-weight: bold;
-        border-bottom: none !important;
-    }
-
-        .card-header h6 {
-            color: white;
-            margin: 0;
-        }
-    /* Custom dropdown */
-
-    .custom-select {
-        border: 1px solid #0d6efd;
-        border-radius: 8px;
-        padding: 6px 10px;
-        font-size: 1rem;
-        font-weight: 500;
-        color: #0d6efd;
+        padding: 20px;
         background-color: #fff;
-        cursor: pointer;
-        transition: all 0.2s ease-in-out;
-        min-width: 300px; /* ✅ nhỏ lại */
-        height: 42px; /* ✅ vừa phải hơn */
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
-        .custom-select:focus {
-            outline: none;
-            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, .25);
-            border-color: #0b5ed7;
+    /* Header */
+    h6 {
+        font-weight: 600;
+        margin-bottom: 15px;
+    }
+
+    /* Tabs */
+    .nav-tabs-custom {
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        gap: 12px;
+    }
+
+        .nav-tabs-custom .nav-link {
+            border: none;
+            background: transparent;
+            color: #6c757d;
+            font-weight: 500;
+            padding: 8px 20px;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
         }
 
-        .custom-select:hover {
-            border-color: #0b5ed7;
-            box-shadow: 0 0 6px rgba(13, 110, 253, 0.3);
-        }
+            .nav-tabs-custom .nav-link:hover {
+                color: #0d6efd;
+                background-color: #f8f9fa;
+            }
+
+            .nav-tabs-custom .nav-link.active {
+                background-color: #0d6efd;
+                color: #fff;
+                font-weight: 600;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            }
+
     /* Table */
-
-    .table-responsive {
-        max-height: 500px;
-        overflow: auto;
-    }
-
     table.table {
+        width: 100%;
         border-radius: 8px;
         overflow: hidden;
-        width: 100%; /* bảng full khung cha */
-        table-layout: auto; /* tự căn theo nội dung */
+        border-collapse: collapse;
+        table-layout: fixed; /* ✅ Quan trọng: giúp hàng full width */
     }
 
-    thead.table-primary {
-        background: linear-gradient(90deg, #0d6efd, #0d9dfd) !important;
-        color: #fff !important;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-    }
-    /* Sticky columns */
-
-    th.sticky-col, td.sticky-col {
-        position: sticky;
-        left: 0;
-        background: #f8f9fa !important;
-        z-index: 3;
-        font-weight: 600;
-        border-right: 1px solid #dee2e6;
+    thead {
+        background: linear-gradient(90deg, #0d6efd, #0d9dfd);
+        color: #fff;
     }
 
-    th.sticky-col-2, td.sticky-col-2 {
-        position: sticky;
-        left: 70px; /* chiều rộng STT */
-        background: #f8f9fa !important;
-        z-index: 3;
-        border-right: 1px solid #dee2e6;
+    .table th, .table td {
+        text-align: center;
+        vertical-align: middle;
+        border: 1px solid #dee2e6;
+        padding: 8px;
+        word-wrap: break-word;
     }
-    /* Row hover & alternate */
+
+        .table td.ten-monhoc, .table th.ten-monhoc {
+            text-align: left;
+        }
 
     tbody tr:nth-child(even) {
         background-color: #fafbfc;
     }
 
-    tbody tr:hover {
-        background-color: #eaf3ff !important;
-    }
-    /* STT column */
-
-    td.sticky-col {
-        text-align: center;
-        font-weight: bold;
-        color: #0d6efd;
-    }
-    /* Borders */
-
-    .table-bordered th, .table-bordered td {
-        border: 1px solid #dee2e6;
-        vertical-align: middle;
-    }
-    /* Căn giữa dữ liệu trong bảng */
-    .table td, .table th {
-        text-align: center;
-        vertical-align: middle;
-    }
-
-        /* Riêng cột Tên môn học thì căn trái */
-        .table td.ten-monhoc, .table th.ten-monhoc {
-            text-align: left;
-        }
-
-    /* Điều chỉnh lại độ rộng cột */
-    th.stt-col, td.stt-col {
-        width: 30px; /* nhỏ hơn */
-    }
-
-    th.ma-col, td.ma-col {
-        width: 80px; /* vừa phải */
-    }
-
-    th.ten-col, td.ten-col {
-        width: 200px; /* tăng thêm */
-    }
-
-    /* Style cho nút tab */
-    .nav-tabs .nav-link {
-        border: none;
-        color: #0d6efd;
-        font-weight: 500;
-        border-radius: 8px 8px 0 0;
-        transition: all 0.2s ease-in-out;
-    }
-
-        /* Khi hover */
-        .nav-tabs .nav-link:hover {
-            background-color: rgba(13, 110, 253, 0.1);
-            color: #0b5ed7;
-        }
-
-        /* Khi active */
-        .nav-tabs .nav-link.active {
-            background: linear-gradient(90deg, #0d6efd, #0d9dfd);
-            color: #fff !important;
-            font-weight: 600;
-            border: none;
-        }
-
-    /* Khi chọn row */
+    /* Hover khi rê chuột vào hàng môn học */
     .table tbody tr.row-selected {
-        background-color: #cce5ff !important; /* xanh nhạt */
+        background-color: #000 !important;
+        color: #fff !important;
         font-weight: 600;
-    }
-    /* Hover vào row sẽ đổi màu + đổ bóng */
-    .table tbody tr {
-        transition: all 0.25s ease-in-out; /* hiệu ứng mượt */
+        transition: background-color 0.1s ease-in-out;
     }
 
-        .table tbody tr:hover {
-            background-color: #cce5ff !important; /* xanh nhạt */
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3); /* đổ bóng xanh nhạt */
-            transform: scale(1.01); /* hơi phóng to nhẹ để nổi bật */
+        /* Ngăn hover ghi đè màu khi đã chọn */
+        .table tbody tr.row-selected:hover {
+            background-color: #000 !important;
+            color: #fff !important;
         }
+
+    /* Hiệu ứng khi rê chuột vào hàng môn học */
+    .table tbody tr:hover {
+        background-color: #000 !important; /* Màu nền xám nhạt */
+        transition: background-color 0.15s ease-in-out;
+        cursor: pointer;
+    }
 </style>
+
+
 @model List<BlueSchoolSystem.Models.ViewModel.LopHocPhanHocKyViewModel>
-
 <h6>Trang chủ / Học vụ / Lớp học phần</h6>
+<div class="lop-hoc-phan-container">
 
-@if (!Model.Any())
-{
-    <div class="alert alert-danger text-center">Không có dữ liệu lớp học phần</div>
-}
-else
-{
-    <!-- Tabs -->
-    <ul class="nav nav-tabs mb-3" id="hocKyTabs" role="tablist">
-        <!-- Tab "Tất cả" -->
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active"
-                    id="tab-all"
-                    data-bs-toggle="tab"
-                    data-bs-target="#content-all"
-                    type="button" role="tab"
-                    aria-controls="content-all"
-                    aria-selected="true">
-                Tất cả
-            </button>
-        </li>
 
-        @for (int i = 0; i < Model.Count; i++)
-        {
-            var hk = Model[i];
+    @if (!Model.Any())
+    {
+        <div class="alert alert-danger text-center">Không có dữ liệu lớp học phần</div>
+    }
+    else
+    {
+        <ul class="nav nav-tabs mb-3" id="hocKyTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link"
-                        id="tab-@hk.HocKyId"
+                <button class="nav-link active"
+                        id="tab-all"
                         data-bs-toggle="tab"
-                        data-bs-target="#content-@hk.HocKyId"
+                        data-bs-target="#content-all"
                         type="button" role="tab"
-                        aria-controls="content-@hk.HocKyId"
-                        aria-selected="false">
-                    @hk.TenHocKy
+                        aria-controls="content-all"
+                        aria-selected="true">
+                    Tất cả
                 </button>
             </li>
-        }
-    </ul>
-
-    <!-- Tab Contents -->
-    <div class="tab-content" id="hocKyTabsContent">
-        <!-- Nội dung tab "Tất cả" -->
-        <div class="tab-pane fade show active"
-             id="content-all"
-             role="tabpanel"
-             aria-labelledby="tab-all">
 
             @foreach (var hk in Model)
             {
-                <h6 class="mt-3 mb-2 fw-bold text-primary">@hk.TenHocKy</h6>
-                <table class="table table-bordered mb-4">
-                    <thead>
-                        <tr>
-                            <th style ="width:70px;">Mã MH</th>
-                            <th style="width:200px;" class="ten-monhoc">Tên môn học</th>
-                            <th style="width:50px;">Số tín chỉ</th>
-                            <th style="width:80px;">Lớp học phần</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @if (hk.DanhSachMon != null && hk.DanhSachMon.Any())
-                        {
-                            foreach (var mon in hk.DanhSachMon)
-                            {
-                                <tr style="cursor:pointer;" data-href="@Url.Action("BuoiDiemDanh", "Home", new { lopHocPhanId = mon.LopHocPhanId, tenMonHoc = mon.TenMonHoc })">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link"
+                            id="tab-@hk.HocKyId"
+                            data-bs-toggle="tab"
+                            data-bs-target="#content-@hk.HocKyId"
+                            type="button" role="tab"
+                            aria-controls="content-@hk.HocKyId"
+                            aria-selected="false">
+                        @hk.TenHocKy
+                    </button>
+                </li>
+            }
+        </ul>
 
-                                    <td>@mon.MaMonHoc</td>
-                                    <td class="ten-monhoc">@mon.TenMonHoc</td>
-                                    <td>@mon.SoTinChi</td>
-                                    <td>@mon.MaLopHocPhan</td>
-                                </tr>
-                            }
-                        }
-                        else
-                        {
+        <div class="tab-content" id="hocKyTabsContent">
+            <!-- Tất cả -->
+            <div class="tab-pane fade show active" id="content-all" role="tabpanel">
+                @foreach (var hk in Model)
+                {
+                    <h6 class="mt-3 mb-2 text-primary fw-bold">@hk.TenHocKy</h6>
+                    <table class="table table-bordered mb-4">
+                        <thead>
                             <tr>
-                                <td colspan="4" class="text-center text-muted">Không có môn học nào</td>
+                                <th style="width:70px;">Mã MH</th>
+                                <th style="width:200px;" class="ten-monhoc">Tên môn học</th>
+                                <th style="width:50px;">Số tín chỉ</th>
+                                <th style="width:80px;">Lớp học phần</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @if (hk.DanhSachMon?.Any() == true)
+                            {
+                                foreach (var mon in hk.DanhSachMon)
+                                {
+                                    <tr data-href="@Url.Action("BuoiDiemDanh", "Home", new { lopHocPhanId = mon.LopHocPhanId, tenMonHoc = mon.TenMonHoc })">
+                                        <td>@mon.MaMonHoc</td>
+                                        <td class="ten-monhoc">@mon.TenMonHoc</td>
+                                        <td>@mon.SoTinChi</td>
+                                        <td>@mon.MaLopHocPhan</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr><td colspan="4" class="text-center text-muted">Không có môn học nào</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+
+            <!-- Riêng từng học kỳ -->
+            @foreach (var hk in Model)
+            {
+                <div class="tab-pane fade" id="content-@hk.HocKyId" role="tabpanel">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Mã MH</th>
+                                <th class="ten-monhoc">Tên môn học</th>
+                                <th>Số tín chỉ</th>
+                                <th>Lớp học phần</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (hk.DanhSachMon?.Any() == true)
+                            {
+                                foreach (var mon in hk.DanhSachMon)
+                                {
+                                    <tr data-href="@Url.Action("BuoiDiemDanh", "Home", new { lopHocPhanId = mon.LopHocPhanId, tenMonHoc = mon.TenMonHoc })">
+                                        <td>@mon.MaMonHoc</td>
+                                        <td class="ten-monhoc">@mon.TenMonHoc</td>
+                                        <td>@mon.SoTinChi</td>
+                                        <td>@mon.MaLopHocPhan</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr><td colspan="4" class="text-center text-muted">Không có môn học nào</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             }
         </div>
+    }
+</div>
 
-        <!-- Nội dung từng học kỳ -->
-        @for (int i = 0; i < Model.Count; i++)
-        {
-            var hk = Model[i];
-
-            <div class="tab-pane fade"
-                 id="content-@hk.HocKyId"
-                 role="tabpanel"
-                 aria-labelledby="tab-@hk.HocKyId">
-
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th style="width:70px;">Mã MH</th>
-                            <th style="width:200px;" class="ten-monhoc">Tên môn học</th>
-                            <th style="width:50px;">Số tín chỉ</th>
-                            <th style="width:80px;">Lớp học phần</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @if (hk.DanhSachMon != null && hk.DanhSachMon.Any())
-                        {
-                            foreach (var mon in hk.DanhSachMon)
-                            {
-                                <tr style="cursor:pointer;" data-href="@Url.Action("BuoiDiemDanh", "Home", new { lopHocPhanId = mon.LopHocPhanId,tenMonHoc = mon.TenMonHoc })">
-                                    <td>@mon.MaMonHoc</td>
-                                    <td class="ten-monhoc">@mon.TenMonHoc</td>
-                                    <td>@mon.SoTinChi</td>
-                                    <td>@mon.MaLopHocPhan</td>
-                                </tr>
-                            }
-                        }
-                        else
-                        {
-                            <tr>
-                                <td colspan="4" class="text-center text-muted">Không có môn học nào</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
-}
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        // Lấy tất cả các row trong bảng
-        document.querySelectorAll("table.table tbody tr").forEach(function (row) {
-            row.addEventListener("click", function () {
-                // Xóa highlight ở tất cả các row khác
-                document.querySelectorAll("table.table tbody tr").forEach(r => r.classList.remove("row-selected"));
+        const rows = document.querySelectorAll("table.table tbody tr");
 
-                // Thêm highlight cho row được chọn
+        rows.forEach(row => {
+            row.addEventListener("click", function () {
+                // Xóa chọn ở tất cả dòng
+                rows.forEach(r => r.classList.remove("row-selected"));
+                // Thêm chọn cho dòng hiện tại
                 this.classList.add("row-selected");
 
-                // 👉 Nếu vẫn muốn chuyển trang thì mở thêm dòng này
-                window.location = this.getAttribute("data-href");
+                // Lấy URL
+                const url = this.getAttribute("data-href");
+
+                // Cho hiệu ứng đổi màu hiển thị rồi mới chuyển trang
+                setTimeout(() => {
+                    window.location.href = url;
+                }, 300); // 0.3s là vừa đủ để thấy rõ nền đen
             });
         });
     });

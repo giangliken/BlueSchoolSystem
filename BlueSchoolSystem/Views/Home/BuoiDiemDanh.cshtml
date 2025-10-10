@@ -1,10 +1,15 @@
 ﻿<style>
-    /* Card */ .card {
+    /* Card */
+    .card {
         border-radius: 12px;
         overflow: hidden;
+        border: 1.5px solid #dee2e6; /* ✅ viền ngoài */
+        padding: 15px;
+        background-color: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
-    /* Header */
 
+    /* Header */
     .card-header {
         background: linear-gradient(90deg, #0dcaf0, #0d9dfd);
         color: white;
@@ -16,8 +21,8 @@
             color: white;
             margin: 0;
         }
-    /* Custom dropdown */
 
+    /* Custom dropdown */
     .custom-select {
         border: 1px solid #0d6efd;
         border-radius: 8px;
@@ -28,8 +33,8 @@
         background-color: #fff;
         cursor: pointer;
         transition: all 0.2s ease-in-out;
-        min-width: 300px; /* ✅ nhỏ lại */
-        height: 42px; /* ✅ vừa phải hơn */
+        min-width: 300px;
+        height: 42px;
     }
 
         .custom-select:focus {
@@ -42,8 +47,8 @@
             border-color: #0b5ed7;
             box-shadow: 0 0 6px rgba(13, 110, 253, 0.3);
         }
-    /* Table */
 
+    /* Table */
     .table-responsive {
         max-height: 500px;
         overflow: auto;
@@ -52,8 +57,8 @@
     table.table {
         border-radius: 8px;
         overflow: hidden;
-        width: 100%; /* bảng full khung cha */
-        table-layout: auto; /* tự căn theo nội dung */
+        width: 100%;
+        table-layout: auto;
     }
 
     thead.table-primary {
@@ -63,8 +68,8 @@
         top: 0;
         z-index: 2;
     }
-    /* Sticky columns */
 
+    /* Sticky columns */
     th.sticky-col, td.sticky-col {
         position: sticky;
         left: 0;
@@ -76,13 +81,13 @@
 
     th.sticky-col-2, td.sticky-col-2 {
         position: sticky;
-        left: 70px; /* chiều rộng STT */
+        left: 70px;
         background: #f8f9fa !important;
         z-index: 3;
         border-right: 1px solid #dee2e6;
     }
-    /* Row hover & alternate */
 
+    /* Row hover & alternate */
     tbody tr:nth-child(even) {
         background-color: #fafbfc;
     }
@@ -90,19 +95,20 @@
     tbody tr:hover {
         background-color: #eaf3ff !important;
     }
-    /* STT column */
 
+    /* STT column */
     td.sticky-col {
         text-align: center;
         font-weight: bold;
         color: #0d6efd;
     }
-    /* Borders */
 
+    /* Borders */
     .table-bordered th, .table-bordered td {
         border: 1px solid #dee2e6;
         vertical-align: middle;
     }
+
     /* Căn giữa dữ liệu trong bảng */
     .table td, .table th {
         text-align: center;
@@ -114,37 +120,49 @@
             text-align: left;
         }
 
-    /* Điều chỉnh lại độ rộng cột */
+    /* Điều chỉnh độ rộng cột */
     th.stt-col, td.stt-col {
-        width: 30px; /* nhỏ hơn */
+        width: 30px;
     }
 
     th.ma-col, td.ma-col {
-        width: 80px; /* vừa phải */
+        width: 80px;
     }
 
     th.ten-col, td.ten-col {
-        width: 200px; /* tăng thêm */
+        width: 200px;
     }
 
-    /* Style cho nút tab */
-    .nav-tabs .nav-link {
-        border: none;
-        color: #0d6efd;
-        font-weight: 500;
-        border-radius: 8px 8px 0 0;
-        transition: all 0.2s ease-in-out;
+    /* Tabs */
+    .nav-tabs-custom {
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        gap: 12px;
     }
 
-        /* Khi hover */
-        .nav-tabs .nav-link:hover {
-            background-color: rgba(13, 110, 253, 0.1);
-            color: #0b5ed7;
+        .nav-tabs-custom .nav-link {
+            border: none;
+            background: transparent;
+            color: #6c757d;
+            font-weight: 500;
+            padding: 8px 20px;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
         }
 
+            .nav-tabs-custom .nav-link:hover {
+                color: #0d6efd;
+                background-color: #f8f9fa;
+            }
 
-
+            .nav-tabs-custom .nav-link.active {
+                background-color: #0d6efd;
+                color: #fff;
+                font-weight: 600;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            }
 </style>
+
 <h6>Trang chủ / Học vụ / Lớp học phần</h6>
 @model List<BlueSchoolSystem.Models.ViewModel.DiemDanhViewModel>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -152,7 +170,8 @@
     ViewData["Title"] = "Điểm danh";
     var tongSoVang = Model.Count(x => x.TenTrangThai == "Vắng mặt");
 }
-
+<div class="card mt-3">
+    <div class="card-body">
 @if (!string.IsNullOrEmpty(ViewBag.TenMonHoc as string))
 {
     <div class="d-flex align-items-center mb-3">
@@ -171,6 +190,7 @@ else
         <h4 class="mb-0">Không có dữ liệu điểm danh của lớp</h4>
     </div>
 }
+
 <!-- Tabs -->
 <ul class="nav nav-tabs mb-3" id="tabDiemDanh" role="tablist">
     <li class="nav-item" role="presentation">
@@ -234,7 +254,7 @@ else
                                     {
                                         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalChiTiet"
                                                 data-ngay="@item.Ngay.ToString("dd/MM/yyyy HH:mm:ss")"
-                                                data-ghichu="@(string.IsNullOrEmpty(item.GhiChu) ? "Giáo viên điểm danh" : item.GhiChu)">
+                                                data-ghichu="@item.GhiChu">
                                             Chi tiết
                                         </button>
                                     }
@@ -247,7 +267,8 @@ else
         }
     </div>
 </div>
-
+    </div>
+</div>
 <!-- Modal Chi tiết -->
 <div class="modal fade" id="modalChiTiet" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
