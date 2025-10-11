@@ -1,6 +1,7 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
 using BlueSchoolSystem.Repository;
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -23,18 +24,21 @@ namespace BlueSchoolSystem.APIControllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly JwtSettings _jwtSettings;
+        private readonly GoogleAuthSettings _googleSettings;
         private readonly IEmailSender _emailSender;
         private readonly ApplicationDbContext _context;
         public APIAccountController(
             SignInManager<ApplicationUser> signInManager,
             UserManager<ApplicationUser> userManager,
             IOptions<JwtSettings> jwtSettings,
+            IOptions<GoogleAuthSettings> googleSettings,
             IEmailSender emailSender,
             ApplicationDbContext context)
         {
             _signInManager = signInManager;
             _userManager = userManager;
             _jwtSettings = jwtSettings.Value;
+            _googleSettings = googleSettings.Value;
             _emailSender = emailSender;
             _context = context;
         }
@@ -69,6 +73,19 @@ namespace BlueSchoolSystem.APIControllers
                 var token = GenerateJwtToken(user, roles);
                 HttpContext.Session.SetString("access_token", token);
 
+                // Tạo refresh token mới
+                string refreshTokenValue = Guid.NewGuid().ToString("N");
+                var refreshToken = new RefreshToken
+                {
+                    Token = refreshTokenValue,
+                    UserId = user.Id,
+                    ExpiryDate = DateTime.UtcNow.AddDays(7), // hạn 7 ngày
+                    IsRevoked = false
+                };
+                _context.RefreshTokens.Add(refreshToken);
+                await _context.SaveChangesAsync();
+
+
                 //Nếu người dùng đăng nhập bằng tài khoản Admin
                 if (role == SD.Role_Admin)
                 {
@@ -78,6 +95,8 @@ namespace BlueSchoolSystem.APIControllers
                         code = 200,
                         message = "Đăng nhập thành công",
                         token = token,
+                        refresh_token = refreshTokenValue,
+
                         user = new
                         {
                             username = user.UserName,
@@ -97,6 +116,8 @@ namespace BlueSchoolSystem.APIControllers
                         code = 200,
                         message = "Đăng nhập thành công",
                         token = token,
+                        refresh_token = refreshTokenValue,
+
                         user = new
                         {
                             username = user.UserName,
@@ -119,6 +140,8 @@ namespace BlueSchoolSystem.APIControllers
                         code = 200,
                         message = "Đăng nhập thành công",
                         token = token,
+                        refresh_token = refreshTokenValue,
+
                         user = new
                         {
                             username = user.UserName,
@@ -139,6 +162,158 @@ namespace BlueSchoolSystem.APIControllers
                 result = false,
                 code = 401,
                 message = "Mật khẩu không đúng" 
+            });
+        }
+
+        [HttpPost("login-google")]
+        public async Task<IActionResult> LoginGoogle([FromBody] GoogleLoginRequest model)
+        {
+            if (string.IsNullOrEmpty(model.IdToken))
+                return BadRequest(new { result = false, code = 400, message = "id_token is required" });
+
+            // Xác thực id_token với Google
+            GoogleJsonWebSignature.Payload payload;
+            try
+            {
+                var settings = new GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = new[] { _googleSettings.ClientId } // hoặc lấy bằng IConfiguration như hướng dẫn ở trên
+                };
+                payload = await GoogleJsonWebSignature.ValidateAsync(model.IdToken, settings);
+            }
+            catch (Exception ex)
+            {
+                return Unauthorized(new { result = false, code = 401, message = "id_token Google không hợp lệ", debug = ex.Message });
+            }
+
+            // Check issuer (bảo mật)
+            if (payload.Issuer != "accounts.google.com" && payload.Issuer != "https://accounts.google.com")
+                return Unauthorized(new { result = false, code = 401, message = "Issuer không hợp lệ" });
+
+            // Kiểm tra user trong hệ thống theo email Google
+            var user = await _userManager.Users
+                .Include(u => u.SinhViens)
+                .Include(u => u.GiangViens)
+                .FirstOrDefaultAsync(u => u.Email == payload.Email);
+
+            // Nếu user chưa tồn tại thì auto-register
+            if (user == null)
+            {
+                user = new ApplicationUser
+                {
+                    UserName = payload.Email,
+                    Email = payload.Email,
+                    EmailConfirmed = true
+                    // Nếu muốn lưu thêm info, tuỳ bạn (ví dụ tên từ Google)
+                };
+                var createResult = await _userManager.CreateAsync(user);
+                if (!createResult.Succeeded)
+                    return StatusCode(500, new { result = false, code = 500, message = "Không tạo được tài khoản", errors = createResult.Errors });
+
+                // Gán role mặc định (ở đây là sinh viên, hoặc tuỳ bạn config)
+                await _userManager.AddToRoleAsync(user, SD.Role_Student);
+            }
+
+            // Lấy role
+            var roles = await _userManager.GetRolesAsync(user);
+            var role = roles.FirstOrDefault() ?? "Unknown";
+            var token = GenerateJwtToken(user, roles);
+
+            // Tạo refresh token
+            string refreshTokenValue = Guid.NewGuid().ToString("N");
+            var refreshToken = new RefreshToken
+            {
+                Token = refreshTokenValue,
+                UserId = user.Id,
+                ExpiryDate = DateTime.UtcNow.AddDays(7),
+                IsRevoked = false
+            };
+            _context.RefreshTokens.Add(refreshToken);
+            await _context.SaveChangesAsync();
+
+            // Trả về info theo role giống login thường
+            if (role == SD.Role_Admin)
+            {
+                return Ok(new
+                {
+                    result = true,
+                    code = 200,
+                    message = "Đăng nhập Google thành công",
+                    token = token,
+                    refresh_token = refreshTokenValue,
+                    user = new
+                    {
+                        username = user.UserName,
+                        role = role,
+                        email = user.Email,
+                        googleName = payload.Name,
+                        avatar = payload.Picture
+                    }
+                });
+            }
+            if (role == SD.Role_Student)
+            {
+                return Ok(new
+                {
+                    result = true,
+                    code = 200,
+                    message = "Đăng nhập Google thành công",
+                    token = token,
+                    refresh_token = refreshTokenValue,
+                    user = new
+                    {
+                        username = user.UserName,
+                        role = role,
+                        mssv = user.SinhViens?.MSSV,
+                        hoSv = user.SinhViens?.HoVaTenDem,
+                        tenSv = user.SinhViens?.Ten,
+                        email = user.Email,
+                        ngaySinh = user.SinhViens?.NgaySinh,
+                        googleName = payload.Name,
+                        avatar = payload.Picture
+                    }
+                });
+            }
+            if (role == SD.Role_Teacher)
+            {
+                return Ok(new
+                {
+                    result = true,
+                    code = 200,
+                    message = "Đăng nhập Google thành công",
+                    token = token,
+                    refresh_token = refreshTokenValue,
+                    user = new
+                    {
+                        username = user.UserName,
+                        role = role,
+                        maGV = user.GiangViens?.MaGiangVien,
+                        hoGV = user.GiangViens?.HoVaTenDem,
+                        tenGV = user.GiangViens?.Ten,
+                        email = user.Email,
+                        ngaySinh = user.GiangViens?.NgaySinh,
+                        googleName = payload.Name,
+                        avatar = payload.Picture
+                    }
+                });
+            }
+
+            // Nếu không khớp role
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Đăng nhập Google thành công",
+                token = token,
+                refresh_token = refreshTokenValue,
+                user = new
+                {
+                    username = user.UserName,
+                    role = role,
+                    email = user.Email,
+                    googleName = payload.Name,
+                    avatar = payload.Picture
+                }
             });
         }
 
@@ -173,6 +348,40 @@ namespace BlueSchoolSystem.APIControllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+        public class RefreshTokenRequest
+        {
+            public string RefreshToken { get; set; }
+        }
+
+        [HttpPost("refresh-token")]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+        {
+            var refreshToken = await _context.RefreshTokens
+                .Include(rt => rt.User)
+                .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken && !rt.IsRevoked && rt.ExpiryDate > DateTime.UtcNow);
+
+            if (refreshToken == null)
+                return Unauthorized(new { message = "Refresh token không hợp lệ hoặc đã hết hạn" });
+
+            // Tạo access token mới
+            var user = refreshToken.User;
+            var roles = await _userManager.GetRolesAsync(user);
+            var newAccessToken = GenerateJwtToken(user, roles);
+
+            // Cấp lại refresh token mới (hoặc dùng lại token cũ nếu muốn đơn giản)
+            string newRefreshTokenValue = Guid.NewGuid().ToString("N");
+            refreshToken.Token = newRefreshTokenValue;
+            refreshToken.ExpiryDate = DateTime.UtcNow.AddDays(7);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                token = newAccessToken,
+                refresh_token = newRefreshTokenValue
+            });
+        }
+
 
         //Gửi OTP khôi phục mật khẩu
         [HttpPost("gui-otp")]

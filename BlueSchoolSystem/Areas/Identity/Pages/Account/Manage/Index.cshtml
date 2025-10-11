@@ -17,7 +17,7 @@
                     @{
                         var usernameLabel = User.IsInRole("Admin")
                         ? "Username"
-                        : User.IsInRole("Teacher") ? "MSNV" : "MSSV";
+                        : User.IsInRole("Teacher") ? "Mã CB/GV" : "MSSV";
                     }
                     <div class="form-floating mb-3">
                         <input asp-for="Username" class="form-control bg-white" placeholder=" " readonly />
@@ -55,6 +55,7 @@
                             <label class="fw-bold">Khoa/Viện</label>
                         </div>
                     }
+
                     @if (!User.IsInRole("Admin"))
                     {
                         <div class="position-relative form-floating mb-3">
