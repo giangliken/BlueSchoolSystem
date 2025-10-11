@@ -309,5 +309,90 @@ namespace BlueSchoolSystem.APIControllers
                 data = tkb
             });
         }
+
+        // ✅ Lấy lớp phụ trách của giảng viên
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("lopphutrach/{maGiangVien}")]
+        public async Task<IActionResult> GetLopPhuTrachByMaGV(string maGiangVien)
+        {
+            // 🔹 1. Lấy mã giảng viên từ token
+            var maGVFromToken = User.FindFirst("username")?.Value;
+            if (maGVFromToken == null)
+            {
+                return Unauthorized(new
+                {
+                    result = false,
+                    code = 401,
+                    message = "Không lấy được mã giảng viên từ token"
+                });
+            }
+
+            // 🔹 2. Nếu người gọi không phải admin và không phải chính giảng viên đó → chặn truy cập
+            var isAdmin = User.IsInRole(SD.Role_Admin);
+            if (!isAdmin && maGVFromToken != maGiangVien)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    result = false,
+                    code = 403,
+                    message = "Bạn không có quyền truy cập thông tin lớp phụ trách của giảng viên khác"
+                });
+            }
+
+            // 🔹 3. Kiểm tra giảng viên có tồn tại không
+            var gv = await _context.GiangViens.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.MaGiangVien == maGiangVien);
+            if (gv == null)
+                return NotFound(new { result = false, code = 404, message = "Không tìm thấy mã giảng viên" });
+
+            // 🔹 4. Truy vấn lớp mà giảng viên này là chủ nhiệm
+            var lopPhuTrach = await (from ctlh in _context.ChiTietLopHocs
+                                     join lh in _context.LopHocs on ctlh.LopHocId equals lh.Id
+                                     join nh in _context.NganhHocs on lh.NganhId equals nh.Id into _nh
+                                     from nh in _nh.DefaultIfEmpty()
+                                     join sv1 in _context.SinhViens on ctlh.LopTruongId equals sv1.Id into _sv1
+                                     from sv1 in _sv1.DefaultIfEmpty()
+                                     join sv2 in _context.SinhViens on ctlh.LopPhoId equals sv2.Id into _sv2
+                                     from sv2 in _sv2.DefaultIfEmpty()
+                                     join sv3 in _context.SinhViens on ctlh.BiThuId equals sv3.Id into _sv3
+                                     from sv3 in _sv3.DefaultIfEmpty()
+                                     where ctlh.GiangVienId == gv.Id
+                                     select new
+                                     {
+                                         gv.MaGiangVien,
+                                         GiangVien = gv.HoVaTenDem + " " + gv.Ten,
+                                         lh.MaLop,
+                                         lh.TenLop,
+                                         NamNhapHoc = "20" + lh.MaLop.Substring(0, 2),
+                                         NhomLop = lh.MaLop.Length > 5 ? lh.MaLop.Substring(5) : "",
+                                         TenNganh = nh != null ? nh.TenNganh : "(Chưa cập nhật)",
+                                         LopTruong = sv1 != null ? sv1.HoVaTenDem + " " + sv1.Ten : "(Chưa có)",
+                                         LopPho = sv2 != null ? sv2.HoVaTenDem + " " + sv2.Ten : "(Chưa có)",
+                                         BiThu = sv3 != null ? sv3.HoVaTenDem + " " + sv3.Ten : "(Chưa có)"
+                                     }).ToListAsync();
+
+            // 🔹 5. Kiểm tra dữ liệu trả về
+            if (!lopPhuTrach.Any())
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Giảng viên này hiện chưa phụ trách lớp nào"
+                });
+            }
+
+            // 🔹 6. Trả kết quả thành công
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy lớp phụ trách thành công",
+                soluong = lopPhuTrach.Count,
+                data = lopPhuTrach
+            });
+        }
+
+
     }
 }
