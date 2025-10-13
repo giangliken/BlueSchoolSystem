@@ -34,6 +34,8 @@ namespace BlueSchoolSystem.Models
         public DbSet<BangDiem> BangDiems { get; set; } // Bảng điểm
         public DbSet<DangKyHocPhan> DangKyHocPhans { get; set; } // Bảng đăng ký học phần
         public DbSet<HocKy> HocKys { get; set; } // Bảng học kỳ
+        public DbSet<ThongBao> ThongBaos { get; set; }
+
 
         //Table lưu trạng thái của hệ thống
         public DbSet<TrangThai> TrangThais { get; set; } // Bảng trạng thái của hệ thống
