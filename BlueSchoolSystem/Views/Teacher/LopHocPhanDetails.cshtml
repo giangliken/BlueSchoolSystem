@@ -1,5 +1,7 @@
 ﻿@using BlueSchoolSystem.Models.ViewModel
 @{
+    var token = Context.Session.GetString("access_token");
+
     var lhp = ViewBag.LopHocPhan as LopHocPhanViewModel;
     var sinhVienList = ViewBag.SinhVienList as List<SinhVienViewModel> ?? new List<SinhVienViewModel>();
     var attendanceList = ViewBag.AttendanceList as List<AttendanceSessionViewModel> ?? new List<AttendanceSessionViewModel>();
@@ -11,6 +13,19 @@
         .ToList();
     int rowIndex = 1;
 }
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success my-2">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger my-2">@TempData["Error"]</div>
+}
+
+<!-- Nút bấm mở modal tạo thông báo -->
+<button type="button" class="btn btn-warning fw-semibold ms-2" data-bs-toggle="modal" data-bs-target="#modalTaoThongBao">
+    <i class="fa-solid fa-bell me-1"></i> Tạo thông báo cho lớp này
+</button>
 
 @if (lhp == null)
 {
@@ -141,3 +156,129 @@ else
         </div>
     </div>
 </div>
+
+<!-- Modal tạo thông báo -->
+<div class="modal fade" id="modalTaoThongBao" tabindex="-1" aria-labelledby="modalTaoThongBaoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="formTaoThongBao" autocomplete="off">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTaoThongBaoLabel">Gửi thông báo cho lớp học phần</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="thongBaoTitle" class="form-label">Tiêu đề</label>
+                        <input type="text" class="form-control" id="thongBaoTitle" name="Title" required maxlength="200" placeholder="Nhập tiêu đề thông báo">
+                    </div>
+                    <div class="mb-3">
+                        <label for="thongBaoContent" class="form-label">Nội dung</label>
+                        <textarea class="form-control" id="thongBaoContent" name="Content" rows="4" required maxlength="2000" placeholder="Nhập nội dung thông báo"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" id="btnGuiThongBao" class="btn btn-primary fw-semibold">
+                        <i class="fa-solid fa-paper-plane me-1"></i> Gửi thông báo
+                    </button>
+
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script>
+        window.__accessToken = @Html.Raw(Json.Serialize(token ?? ""));
+    </script>
+
+    <script>
+        document.getElementById('formTaoThongBao').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const title = document.getElementById('thongBaoTitle').value;
+            const content = document.getElementById('thongBaoContent').value;
+            var token = window.__accessToken;
+
+            // Gán đúng mã lớp học phần 
+            const maLopHocPhan = '@lhp.MaLopHocPhan';
+            const baseurl = window.location.origin; 
+
+            fetch(`${baseurl}/api/lophocphan/${maLopHocPhan}/guithongbao`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({
+                    Title: title,
+                    Content: content
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.result) {
+                    $('#modalTaoThongBao').modal('hide');
+                    alert(data.message ?? 'Gửi thông báo thành công!');
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + (data.message ?? 'Không xác định!'));
+                }
+            })
+            .catch(err => {
+                alert('Gửi thông báo thất bại!');
+                console.error(err);
+            });
+        });
+
+                document.getElementById('formTaoThongBao').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const title = document.getElementById('thongBaoTitle').value;
+            const content = document.getElementById('thongBaoContent').value;
+            var token = window.__accessToken;
+            const maLopHocPhan = '@lhp.MaLopHocPhan';
+            const baseurl = window.location.origin;
+
+            // Disable form và show loading
+            const btn = document.getElementById('btnGuiThongBao');
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Đang gửi...`;
+
+            fetch(`${baseurl}/api/lophocphan/${maLopHocPhan}/guithongbao`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({
+                    Title: title,
+                    Content: content
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-paper-plane me-1"></i> Gửi thông báo`;
+                if (data.result) {
+                    $('#modalTaoThongBao').modal('hide');
+                    alert(data.message ?? 'Gửi thông báo thành công!');
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + (data.message ?? 'Không xác định!'));
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-paper-plane me-1"></i> Gửi thông báo`;
+                alert('Gửi thông báo thất bại!');
+                console.error(err);
+            });
+        });
+
+    </script>
+
+}
+
