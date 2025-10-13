@@ -1,0 +1,178 @@
+﻿@model BlueSchoolSystem.Models.ViewModel.AttendanceSessionDetailViewModel
+
+@{
+    var isExpired = Model.ExpireAt <= DateTime.Now;
+    // Firebase config ở đây là giả lập, thay bằng config thật của bạn!
+}
+<a asp-action="LopHocPhanDetails"
+   asp-controller="Teacher"
+   asp-route-maLopHocPhan="@Model.MaLopHocPhan"
+   class="btn btn-secondary mb-3 d-inline-flex align-items-center">
+    <i class="fa-solid fa-arrow-left me-2"></i>
+    Quay lại lớp học phần
+</a>
+
+<h4>
+    Buổi điểm danh ngày @Model.Ngay.ToString("dd/MM/yyyy")
+    <span id="timer" class="badge bg-danger fs-5"></span>
+</h4>
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center p-3">
+            <img id="qr-img" src="data:image/png;base64,@Model.QrCodeBase64" style="width:200px;@(isExpired ? "opacity:0.3;" : "")" />
+            <div class="mt-2 fw-semibold text-primary">
+                Mã điểm danh: <span id="ma-code">@(!isExpired ? Model.Code : "")</span>
+            </div>
+            <form asp-action="RegenerateAttendanceCode" asp-controller="Teacher" asp-route-id="@Model.Id" method="post" class="mt-2">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-warning btn-sm" @(isExpired ? "" : "disabled")>
+                    <i class="fa-solid fa-rotate-right"></i> Tạo lại mã điểm danh
+                </button>
+            </form>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <h5>Danh sách sinh viên đã điểm danh</h5>
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>MSSV</th>
+                        <th>Họ tên</th>
+                        <th>Thời gian điểm danh</th>
+                        <th>Trạng thái</th>
+
+                        @* <th>Sửa</th> *@
+                    </tr>
+                </thead>
+                <tbody id="attendance-table-body">
+                    @* Lần đầu load trang vẫn render dữ liệu Model.SinhViens *@
+                    @if (Model.SinhViens != null && Model.SinhViens.Any())
+                    {
+                        int stt = 1;
+                        foreach (var sv in Model.SinhViens)
+                        {
+                            <tr>
+                                <td>@stt</td>
+                                <td>@sv.MSSV</td>
+                                <td>@sv.HoVaTenDem @sv.Ten</td>
+                                
+                                <td>@sv.ThoiGian?.ToString("HH:mm:ss dd/MM/yyyy")</td>
+                                <td>
+                                    @if (sv.TrangThai == 1)
+                                    {
+                                        <span class="badge bg-success">Có mặt</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Vắng</span>
+                                    }
+                                </td>
+                                @* <td>
+                                    <form asp-action="UpdateAttendanceStatus" asp-controller="Teacher" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="diemDanhId" value="@Model.Id" />
+                                        <input type="hidden" name="sinhVienId" value="@sv.Id" />
+                                        <select name="trangThai" class="form-select form-select-sm d-inline" style="width:100px;">
+                                            <option value="1" selected="@(sv.TrangThai == 1 ? "selected" : null)">Có mặt</option>
+                                            <option value="0" selected="@(sv.TrangThai == 0 ? "selected" : null)">Vắng</option>
+                                        </select>
+                                        <button type="submit" class="btn btn-outline-primary btn-sm ms-1">Lưu</button>
+                                    </form>
+                                </td> *@
+                            </tr>
+                            stt++;
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="6">Chưa có sinh viên điểm danh.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Nhúng SDK Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <script>
+        // 1. Firebase config - điền config thật của bạn ở đây!
+                var firebaseConfig = {
+          apiKey: "AIzaSyD2Uh_6wINLjM99TZ64cIdR330cWPrJ3ws",
+          authDomain: "bluenet-e6525.firebaseapp.com",
+          databaseURL: "https://bluenet-e6525-default-rtdb.firebaseio.com",
+          projectId: "bluenet-e6525",
+          storageBucket: "bluenet-e6525.firebasestorage.app",
+          messagingSenderId: "682840647075",
+          appId: "1:682840647075:web:ed799955c38a40f2526616",
+          measurementId: "G-RXWF28P678"
+        };
+        firebase.initializeApp(firebaseConfig);
+
+        // 2. Lắng nghe node điểm danh của buổi này
+        var diemDanhId = "@Model.Id"; // id buổi điểm danh
+        var db = firebase.database();
+        var diemDanhRef = db.ref("attendance_sessions/" + diemDanhId);
+
+        diemDanhRef.on("value", function(snapshot) {
+            const data = snapshot.val();
+            renderAttendanceTable(data);
+        });
+
+        // 3. Render bảng điểm danh
+        function renderAttendanceTable(data) {
+            let tbody = document.getElementById("attendance-table-body");
+            let html = "";
+            let stt = 1;
+
+            if (!data || Object.keys(data).length === 0) {
+                html = `<tr><td colspan="6">Chưa có sinh viên điểm danh.</td></tr>`;
+            } else {
+                Object.values(data).forEach(sv => {
+                    html += `
+                    <tr>
+                        <td>${stt++}</td>
+                        <td>${sv.mssv}</td>
+                        <td>${sv.hoVaTenDem} ${sv.ten}</td>
+                      
+                        <td>${sv.thoiGian ? new Date(sv.thoiGian).toLocaleString('vi-VN') : ""}</td>
+                         <td>
+                            ${sv.trangThai == 1
+                                ? '<span class="badge bg-success">Có mặt</span>'
+                                : '<span class="badge bg-danger">Vắng</span>'
+                            }
+                        </td>
+                    </tr>
+                    `;
+                });
+            }
+            tbody.innerHTML = html;
+        }
+
+        // 4. Timer countdown (giữ nguyên code cũ của bạn)
+        var expireAt = "@Model.ExpireAt.ToString("yyyy-MM-ddTHH:mm:ss")";
+        var expireDate = new Date(expireAt);
+        var timerSpan = document.getElementById("timer");
+        function updateTimer() {
+            var now = new Date();
+            var diff = Math.max(0, Math.floor((expireDate - now) / 1000));
+            var mm = String(Math.floor(diff / 60)).padStart(2, '0');
+            var ss = String(diff % 60).padStart(2, '0');
+            timerSpan.textContent = mm + ":" + ss;
+            if (diff <= 0) {
+                timerSpan.classList.remove("bg-danger");
+                timerSpan.classList.add("bg-secondary");
+                document.getElementById("qr-img").style.opacity = 0.3;
+                document.getElementById("ma-code").textContent = "";
+            } else {
+                setTimeout(updateTimer, 500);
+            }
+        }
+        updateTimer();
+    </script>
+}

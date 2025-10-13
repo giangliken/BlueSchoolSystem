@@ -1,0 +1,18 @@
+﻿@{
+    ViewBag.Title = "Tạo buổi điểm danh mới";
+    var lopHocPhanId = ViewBag.LopHocPhanId;
+}
+<h2>Tạo buổi điểm danh mới cho lớp học phần @lopHocPhanId</h2>
+
+<form asp-action="CreateAttendanceSession" method="post">
+    <input type="hidden" name="LopHocPhanId" value="@lopHocPhanId" />
+    <div class="mb-3">
+        <label class="form-label">Ghi chú</label>
+        <input type="text" name="GhiChu" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Thời gian đóng (ExpireAt, để trống = mặc định 20 phút)</label>
+        <input type="datetime-local" name="ExpireAt" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-success">Tạo buổi điểm danh</button>
+</form>
