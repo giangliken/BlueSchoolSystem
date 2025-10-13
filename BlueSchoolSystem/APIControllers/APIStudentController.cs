@@ -768,6 +768,8 @@ namespace BlueSchoolSystem.APIControllers
                 Longitude = request.Longitude,   
                 DeviceId = request.DeviceId,
                 ThoiGian = now,
+                GhiChu = "Điểm danh QR",
+         
             };
             _context.ChiTietDiemDanhs.Add(chiTiet);
             await _context.SaveChangesAsync();

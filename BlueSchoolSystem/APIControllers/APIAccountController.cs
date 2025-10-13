@@ -2,6 +2,8 @@
 using BlueSchoolSystem.Models.ViewModel;
 using BlueSchoolSystem.Repository;
 using Google.Apis.Auth;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -543,6 +545,26 @@ namespace BlueSchoolSystem.APIControllers
                 message = "Xác thực OTP thành công. Bạn có thể đổi mật khẩu."
             });
         }
+
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student)]
+        [HttpPost("update-fcm-token")]
+        public async Task<IActionResult> UpdateFcmToken([FromBody] UpdateFcmTokenRequest req)
+        {
+            var userId = User.FindFirst("userId")?.Value;
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+            user.FcmToken = req.FcmToken;
+            await _context.SaveChangesAsync();
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+            }
+            );
+        }
+
+        public class UpdateFcmTokenRequest { public string FcmToken { get; set; } }
+
 
     }
 }

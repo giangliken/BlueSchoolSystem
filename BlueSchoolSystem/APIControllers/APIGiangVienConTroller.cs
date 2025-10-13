@@ -1,5 +1,6 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using Firebase.Database.Query;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection.Metadata;
+using System.Text;
 
 namespace BlueSchoolSystem.APIControllers
 {
@@ -669,6 +671,126 @@ namespace BlueSchoolSystem.APIControllers
             public int SinhVienId { get; set; }
             public int TrangThai { get; set; }
         }
+
+
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpPost("lophocphan/{maLopHocPhan}/guithongbao")]
+        public async Task<IActionResult> GuiThongBaoLopHocPhan(
+    string maLopHocPhan,
+    [FromBody] GuiThongBaoLopRequest model)
+        {
+            var senderUserId = User.FindFirst("userId")?.Value;
+            if (string.IsNullOrEmpty(senderUserId))
+                return Unauthorized("Không xác định được user gửi.");
+
+            // Lấy tất cả sinh viên của lớp học phần
+            var chiTietList = await _context.ChiTietLopHocPhans
+                .Include(ct => ct.SinhVien)
+                .Include(ct => ct.LopHocPhan)
+                .Where(ct => ct.LopHocPhan.MaLopHocPhan == maLopHocPhan)
+                .ToListAsync();
+
+            if (chiTietList == null || !chiTietList.Any())
+                return NotFound("Không tìm thấy lớp học phần hoặc chưa có sinh viên.");
+
+            // Lấy UserId của sinh viên
+            var svUserIds = chiTietList
+                .Where(ct => ct.SinhVien != null && !string.IsNullOrEmpty(ct.SinhVien.UserId))
+                .Select(ct => ct.SinhVien.UserId)
+                .Distinct()
+                .ToList();
+
+            if (svUserIds.Count == 0)
+                return BadRequest("Lớp này chưa có sinh viên hoặc thông tin UserId chưa đủ.");
+
+            // Insert ThongBao cho từng sinh viên
+            var now = DateTime.Now;
+            var thongBaos = svUserIds.Select(uid => new ThongBao
+            {
+                Title = model.Title,
+                Content = model.Content,
+                Time = now,
+                ReceiverUserId = uid,
+                SenderUserId = senderUserId,
+                Type = model.Type ?? "LopHocPhan"
+            }).ToList();
+
+            await _context.ThongBaos.AddRangeAsync(thongBaos);
+            await _context.SaveChangesAsync();
+
+            foreach (var tb in thongBaos)
+            {
+                await PushNotificationToFirebase(tb.ReceiverUserId, tb);
+                var user = await _context.Users.FindAsync(tb.ReceiverUserId);
+                if (!string.IsNullOrEmpty(user?.FcmToken))
+                {
+                    await SendFcmPush(user.FcmToken, tb.Title, tb.Content);
+                }
+            }
+
+            return Ok(new { result = true, message = $"Đã gửi thông báo cho {svUserIds.Count} sinh viên trong lớp!" });
+        }
+
+        // DTO nhận body
+        public class GuiThongBaoLopRequest
+        {
+            public string Title { get; set; }
+            public string Content { get; set; }
+            public string? Type { get; set; }
+        }
+
+
+        private async Task PushNotificationToFirebase(string receiverUserId, ThongBao tb)
+        {
+            var firebaseClient = new Firebase.Database.FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com");
+
+            var data = new
+            {
+                id = tb.Id, // Id của thông báo trong SQL nếu có
+                title = tb.Title,
+                content = tb.Content,
+                time = tb.Time.ToString("s"),
+                type = tb.Type,
+                senderUserId = tb.SenderUserId
+            };
+
+            // Push lên nhánh notification riêng cho từng user
+            await firebaseClient
+                .Child("notifications")
+                .Child(receiverUserId)
+                .PostAsync(data); // dùng PostAsync để tạo node mới (giữ lại nhiều thông báo)
+        }
+
+
+        private async Task SendFcmPush(string fcmToken, string title, string body)
+        {
+            var serverKey = "YOUR_SERVER_KEY_FROM_FIREBASE";
+            var message = new
+            {
+                to = fcmToken,
+                notification = new
+                {
+                    title = title,
+                    body = body,
+                },
+                data = new
+                {
+                    click_action = "FLUTTER_NOTIFICATION_CLICK",
+                    customKey = "customValue"
+                }
+            };
+
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", "key=" + serverKey);
+
+            var json = System.Text.Json.JsonSerializer.Serialize(message);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await client.PostAsync("https://fcm.googleapis.com/fcm/send", content);
+
+            // Optionally: handle response if needed
+        }
+
+
 
 
     }
