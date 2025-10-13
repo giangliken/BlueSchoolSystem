@@ -1,40 +1,20 @@
 ﻿@model IEnumerable<BlueSchoolSystem.Models.ViewModel.ThoiKhoaBieuViewModel>
-
 @{
+    // ... (Code khởi tạo tietStart, tietEnd, GetThu, monHocTheoThu giữ nguyên) ...
     var tietStart = new Dictionary<int, string> {
-        {1,"06:45"},{2,"07:30"},{3,"08:15"},
-        {4,"09:20"},{5,"10:05"},{6,"10:50"},
-        {7,"12:30"},{8,"13:10"},{9,"14:00"},
-        {10,"15:05"},{11,"15:50"},{12,"16:35"},
+        {1,"06:45"},{2,"07:30"},{3,"08:15"}, {4,"09:20"},{5,"10:05"},{6,"10:50"},
+        {7,"12:30"},{8,"13:10"},{9,"14:00"}, {10,"15:05"},{11,"15:50"},{12,"16:35"},
         {13,"18:00"},{14,"18:45"},{15,"19:30"}
     };
     var tietEnd = new Dictionary<int, string> {
-        {1,"07:30"},{2,"08:15"},{3,"09:00"},
-        {4,"10:05"},{5,"10:50"},{6,"11:35"},
-        {7,"13:15"},{8,"13:55"},{9,"14:45"},
-        {10,"15:50"},{11,"16:35"},{12,"17:20"},
+        {1,"07:30"},{2,"08:15"},{3,"09:00"}, {4,"10:05"},{5,"10:50"},{6,"11:35"},
+        {7,"13:15"},{8,"13:55"},{9,"14:45"}, {10,"15:50"},{11,"16:35"},{12,"17:20"},
         {13,"18:45"},{14,"19:30"},{15,"20:15"}
     };
 
-    int ToTiet(string? gio)
+    int GetThu(DateTime ngayHoc)
     {
-        if (string.IsNullOrEmpty(gio)) return 0;
-        var hm = TimeSpan.Parse(gio);
-        if (hm < TimeSpan.Parse("07:30")) return 1;
-        if (hm <= TimeSpan.Parse("08:15")) return 2;
-        if (hm <= TimeSpan.Parse("09:00")) return 3;
-        if (hm <= TimeSpan.Parse("10:05")) return 4;
-        if (hm <= TimeSpan.Parse("10:50")) return 5;
-        if (hm <= TimeSpan.Parse("11:35")) return 6;
-        if (hm <= TimeSpan.Parse("13:15")) return 7;
-        if (hm <= TimeSpan.Parse("13:55")) return 8;
-        if (hm <= TimeSpan.Parse("14:45")) return 9;
-        if (hm <= TimeSpan.Parse("15:50")) return 10;
-        if (hm <= TimeSpan.Parse("16:35")) return 11;
-        if (hm <= TimeSpan.Parse("17:20")) return 12;
-        if (hm <= TimeSpan.Parse("18:45")) return 13;
-        if (hm <= TimeSpan.Parse("19:30")) return 14;
-        return 15;
+        return ngayHoc.DayOfWeek == DayOfWeek.Sunday ? 8 : (int)ngayHoc.DayOfWeek + 1;
     }
 
     var monHocTheoThu = Model.Select(x => new
@@ -43,25 +23,25 @@
         x.TenMonHoc,
         x.TenGiangVien,
         x.MaPhongHoc,
-        x.Thu,
-        StartTiet = ToTiet(x.GioBatDau),
-        EndTiet = ToTiet(x.GioKetThuc),
+        Thu = GetThu(x.NgayHoc),
+        StartTiet = x.TietBatDau,
+        EndTiet = x.TietBatDau + x.SoTiet - 1,
         x.GioBatDau,
         x.GioKetThuc,
         x.NgayBatDau,
-        x.NgayKetThuc
+        x.NgayKetThuc,
+        x.NgayHoc
     }).ToList();
 }
-
 <style>
+    /* CSS giữ nguyên */
     table.tkb {
         border-collapse: collapse;
         width: 100%;
         text-align: center;
     }
 
-        table.tkb th,
-        table.tkb td {
+        table.tkb th, table.tkb td {
             border: 1px solid #999;
             width: 60px;
             height: 30px;
@@ -75,14 +55,12 @@
             color: #fff;
         }
 
-            table.tkb th.tiet-col,
-            table.tkb td.tiet-col {
+            table.tkb th.tiet-col, table.tkb td.tiet-col {
                 background: #007bff;
                 color: #fff;
                 font-weight: bold;
             }
 
-    /* Khung tooltip */
     .lop {
         background: #dff0d8;
         height: 100%;
@@ -98,7 +76,6 @@
         position: relative;
     }
 
-        /* Nội dung tooltip */
         .lop .tooltiptext {
             visibility: hidden;
             width: 220px;
@@ -134,50 +111,40 @@
             opacity: 1;
         }
 
-    /* Đồng bộ select */
-    #weekSelect,
-    #monthSelect {
+    #weekSelect, #monthSelect {
         border-radius: 8px;
         transition: all 0.2s ease-in-out;
         min-width: 220px;
         height: 42px;
-        font-size: 1rem; /* giống lịch thi */
-        color: #0d6efd; /* chữ xanh */
-        font-weight: 500; /* đậm vừa */
+        font-size: 1rem;
+        color: #0d6efd;
+        font-weight: 500;
         border: 1px solid #0d6efd;
     }
 
-        /* Hiệu ứng hover */
-        #weekSelect:hover,
-        #monthSelect:hover {
+        #weekSelect:hover, #monthSelect:hover {
             box-shadow: 0 0 6px rgba(13,110,253,.3);
         }
 
-        /* Đồng bộ luôn các option bên trong */
-        #weekSelect option,
-        #monthSelect option {
+        #weekSelect option, #monthSelect option {
             font-size: 1rem;
             color: #0d6efd;
             font-weight: 500;
         }
 
-
-    .btn-group .btn,
-    #weekSelect {
+    .btn-group .btn, #weekSelect {
         font-size: 13px;
         padding: 4px 8px;
     }
 
-    /* Style đồng bộ cho nút điều hướng & nút toggle */
     .btn-sm, #btnToggle, #btnCurrentWeek, #btnCurrentMonth {
         border-radius: 8px !important;
         height: 42px !important;
         font-size: 1rem !important;
         padding: 0 14px !important;
-        min-width: 100px; /* để cân đối với select */
+        min-width: 100px;
     }
 
-    /* Riêng nút mũi tên nhỏ hơn một chút */
     .btn-outline-primary.btn-sm {
         min-width: 100px !important;
         padding: 0 !important;
@@ -190,33 +157,31 @@
         height: 42px;
         font-size: 1rem;
     }
+
         .form-select:hover {
-        box-shadow: 0 0 6px rgba(13,110,253,.3);
-    }
+            box-shadow: 0 0 6px rgba(13,110,253,.3);
+        }
+
 </style>
 
-
 @{
-    /*   monday  : đầu tuần theo offset hiện tại  */
     var today = DateTime.Today;
-    var baseMon = today.AddDays(-(int)today.DayOfWeek + 1);   // Monday của tuần hiện tại
+    var baseMon = today.AddDays(-(int)today.DayOfWeek + 1);
     if (baseMon.DayOfWeek == DayOfWeek.Sunday) baseMon = baseMon.AddDays(-6);
 
-    // offset hiện tại lấy từ ViewBag (nếu null thì =0)
+    // Lấy viewMode từ ViewBag. Controller đã truyền vào.
+    string viewMode = ViewBag.ViewMode as string ?? "week";
     int curOffset = (int)(ViewBag.WeekOffset ?? 0);
-    // monday đã tính cho view (đầu tuần đang hiển thị)
-    var monday = baseMon.AddDays(7 * curOffset);
 
+    var monday = baseMon.AddDays(7 * curOffset);
     var weekDays = Enumerable.Range(0, 7).Select(i => monday.AddDays(i)).ToList();
     var startOfWeek = weekDays.First().Date;
     var endOfWeek = weekDays.Last().Date;
 
     var monHocTrongTuan = monHocTheoThu
-        .Where(x => x.NgayKetThuc.Date >= startOfWeek
-                 && x.NgayBatDau.Date <= endOfWeek)
+        .Where(x => x.NgayHoc.Date >= startOfWeek && x.NgayHoc.Date <= endOfWeek)
         .ToList();
 
-    // Tháng (có offset)
     int monthOffset = ViewBag.MonthOffset != null ? (int)ViewBag.MonthOffset : 0;
     var monthDate = new DateTime(today.Year, today.Month, 1).AddMonths(monthOffset);
     int month = monthDate.Month;
@@ -224,47 +189,34 @@
     int daysInMonth = DateTime.DaysInMonth(year, month);
 
     var monHocTrongThang = Model
-        .Where(x => x.NgayKetThuc.Date >= new DateTime(year, month, 1)
-                 && x.NgayBatDau.Date <= new DateTime(year, month, daysInMonth))
+        .Where(x => x.NgayHoc.Month == month && x.NgayHoc.Year == year)
         .ToList();
 
-    // chọn tháng
     int selectedMonth = ViewBag.Thang != null ? (int)ViewBag.Thang : month;
 }
 
 <h6 class="mb-3">Trang chủ / Học vụ / Thời khóa biểu</h6>
 
 <div class="d-flex align-items-center gap-2 mb-3">
-
-    <!-- Nút chuyển chế độ -->
-    <button id="btnToggle" class="btn btn-secondary btn-sm" onclick="toggleView()">Xem lịch tháng</button>
-
-    <!-- Nút lùi tuần/tháng -->
+    <button id="btnToggle" class="btn btn-secondary btn-sm" onclick="toggleView()">
+        @((viewMode == "week") ? "Xem lịch tháng" : "Xem lịch tuần")
+    </button>
     <button class="btn btn-outline-primary btn-sm" onclick="navigate('prev')">←</button>
 
-    <!-- Combobox chọn tuần -->
-    <select id="weekSelect"
-        onchange="goToSelectedWeek(this.value)"
-        class="form-select "
-        style="width:220px;display:inline-block;">
+    <select id="weekSelect" onchange="goToSelectedWeek(this.value)" class="form-select" style="width:220px; @(viewMode == "week" ? "display:inline-block;" : "display:none;")">
         @for (int i = -4; i <= 4; i++)
         {
-            /* offset tuyệt đối cho option này */
             int optOffset = curOffset + i;
-
-            /* ngày Monday / Sunday của tuần này */
-            var optMon = monday.AddDays(7 * i);      // Monday = monday + i tuần
+            var optMon = monday.AddDays(7 * i);
             var optSun = optMon.AddDays(6);
-
-            bool isSel = optOffset == curOffset;    // đã là tuần đang hiển thị?
-                    <option value="@optOffset" selected="@(isSel ? "selected" : null)">
-                        Tuần : @optMon.ToString("dd/MM/yyyy") - @optSun.ToString("dd/MM/yyyy")
-                    </option>
+            bool isSel = optOffset == curOffset;
+            <option value="@optOffset" selected="@(isSel ? "selected" : null)">
+                Tuần : @optMon.ToString("dd/MM/yyyy") - @optSun.ToString("dd/MM/yyyy")
+            </option>
         }
-     </select>
-    <!-- Combobox chọn tháng -->
-    <select id="monthSelect" onchange="goToMonth(this.value)" class="form-select "
-            style="width: 160px; display:none;">
+    </select>
+
+    <select id="monthSelect" onchange="goToMonth(this.value)" class="form-select" style="width: 160px; @(viewMode == "month" ? "display:inline-block;" : "display:none;")">
         @for (int m = 1; m <= 12; m++)
         {
             if (m == selectedMonth)
@@ -278,21 +230,14 @@
         }
     </select>
 
-    <!-- Nút tiến tuần/tháng -->
     <button class="btn btn-outline-primary btn-sm" onclick="navigate('next')">→</button>
 
-    <!-- Nút Tuần hiện tại -->
-    <button id="btnCurrentWeek" class="btn btn-primary btn-sm" onclick="goToCurrentWeek()">
-        Tuần hiện tại
-    </button>
-    <!-- Nút chuyển về tháng hiện tại -->
-    <button id="btnCurrentMonth" class="btn btn-primary btn-sm" style="display:none;" onclick="goToCurrentMonth()">
-        Tháng hiện tại
-    </button>
+    <button id="btnCurrentWeek" class="btn btn-primary btn-sm" onclick="goToCurrentWeek()" style="@(viewMode == "week" ? "display:inline-block;" : "display:none;")">Tuần hiện tại</button>
+
+    <button id="btnCurrentMonth" class="btn btn-primary btn-sm" onclick="goToCurrentMonth()" style="@(viewMode == "month" ? "display:inline-block;" : "display:none;")">Tháng hiện tại</button>
 </div>
 
-<!-- Lịch tuần -->
-<div id="lichTuan">
+<div id="lichTuan" style="@(viewMode == "week" ? "display:block;" : "display:none;")">
     <table class="tkb">
         <thead>
             <tr>
@@ -301,9 +246,7 @@
                 {
                     <th>
                         <div style="display:flex; flex-direction:column; align-items:center;">
-                            <span>
-                                @((i + 2 > 7) ? "Chủ nhật" : "Thứ " + (i + 2))
-                            </span>
+                            <span>@((i + 2 > 7) ? "Chủ nhật" : "Thứ " + (i + 2))</span>
                             <span>@weekDays[i].ToString("dd/MM/yyyy")</span>
                         </div>
                     </th>
@@ -314,29 +257,17 @@
             @for (int tiet = 1; tiet <= 15; tiet++)
             {
                 <tr>
-                    <td class="tiet-col" title="Tiết @tiet (từ @tietStart[tiet] đến @tietEnd[tiet])">
-                        Tiết @tiet
-                    </td>
-
+                    <td class="tiet-col" title="Tiết @tiet (từ @tietStart[tiet] đến @tietEnd[tiet])">Tiết @tiet</td>
                     @for (int thu = 2; thu <= 8; thu++)
                     {
-                        // Tính ngày của buổi học dựa trên thứ và tuần đang xem
-                        // Thứ trong weekDays: index0=Thứ2, index1=Thứ3, ... index6=ChủNhật
-                        var ngayHoc = weekDays[thu - 2]; // Vì 'thu' bắt đầu từ 2 (Thứ 2)
-
-                        // Tìm lớp học phù hợp:
-                        // 1. Cùng thứ
-                        // 2. Tiết học trùng khớp
-                        // 3. Ngày học tính được phải nằm trong khoảng từ NgayBatDau đến NgayKetThuc của lớp
-
+                        var ngayHoc = weekDays[thu - 2];
                         var lop = monHocTrongTuan.FirstOrDefault(x =>
                         x.Thu == thu &&
-                        x.StartTiet == tiet &&
-                        ngayHoc >= x.NgayBatDau.Date &&
-                        ngayHoc <= x.NgayKetThuc.Date
-                        );
+                        x.StartTiet <= tiet &&
+                        x.EndTiet >= tiet &&
+                        x.NgayHoc.Date == ngayHoc.Date);
 
-                        if (lop != null)
+                        if (lop != null && lop.StartTiet == tiet)
                         {
                             var soTiet = lop.EndTiet - lop.StartTiet + 1;
                             <td rowspan="@soTiet">
@@ -348,16 +279,20 @@
                                         <b>Tên môn:</b> @lop.TenMonHoc <br />
                                         <b>Phòng:</b> @lop.MaPhongHoc <br />
                                         <b>Thứ:</b> @lop.Thu <br />
-                                        <b>Thời gian:</b> @(TimeSpan.Parse(lop.GioBatDau).ToString(@"hh\:mm")) - @(TimeSpan.Parse(lop.GioKetThuc).ToString(@"hh\:mm")) <br />
+                                        <b>Thời gian:</b> @lop.GioBatDau - @lop.GioKetThuc <br />
                                         <b>Giảng viên:</b> @lop.TenGiangVien <br />
                                     </span>
                                 </div>
                             </td>
                         }
-                        else
+                        else if (lop == null)
                         {
-                            // Kiểm tra xem có lớp nào đang chiếm tiết này hay không (rowspan)
-                            var lopDangChiem = monHocTrongTuan.Any(x => x.Thu == thu && x.StartTiet < tiet && x.EndTiet >= tiet);
+                            var lopDangChiem = monHocTrongTuan.Any(x =>
+                            x.Thu == thu &&
+                            x.StartTiet < tiet &&
+                            x.EndTiet >= tiet &&
+                            x.NgayHoc.Date == ngayHoc.Date);
+
                             if (!lopDangChiem)
                             {
                                 <td></td>
@@ -370,8 +305,8 @@
     </table>
 </div>
 
-<!-- Lịch tháng -->
-<div id="lichThang" style="display:none;">
+
+<div id="lichThang" style="@(viewMode == "month" ? "display:block;" : "display:none;")">
     <table class="tkb">
         <thead>
             <tr>
@@ -387,10 +322,8 @@
         <tbody>
             @{
                 var firstDay = new DateTime(year, month, 1);
-                // Cột đầu tiên là thứ 2 -> lùi về thứ 2 gần nhất
                 int diff = ((int)firstDay.DayOfWeek + 6) % 7;
                 var startOfMonthGrid = firstDay.AddDays(-diff);
-
                 int totalDays = diff + daysInMonth;
                 int totalWeeks = (int)Math.Ceiling(totalDays / 7.0);
 
@@ -401,18 +334,11 @@
                         {
                             var currentDay = startOfMonthGrid.AddDays(week * 7 + day);
                             var isOtherMonth = currentDay.Month != month;
-
                             <td style="height:100px; vertical-align:top; font-size:12px; @(isOtherMonth ? "background:#f8f9fa;" : "")">
                                 <div><b>@currentDay.Day</b></div>
-
                                 @foreach (var lop in monHocTrongThang)
                                 {
-                                    // Map Thu (2..8) sang DayOfWeek: Monday=1, ... Sunday=0
-                                    var lopDayOfWeek = lop.Thu == 8 ? DayOfWeek.Sunday : (DayOfWeek)(lop.Thu - 2 + 1);
-
-                                    if (currentDay.Date >= lop.NgayBatDau.Date
-                                    && currentDay.Date <= lop.NgayKetThuc.Date
-                                    && currentDay.DayOfWeek == lopDayOfWeek)
+                                    if (lop.NgayHoc.Date == currentDay.Date)
                                     {
                                         <div style="background:#dff0d8; margin:2px; padding:2px; border-radius:4px; font-size:11px;">
                                             @lop.TenMonHoc <br />
@@ -429,157 +355,76 @@
     </table>
 </div>
 
+---
+
+### 💻 Code JavaScript Đã Tối Ưu
+
+Vì logic ẩn/hiện đã được xử lý trong Razor, phần JavaScript có thể được đơn giản hóa:
+
+```javascript
 <script>
-    // Lấy offset hiện tại từ query‑string (được dùng khi đổi nút ← →)
+    // Lấy giá trị từ URL, đảm bảo viewMode được đồng bộ
     const urlParams = new URLSearchParams(window.location.search);
-    let weekOffset   = parseInt(urlParams.get("weekOffset") || 0);
-    let monthOffset  = parseInt(urlParams.get("monthOffset") || 0);
+    // Lấy giá trị hiện tại từ URL (để sử dụng trong navigate)
+    let weekOffset = parseInt(urlParams.get("weekOffset") || 0);
+    let monthOffset = parseInt(urlParams.get("monthOffset") || 0);
+    // Lấy viewMode từ URL (hoặc mặc định là "week")
+    let viewMode = urlParams.get("viewMode") || "week";
 
-
-
-    /* ----------  TUẦN HIỆN TẠI  ---------- */
+    // Hàm chuyển về tuần hiện tại
     function goToCurrentWeek() {
-        // reset offset = 0 → tuần hiện tại
+        // Giữ lại monthOffset (mặc dù không quan trọng khi viewMode=week)
         window.location.href = `?weekOffset=0&monthOffset=${monthOffset}&viewMode=week`;
     }
-           /* ----------  CHUYỂN ĐỔI TUẦN  ---------- */
+
+    // Hàm chọn tuần từ dropdown
     function goToSelectedWeek(selectedOffset) {
-        const newWeekOffset = parseInt(selectedOffset);   // offset tuyệt đối
+        const newWeekOffset = parseInt(selectedOffset);
         window.location.href = `?weekOffset=${newWeekOffset}&monthOffset=${monthOffset}&viewMode=week`;
     }
-    // Giá trị tháng đang hiển thị (biến server-side nhúng vào JS)
+
+    // Lấy tháng hiện tại đang hiển thị từ C#
     const currentDisplayedMonth = @month;
 
+    // Hàm chọn tháng từ dropdown
     function goToMonth(selectedMonth) {
-        // selectedMonth là 1..12 (string) -> chuyển về số
         const m = parseInt(selectedMonth, 10);
-
-        // delta so với tháng đang hiển thị
+        // Tính delta monthOffset để chuyển đến tháng m của năm hiện tại trong view
         const delta = m - currentDisplayedMonth;
-
-        // cập nhật monthOffset và điều hướng
         const newMonthOffset = monthOffset + delta;
         window.location.href = `?weekOffset=${weekOffset}&monthOffset=${newMonthOffset}&viewMode=month`;
     }
-        function goToCurrentMonth() {
-        // Reset monthOffset = 0 => quay về tháng hiện tại
+
+    // Hàm chuyển về tháng hiện tại
+    function goToCurrentMonth() {
         window.location.href = `?weekOffset=${weekOffset}&monthOffset=0&viewMode=month`;
     }
-    function updateLabel() {
-        var tuan = document.getElementById("lichTuan").style.display !== "none";
-        var label = document.getElementById("currentLabel");
 
-        if (tuan) {
-            const soTuan = @(ViewBag.SoTuan ?? 0);
-
-            // Tính monday và sunday theo weekOffset
-            const today = new Date();
-            const monday = new Date(today);
-            monday.setDate(today.getDate() - today.getDay() + 1 + weekOffset * 7);
-            const sunday = new Date(monday);
-            sunday.setDate(monday.getDate() + 6);
-
-            if (soTuan > 0) {
-                label.innerText = `Tuần ${soTuan} (${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()})`;
-            } else {
-                label.innerText = `Không có môn trong tuần này (${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()})`;
-            }
-        } else {
-            const month = new Date(new Date().getFullYear(), new Date().getMonth() + monthOffset, 1);
-            const year = month.getFullYear();
-            const monthName = month.toLocaleString('default', { month: 'long' });
-
-            label.innerText = `Tháng: ${monthName} / ${year}`;
-        }
-    }
-
+    // Hàm chuyển đổi chế độ xem
     function toggleView() {
-        var tuan = document.getElementById("lichTuan");
-    var thang = document.getElementById("lichThang");
-    var btn = document.getElementById("btnToggle");
-    var weekSelect = document.getElementById("weekSelect");
-    var monthSelect = document.getElementById("monthSelect");
-    var btnCurrentWeek = document.getElementById("btnCurrentWeek");
-    var btnCurrentMonth = document.getElementById("btnCurrentMonth");
-
-    if (tuan.style.display === "none") {
-        // Đang xem tháng -> chuyển sang tuần
-        tuan.style.display = "block";
-        thang.style.display = "none";
-        weekSelect.style.display = "inline-block";
-        monthSelect.style.display = "none";
-        btnCurrentWeek.style.display = "inline-block";
-        btnCurrentMonth.style.display = "none";
-        btn.innerText = "Xem lịch tháng";
-    } else {
-        // Đang xem tuần -> chuyển sang tháng
-        tuan.style.display = "none";
-        thang.style.display = "block";
-        weekSelect.style.display = "none";
-        monthSelect.style.display = "inline-block";
-        btnCurrentWeek.style.display = "none";
-        btnCurrentMonth.style.display = "inline-block";
-        btn.innerText = "Xem lịch tuần";
+        // Chuyển viewMode: week -> month, hoặc month -> week
+        const newViewMode = viewMode === "week" ? "month" : "week";
+        // Chuyển hướng để Controller và Razor render lại giao diện đúng chế độ
+        window.location.href = `?weekOffset=${weekOffset}&monthOffset=${monthOffset}&viewMode=${newViewMode}`;
     }
 
-        updateLabel();
-    }
-
-            /* ----------  NÚT ĐIỀU HƯỚNG ← →  ---------- */
+    // Hàm điều hướng (trước/sau)
     function navigate(action) {
-        const viewMode = (document.getElementById("lichTuan").style.display !== "none")
-                         ? "week" : "month";
-
         if (viewMode === "week") {
-            if (action === "prev")  weekOffset--;
-            if (action === "next")  weekOffset++;
-            if (action === "today") weekOffset = 0;
-
-            // đồng bộ combobox sau khi nhấn ← hoặc →
-            document.getElementById('weekSelect').value = weekOffset;
-        } else {
-            if (action === "prev")  monthOffset--;
-            if (action === "next")  monthOffset++;
-            if (action === "today") monthOffset = 0;
+            if (action === "prev") weekOffset--;
+            if (action === "next") weekOffset++;
+        } else { // viewMode === "month"
+            if (action === "prev") monthOffset--;
+            if (action === "next") monthOffset++;
         }
-
+        // Chuyển hướng với offset mới
         window.location.href = `?weekOffset=${weekOffset}&monthOffset=${monthOffset}&viewMode=${viewMode}`;
     }
 
-        window.onload = function () {
-        var tuan = document.getElementById("lichTuan");
-        var thang = document.getElementById("lichThang");
-        var btn = document.getElementById("btnToggle");
-        var weekSelect = document.getElementById("weekSelect");
-        var monthSelect = document.getElementById("monthSelect");
-        var btnCurrentWeek = document.getElementById("btnCurrentWeek");
-        var btnCurrentMonth = document.getElementById("btnCurrentMonth"); // 👈 thêm
 
-        if ("@ViewBag.ViewMode" === "month") {
-            tuan.style.display = "none";
-            thang.style.display = "block";
-            weekSelect.style.display = "none";
-            monthSelect.style.display = "inline-block";
-            btnCurrentWeek.style.display = "none";
-            btnCurrentMonth.style.display = "inline-block"; // 👈 bật lại nút tháng hiện tại
-            btn.innerText = "Xem lịch tuần";
-        } else {
-            tuan.style.display = "block";
-            thang.style.display = "none";
-            weekSelect.style.display = "inline-block";
-            monthSelect.style.display = "none";
-            btnCurrentWeek.style.display = "inline-block";
-            btnCurrentMonth.style.display = "none"; // 👈 ẩn đi khi ở tuần
-            btn.innerText = "Xem lịch tháng";
-        }
-
-        updateLabel();
-    }
-
-          // Xử lý sự kiện cho combobox tuần
+    // Giữ lại event listener cho dropdown tuần
     document.getElementById('weekSelect').addEventListener('change', function(e) {
         goToSelectedWeek(e.target.value);
     });
 
-    
 </script>
