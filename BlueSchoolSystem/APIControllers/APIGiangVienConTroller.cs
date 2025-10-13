@@ -269,8 +269,6 @@ namespace BlueSchoolSystem.APIControllers
             var tkb = await (from lhp in _context.LopHocPhans
                              join mh in _context.MonHocs on lhp.MonHocId equals mh.Id into _mh
                              from mh in _mh.DefaultIfEmpty()
-                             join ph in _context.PhongHocs on lhp.PhongHocId equals ph.Id into _ph
-                             from ph in _ph.DefaultIfEmpty()
                              where lhp.GiangVienId == gv.Id
                              //orderby lhp.Thu, lhp.GioBatDau
                              select new
@@ -285,9 +283,6 @@ namespace BlueSchoolSystem.APIControllers
                                  lhp.MonHocId,
                                  MaMonHoc = mh != null ? mh.MaMonHoc : null,
                                  TenMonHoc = mh != null ? mh.TenMonHoc : null,
-                                 lhp.PhongHocId,
-                                 MaPhongHoc = ph != null ? ph.MaPhongHoc : null,
-                                 TenPhongHoc = ph != null ? ph.TenPhongHoc : null,
                                  lhp.NgayBatDau,
                                  lhp.NgayKetThuc,
                                  lhp.SiSo,
