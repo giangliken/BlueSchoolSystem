@@ -136,7 +136,7 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
             var user = await _userManager.FindByEmailAsync(email);
             if (user == null)
             {
-                ErrorMessage = "User không có trong hệ thống. Vui lòng liên hệ admin!";
+                ErrorMessage = "Tài khoản Google này chưa liên kết với bất kì với tài khoản nào của BlueSchool. Nếu đó là lỗi xin vui lòng liên hệ Phòng Đào Tạo!";
                 return RedirectToPage("./Login", new { ReturnUrl = returnUrl });
             }
 
