@@ -8,6 +8,7 @@ using QRCoder;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using static BlueSchoolSystem.APIControllers.APIGiangVienConTroller;
 
 namespace BlueSchoolSystem.Controllers
 {
@@ -292,6 +293,42 @@ namespace BlueSchoolSystem.Controllers
         }
 
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GuiThongBaoLopHocPhan(string maLopHocPhan, [FromForm] GuiThongBaoLopRequest model)
+        {
+            if (string.IsNullOrWhiteSpace(model.Title) || string.IsNullOrWhiteSpace(model.Content))
+            {
+                TempData["Error"] = "Tiêu đề và nội dung không được để trống!";
+                return RedirectToAction("LopHocPhanDetails", new { maLopHocPhan });
+            }
+
+            // Lấy access_token (nếu API cần xác thực)
+            var token = HttpContext.Session.GetString("access_token");
+
+            // Chuẩn bị HttpClient
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            // Gửi body dạng JSON
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(model);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await client.PostAsync($"api/lophocphan/{maLopHocPhan}/guithongbao", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                TempData["Success"] = "Đã gửi thông báo cho lớp học phần!";
+            }
+            else
+            {
+                var errorMsg = await response.Content.ReadAsStringAsync();
+                TempData["Error"] = "Gửi thông báo thất bại! " + errorMsg;
+            }
+            return RedirectToAction("LopHocPhanDetails", new { maLopHocPhan });
+        }
 
     }
 }
