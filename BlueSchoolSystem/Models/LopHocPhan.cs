@@ -10,8 +10,6 @@
         public MonHoc? MonHoc { get; set; } // Môn học liên kết
         public int? GiangVienId { get; set; } // Mã giảng viên liên kết
         public GiangVien? GiangVien { get; set; } // Giảng viên liên kết
-        //Thông tin phòng học
-        public int? PhongHocId { get; set; } // ID của phòng học
         public DateTime NgayBatDau { get; set; } // Ngày bắt đầu lớp học phần
         public DateTime NgayKetThuc { get; set; } // Ngày kết thúc lớp học phần
         public int SiSo { get; set; } // Sĩ số tối đa của lớp học phần
