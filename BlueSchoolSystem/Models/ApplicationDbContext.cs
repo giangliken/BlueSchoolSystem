@@ -28,6 +28,7 @@ namespace BlueSchoolSystem.Models
         public DbSet<LichThi> LichThis { get; set; } // Bảng lịch thi
         public DbSet<ChiTietLopHocPhan> ChiTietLopHocPhans { get; set; } // Bảng chi tiết lớp học phần
         public DbSet<DiemDanh> DiemDanhs { get; set; } // Bảng điểm danh
+        public DbSet<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; }
         public DbSet<PhongHoc> PhongHocs { get; set; } // Bảng phòng học
         public DbSet<BangDiem> BangDiems { get; set; } // Bảng điểm
         public DbSet<DangKyHocPhan> DangKyHocPhans { get; set; } // Bảng đăng ký học phần
@@ -69,9 +70,27 @@ namespace BlueSchoolSystem.Models
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<DiemDanh>()
-                .HasOne(dd => dd.ChiTietLopHocPhan)
-                .WithMany(ct => ct.DiemDanhs)   
-                .HasForeignKey(dd => dd.ChiTietLopHocPhanId)
+                .HasOne(dd => dd.LopHocPhan)
+                .WithMany(lhp => lhp.DiemDanhs)
+                .HasForeignKey(dd => dd.LopHocPhanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ChiTietDiemDanh>()
+                .HasOne(ct => ct.TrangThai)
+                .WithMany()
+                .HasForeignKey(ct => ct.TrangThaiId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<ChiTietDiemDanh>()
+                .HasOne(ct => ct.SinhVien)
+                .WithMany(sv => sv.ChiTietDiemDanhs)
+                .HasForeignKey(ct => ct.SinhVienId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<ChiTietDiemDanh>()
+                .HasOne(ct => ct.DiemDanh)
+                .WithMany(dd => dd.ChiTietDiemDanhs)
+                .HasForeignKey(ct => ct.DiemDanhId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<LichThi>()

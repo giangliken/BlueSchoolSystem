@@ -753,67 +753,79 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
-        // Lấy các buổi điểm danh theo mssv và id lớp học phần
+        //  Lấy các buổi điểm danh của sinh viên theo MSSV và ID lớp học phần
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
         [HttpGet("lophocphansinhvien/{mssv}/lop/{lopHocPhanId}/diemdanh")]
         public async Task<IActionResult> GetDiemDanhByLop(string mssv, int lopHocPhanId)
         {
-            // MSSV từ token
+            // 🔹 1. Lấy MSSV từ token
             var mssvFromToken = User.FindFirst("username")?.Value;
             if (mssvFromToken == null)
-                return Unauthorized(new {
-                    result = false, 
-                    code = 401, 
-                    message = "Không lấy được MSSV từ token" 
+                return Unauthorized(new
+                {
+                    result = false,
+                    code = 401,
+                    message = "Không lấy được MSSV từ token"
                 });
 
             if (mssvFromToken != mssv)
                 return StatusCode(StatusCodes.Status403Forbidden, new
-                { 
-                    result = false, 
-                    code = 403, 
-                    message = "Không có quyền truy cập" 
+                {
+                    result = false,
+                    code = 403,
+                    message = "Không có quyền truy cập dữ liệu của sinh viên khác"
                 });
 
-            // ✅ Kiểm tra sinh viên có thuộc lớp học phần không
+            // 🔹 2. Kiểm tra sinh viên có thuộc lớp học phần này không
             var isExist = await _context.ChiTietLopHocPhans
                 .Include(ct => ct.SinhVien)
                 .AnyAsync(ct => ct.LopHocPhanId == lopHocPhanId && ct.SinhVien.MSSV == mssv);
 
             if (!isExist)
-                return NotFound(new { result = false, code = 404, message = "Sinh viên không thuộc lớp học phần này" });
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Sinh viên không thuộc lớp học phần này"
+                });
 
-            // ✅ Lấy danh sách điểm danh
+            // 🔹 3. Lấy danh sách buổi điểm danh và trạng thái của sinh viên
             var query = from dd in _context.DiemDanhs
-                        join tt in _context.TrangThais on dd.TrangThaiId equals tt.Id into tts
+                        join ctd in _context.ChiTietDiemDanhs on dd.Id equals ctd.DiemDanhId
+                        join sv in _context.SinhViens on ctd.SinhVienId equals sv.Id
+                        join tt in _context.TrangThais on ctd.TrangThaiId equals tt.Id into tts
                         from tt in tts.DefaultIfEmpty()
-                        join ct in _context.ChiTietLopHocPhans on dd.ChiTietLopHocPhanId equals ct.Id
-                        join sv in _context.SinhViens on ct.SinhVienId equals sv.Id
-                        where sv.MSSV == mssv && ct.LopHocPhanId == lopHocPhanId
+                        where sv.MSSV == mssv && dd.LopHocPhanId == lopHocPhanId
                         orderby dd.Ngay
                         select new
                         {
                             dd.Ngay,
+                            dd.Code,
+                            dd.GhiChu,
                             TenTrangThai = tt.TenTrangThai,
-                            dd.GhiChu
+                            ctd.ThoiGian,
+                            ctd.DeviceId,
+                            GhiChuChiTiet = ctd.GhiChu
                         };
 
             var data = await query.ToListAsync();
 
             if (!data.Any())
                 return NotFound(new
-                { 
-                    result = false, 
-                    code = 404, 
-                    message = "Không có dữ liệu điểm danh" 
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không có dữ liệu điểm danh"
                 });
 
+            // 🔹 4. Trả kết quả
             return Ok(new
-            { 
-                result = true, 
-                code = 200, 
-                message = "Lấy danh sách điểm danh thành công", 
-                soluong = data.Count, data 
+            {
+                result = true,
+                code = 200,
+                message = "Lấy danh sách điểm danh thành công",
+                soluong = data.Count,
+                data
             });
         }
 

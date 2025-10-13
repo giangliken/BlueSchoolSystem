@@ -16,6 +16,6 @@
 
         public string? GhiChu { get; set; }
 
-
+        public List<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; } = new();
     }
 }

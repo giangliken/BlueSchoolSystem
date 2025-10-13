@@ -9,8 +9,7 @@
         public int? SinhVienId { get; set; } // ID của sinh viên
         public SinhVien? SinhVien { get; set; } // Tham chiếu đến sinh viên
 
-        // 🔹 Navigation tới các lần điểm danh
-        public ICollection<DiemDanh> DiemDanhs { get; set; } = new List<DiemDanh>();
+
 
     }
 }
