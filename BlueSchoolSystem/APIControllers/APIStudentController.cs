@@ -298,12 +298,12 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
-        //Lấy danh sách thời khóa biểu theo mã số sinh viên
+        // Lấy danh sách thời khóa biểu theo mã số sinh viên
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
         [HttpGet("thoikhoabieusinhvien/{mssv}")]
         public async Task<IActionResult> GetThoiKhoaBieuByMSSV(string mssv)
         {
-            // Lấy MSSV từ JWT claim
+            // 🔹 Lấy MSSV từ JWT claim
             var mssvFromToken = User.FindFirst("username")?.Value;
 
             if (mssvFromToken == null)
@@ -325,26 +325,37 @@ namespace BlueSchoolSystem.APIControllers
                     message = "Bạn không có quyền truy cập thời khóa biểu của sinh viên khác"
                 });
             }
-            var tkb = await (from dk in _context.ChiTietLopHocPhans
-                             join lhp in _context.LopHocPhans on dk.LopHocPhanId equals lhp.Id
-                             join sv in _context.SinhViens on dk.SinhVienId equals sv.Id
-                             join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
-                             join gv in _context.GiangViens on lhp.GiangVienId equals gv.Id
-                             where sv.MSSV == mssv
-                             //orderby lhp.Thu, lhp.GioBatDau
-                             select new
-                             {
-                                 sv.MSSV,
-                                 lhp.MaLopHocPhan,
-                                 lhp.TenLopHocPhan,
-                                 MaMonHoc = mh.MaMonHoc,
-                                 TenMonHoc = mh.TenMonHoc,
-                                 TenGiangVien = gv.HoVaTenDem + " " + gv.Ten,
-                                 lhp.NgayBatDau,
-                                 lhp.NgayKetThuc
-                             }).ToListAsync();
 
-            if (!tkb.Any())
+            // 🔹 Lấy danh sách thời khóa biểu (join thêm PhongHoc)
+            var tkbData = await (
+                from ct in _context.ChiTietLopHocPhans
+                join sv in _context.SinhViens on ct.SinhVienId equals sv.Id
+                join lhp in _context.LopHocPhans on ct.LopHocPhanId equals lhp.Id
+                join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                join gv in _context.GiangViens on lhp.GiangVienId equals gv.Id into gjv
+                from gv in gjv.DefaultIfEmpty()
+                join lh in _context.LichHocs on lhp.Id equals lh.LopHocPhanId
+                join ph in _context.PhongHocs on lh.PhongHocId equals ph.Id into gph
+                from ph in gph.DefaultIfEmpty() // Cho phép null nếu chưa có phòng học
+                where sv.MSSV == mssv
+                orderby lh.Ngay, lh.GioBatDau
+                select new
+                {
+                    lhp.MaLopHocPhan,
+                    lhp.TenLopHocPhan,
+                    MaMonHoc = mh.MaMonHoc,
+                    TenMonHoc = mh.TenMonHoc,
+                    TenGiangVien = gv != null ? (gv.HoVaTenDem + " " + gv.Ten) : "Chưa có giảng viên",
+                    MaPhongHoc = ph != null ? ph.MaPhongHoc : "Chưa có phòng",
+                    lh.Ngay,
+                    lh.GioBatDau,
+                    lh.GioKetThuc,
+                    lhp.NgayBatDau,
+                    lhp.NgayKetThuc
+                }
+            ).ToListAsync();
+
+            if (!tkbData.Any())
             {
                 return NotFound(new
                 {
@@ -353,6 +364,50 @@ namespace BlueSchoolSystem.APIControllers
                     message = "Không tìm thấy thời khóa biểu cho MSSV này"
                 });
             }
+
+            // 🔹 Tính tiết bắt đầu và số tiết dựa vào giờ học
+            var tkb = tkbData.Select(item =>
+            {
+                int ToTiet(TimeSpan gio)
+                {
+                    if (gio <= TimeSpan.Parse("07:30")) return 1;
+                    if (gio <= TimeSpan.Parse("08:15")) return 2;
+                    if (gio <= TimeSpan.Parse("09:00")) return 3;
+                    if (gio <= TimeSpan.Parse("10:05")) return 4;
+                    if (gio <= TimeSpan.Parse("10:50")) return 5;
+                    if (gio <= TimeSpan.Parse("11:35")) return 6;
+                    if (gio <= TimeSpan.Parse("13:15")) return 7;
+                    if (gio <= TimeSpan.Parse("13:55")) return 8;
+                    if (gio <= TimeSpan.Parse("14:45")) return 9;
+                    if (gio <= TimeSpan.Parse("15:50")) return 10;
+                    if (gio <= TimeSpan.Parse("16:35")) return 11;
+                    if (gio <= TimeSpan.Parse("17:20")) return 12;
+                    if (gio <= TimeSpan.Parse("18:45")) return 13;
+                    if (gio <= TimeSpan.Parse("19:30")) return 14;
+                    return 15;
+                }
+
+                int tietBatDau = ToTiet(item.GioBatDau);
+                int tietKetThuc = ToTiet(item.GioKetThuc);
+                int soTiet = tietKetThuc - tietBatDau + 1;
+
+                return new ThoiKhoaBieuViewModel
+                {
+                    MaLopHocPhan = item.MaLopHocPhan,
+                    TenLopHocPhan = item.TenLopHocPhan,
+                    MaMonHoc = item.MaMonHoc,
+                    TenMonHoc = item.TenMonHoc,
+                    TenGiangVien = item.TenGiangVien,
+                    MaPhongHoc = item.MaPhongHoc,
+                    NgayHoc = item.Ngay,
+                    GioBatDau = item.GioBatDau.ToString(@"hh\:mm"),
+                    GioKetThuc = item.GioKetThuc.ToString(@"hh\:mm"),
+                    NgayBatDau = item.NgayBatDau,
+                    NgayKetThuc = item.NgayKetThuc,
+                    TietBatDau = tietBatDau,
+                    SoTiet = soTiet
+                };
+            }).ToList();
 
             return Ok(new
             {
@@ -363,6 +418,8 @@ namespace BlueSchoolSystem.APIControllers
                 data = tkb
             });
         }
+
+
 
         // Lấy danh sách lịch thi theo MSSV
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
