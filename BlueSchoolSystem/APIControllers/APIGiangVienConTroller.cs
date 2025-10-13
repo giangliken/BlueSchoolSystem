@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection.Metadata;
 
 namespace BlueSchoolSystem.APIControllers
 {
@@ -271,7 +272,7 @@ namespace BlueSchoolSystem.APIControllers
                              join ph in _context.PhongHocs on lhp.PhongHocId equals ph.Id into _ph
                              from ph in _ph.DefaultIfEmpty()
                              where lhp.GiangVienId == gv.Id
-                             orderby lhp.Thu, lhp.GioBatDau
+                             //orderby lhp.Thu, lhp.GioBatDau
                              select new
                              {
                                  gv.MaGiangVien,
@@ -287,9 +288,6 @@ namespace BlueSchoolSystem.APIControllers
                                  lhp.PhongHocId,
                                  MaPhongHoc = ph != null ? ph.MaPhongHoc : null,
                                  TenPhongHoc = ph != null ? ph.TenPhongHoc : null,
-                                 lhp.Thu,
-                                 lhp.GioBatDau,
-                                 lhp.GioKetThuc,
                                  lhp.NgayBatDau,
                                  lhp.NgayKetThuc,
                                  lhp.SiSo,
@@ -309,5 +307,374 @@ namespace BlueSchoolSystem.APIControllers
                 data = tkb
             });
         }
+
+
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("lophocphan")]
+        public async Task<IActionResult> LayLopHP()
+        {
+            // Lấy userId từ token
+            var userId = User.FindFirst("userId")?.Value;
+            var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.UserId == userId);
+            if (giangVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy thông tin giảng viên" });
+
+            // JOIN LopHocPhan với HocKy, rồi group by học kỳ
+            var query = from lhp in _context.LopHocPhans
+                        join hk in _context.HocKys on lhp.HocKyId equals hk.Id
+                        join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                        where lhp.GiangVienId == giangVien.Id
+                        select new
+                        {
+                            lhp.Id,
+                            lhp.MaLopHocPhan,
+                            lhp.TenLopHocPhan,
+                            mh.MaMonHoc,
+                            mh.TenMonHoc,
+                            NgayBatDauLop = lhp.NgayBatDau,
+                            NgayKetThucLop = lhp.NgayKetThuc,
+                            SiSoThucTe = _context.ChiTietLopHocPhans.Count(ct => ct.LopHocPhanId == lhp.Id),
+                            lhp.TrangThai,
+                            HocKyId = hk.Id,
+                            hk.TenHocKy,
+                            hk.NgayBatDau,
+                        };
+
+            var result = await query
+                .GroupBy(x => new { x.HocKyId, x.TenHocKy, x.NgayBatDau })
+                .Select(g => new
+                {
+                    HocKyId = g.Key.HocKyId,
+                    TenHocKy = g.Key.TenHocKy,
+                    NgayBatDau = g.Key.NgayBatDau,
+                    LopHocPhans = g.OrderBy(x => x.MaLopHocPhan).ToList()
+                })
+                .OrderByDescending(x => x.NgayBatDau)
+                .ToListAsync();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy danh sách học phần thành công",
+                soluong = result.Count,
+                data = result
+            });
+        }
+
+
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("chitietlophocphan/{maLopHocPhan}")]
+        public async Task<IActionResult> LayChiTietLopHocPhan(string maLopHocPhan)
+        {
+            // Truy vấn lớp học phần theo mã lớp
+            var lop = await (from lhp in _context.LopHocPhans
+                             join hk in _context.HocKys on lhp.HocKyId equals hk.Id
+                             join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                             join ct in _context.ChiTietLopHocPhans on lhp.Id equals ct.LopHocPhanId into _ct
+                             where lhp.MaLopHocPhan == maLopHocPhan
+                             select new
+                             {
+                                 lhp.Id,
+                                 lhp.MaLopHocPhan,
+                                 lhp.TenLopHocPhan,
+                                 mh.MaMonHoc,
+                                 mh.TenMonHoc,
+                                 hk.TenHocKy,
+                                 hk.NgayBatDau,
+                                 hk.NgayKetThuc,
+                                 lhp.TrangThai,
+                                 // Sĩ số thực tế
+                                 SiSoThucTe = _context.ChiTietLopHocPhans.Count(x => x.LopHocPhanId == lhp.Id),
+                                 // Danh sách sinh viên
+                                 DanhSachSinhVien = (from ct in _context.ChiTietLopHocPhans
+                                                     join sv in _context.SinhViens on ct.SinhVienId equals sv.Id
+                                                     where ct.LopHocPhanId == lhp.Id
+                                                     select new
+                                                     {
+                                                         sv.MSSV,
+                                                         sv.HoVaTenDem,
+                                                         sv.Ten,
+                                                     }).ToList()
+                             }).FirstOrDefaultAsync();
+
+            if (lop == null)
+                return NotFound(new { result = false, message = "Không tìm thấy lớp học phần với mã này!" });
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy chi tiết lớp học phần thành công",
+                data = lop
+            });
+        }
+
+
+
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("lophocphan/{lopHocPhanId}/buoidiemdanh")]
+        public async Task<IActionResult> GetDiemDanhByLopHocPhan(int lopHocPhanId)
+        {
+            var userId = User.FindFirst("userId")?.Value;
+            var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.UserId == userId);
+            if (giangVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy thông tin giảng viên" });
+
+            var lopHocPhan = await _context.LopHocPhans.FirstOrDefaultAsync(lhp => lhp.Id == lopHocPhanId);
+            if (lopHocPhan == null || lopHocPhan.GiangVienId != giangVien.Id)
+                return StatusCode(403, new { result = false, message = "Không có quyền truy cập lớp học phần này" });
+
+            var buois = await _context.DiemDanhs
+                .Where(dd => dd.LopHocPhanId == lopHocPhanId)
+                .OrderByDescending(dd => dd.Ngay)
+                .Select(dd => new {
+                    dd.Id,
+                    dd.Ngay,
+                    dd.Code,
+                    dd.CreatedAt,
+                    dd.ExpireAt,
+                    dd.GhiChu,
+                    dd.TrangThaiId
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy danh sách buổi điểm danh thành công",
+                soluong = buois.Count,
+                data = buois
+            });
+        }
+
+        public class CreateDiemDanhRequest
+        {
+            public DateTime Ngay { get; set; }
+            public string? GhiChu { get; set; }
+            public DateTime? ExpireAt { get; set; }
+        }
+
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpPost("lophocphan/{lopHocPhanId}/buoidiemdanh/tao")]
+        public async Task<IActionResult> TaoBuoiDiemDanh(int lopHocPhanId, [FromBody] CreateDiemDanhRequest model)
+        {
+            var userId = User.FindFirst("userId")?.Value;
+            var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.UserId == userId);
+            if (giangVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy thông tin giảng viên" });
+
+            var lopHocPhan = await _context.LopHocPhans.FirstOrDefaultAsync(lhp => lhp.Id == lopHocPhanId);
+            if (lopHocPhan == null || lopHocPhan.GiangVienId != giangVien.Id)
+                return StatusCode(403, new { result = false, message = "Không có quyền truy cập lớp học phần này" });
+
+            // Sinh mã code ngắn gọn
+            string code;
+            var random = new Random();
+            bool exists;
+            int maxTry = 100; // thử tối đa 100 lần
+
+            do
+            {
+                code = random.Next(1000, 10000).ToString(); // 4 số (1000 -> 9999)
+                exists = await _context.DiemDanhs.AnyAsync(dd =>
+                    dd.ExpireAt >= DateTime.Now && dd.Code == code
+                );
+                maxTry--;
+            } while (exists && maxTry > 0);
+
+            if (exists)
+            {
+                return BadRequest(new { result = false, message = "Không tạo được mã điểm danh, thử lại sau!" });
+            }
+
+            var buoi = new DiemDanh
+            {
+                LopHocPhanId = lopHocPhanId,
+                Ngay = model.Ngay,
+                Code = code,
+                CreatedAt = DateTime.Now,
+                ExpireAt = model.ExpireAt ?? DateTime.Now.AddMinutes(20),
+                GhiChu = model.GhiChu,
+                TrangThaiId = 1 // Đang mở
+            };
+            _context.DiemDanhs.Add(buoi);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Tạo buổi điểm danh thành công",
+                data = new
+                {
+                    buoi.Id,
+                    buoi.Ngay,
+                    buoi.Code,
+                    buoi.CreatedAt,
+                    buoi.ExpireAt,
+                    buoi.GhiChu,
+                    buoi.TrangThaiId
+                }
+            });
+        }
+
+
+        // GET: api/buoidiemdanh/{diemDanhId}/chitiet
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("buoidiemdanh/{diemDanhId}/chitiet")]
+        public async Task<IActionResult> GetChiTietBuoiDiemDanh(int diemDanhId)
+        {
+            var userId = User.FindFirst("userId")?.Value;
+            var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.UserId == userId);
+            if (giangVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy thông tin giảng viên" });
+
+            var buoi = await _context.DiemDanhs
+                .Include(x => x.LopHocPhan)
+                .FirstOrDefaultAsync(x => x.Id == diemDanhId);
+
+            if (buoi == null || buoi.LopHocPhan.GiangVienId != giangVien.Id)
+                return StatusCode(403, new { result = false, message = "Không có quyền truy cập buổi điểm danh này" });
+
+            // Lấy danh sách sinh viên điểm danh
+            var svIds = await _context.ChiTietLopHocPhans
+                .Where(ct => ct.LopHocPhanId == buoi.LopHocPhanId)
+                .Select(ct => ct.SinhVienId)
+                .ToListAsync();
+
+            var sinhViens = await _context.ChiTietDiemDanhs
+                .Where(ctdd => ctdd.DiemDanhId == diemDanhId)
+                .OrderBy(ctdd => ctdd.SinhVien.MSSV)
+                .Select(ctdd => new
+                {
+                    ctdd.SinhVien.Id,
+                    ctdd.SinhVien.MSSV,
+                    ctdd.SinhVien.HoVaTenDem,
+                    ctdd.SinhVien.Ten,
+                    TrangThai = ctdd.TrangThaiId,
+                    ThoiGian = ctdd.ThoiGian
+                })
+                .ToListAsync();
+
+            var result = new
+            {
+                buoi.Id,
+                buoi.Code,
+                buoi.Ngay,          
+                buoi.ExpireAt,
+                MaLopHocPhan = buoi.LopHocPhan.MaLopHocPhan,
+                SinhViens = sinhViens
+            };
+
+
+            return Ok(new
+            {
+                result = true,
+                data = result
+            });
+        }
+
+
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("lophocphan/ma/{maLopHocPhan}/buoidiemdanh")]
+        public async Task<IActionResult> GetDiemDanhByMaLopHocPhan(string maLopHocPhan)
+        {
+            var userId = User.FindFirst("userId")?.Value;
+            var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.UserId == userId);
+            if (giangVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy thông tin giảng viên" });
+
+            var lopHocPhan = await _context.LopHocPhans.FirstOrDefaultAsync(lhp => lhp.MaLopHocPhan == maLopHocPhan);
+            if (lopHocPhan == null || lopHocPhan.GiangVienId != giangVien.Id)
+                return StatusCode(403, new { result = false, message = "Không có quyền truy cập lớp học phần này" });
+
+            var buois = await _context.DiemDanhs
+                .Where(dd => dd.LopHocPhanId == lopHocPhan.Id)
+                .OrderByDescending(dd => dd.Ngay)
+                .Select(dd => new {
+                    dd.Id,
+                    dd.Ngay,
+                    dd.Code,
+                    dd.CreatedAt,
+                    dd.ExpireAt,
+                    dd.GhiChu,
+                    dd.TrangThaiId
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy danh sách buổi điểm danh thành công",
+                soluong = buois.Count,
+                data = buois
+            });
+        }
+
+        [HttpPost("buoidiemdanh/{id}/regeneratecode")]
+        public async Task<IActionResult> RegenerateCode(int id)
+        {
+            var buoi = await _context.DiemDanhs.FindAsync(id);
+            if (buoi == null)
+                return NotFound();
+
+            // Tạo lại code mới, đảm bảo không trùng
+            string code;
+            var random = new Random();
+            int maxTry = 100;
+            bool exists;
+            do
+            {
+                code = random.Next(1000, 10000).ToString();
+                exists = await _context.DiemDanhs.AnyAsync(dd => dd.ExpireAt >= DateTime.Now && dd.Code == code);
+                maxTry--;
+            } while (exists && maxTry > 0);
+
+            if (exists)
+                return BadRequest(new { result = false, message = "Không tạo được mã mới" });
+
+            buoi.Code = code;
+            buoi.ExpireAt = DateTime.Now.AddSeconds(60); // reset expire mới nếu muốn
+            await _context.SaveChangesAsync();
+
+            return Ok(new { result = true, newCode = code });
+        }
+
+        [HttpPost("diemdanh/capnhattrangthai")]
+        public async Task<IActionResult> UpdateTrangThaiDiemDanh([FromBody] UpdateTrangThaiModel model)
+        {
+            var chiTiet = await _context.ChiTietDiemDanhs
+                .FirstOrDefaultAsync(x => x.DiemDanhId == model.DiemDanhId && x.SinhVienId == model.SinhVienId);
+            if (chiTiet == null)
+            {
+                // Nếu chưa có thì tạo mới (trường hợp chỉnh cho sinh viên bị vắng)
+                chiTiet = new ChiTietDiemDanh
+                {
+                    DiemDanhId = model.DiemDanhId,
+                    SinhVienId = model.SinhVienId,
+                    TrangThaiId = model.TrangThai,
+                    ThoiGian = DateTime.Now
+                };
+                _context.ChiTietDiemDanhs.Add(chiTiet);
+            }
+            else
+            {
+                chiTiet.TrangThaiId = model.TrangThai;
+                chiTiet.ThoiGian = DateTime.Now;
+            }
+            await _context.SaveChangesAsync();
+            return Ok(new { result = true });
+        }
+        public class UpdateTrangThaiModel
+        {
+            public int DiemDanhId { get; set; }
+            public int SinhVienId { get; set; }
+            public int TrangThai { get; set; }
+        }
+
+
     }
 }

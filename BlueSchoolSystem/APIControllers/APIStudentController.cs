@@ -1,5 +1,8 @@
-﻿using BlueSchoolSystem.Models;
+﻿using Azure.Core;
+using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using Firebase.Database;
+using Firebase.Database.Query;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -329,7 +332,7 @@ namespace BlueSchoolSystem.APIControllers
                              join gv in _context.GiangViens on lhp.GiangVienId equals gv.Id
                              join ph in _context.PhongHocs on lhp.PhongHocId equals ph.Id
                              where sv.MSSV == mssv
-                             orderby lhp.Thu, lhp.GioBatDau
+                             //orderby lhp.Thu, lhp.GioBatDau
                              select new
                              {
                                  sv.MSSV,
@@ -339,9 +342,6 @@ namespace BlueSchoolSystem.APIControllers
                                  TenMonHoc = mh.TenMonHoc,
                                  TenGiangVien = gv.HoVaTenDem + " " + gv.Ten,
                                  MaPhongHoc = ph.MaPhongHoc,
-                                 lhp.Thu,
-                                 lhp.GioBatDau,
-                                 lhp.GioKetThuc,
                                  lhp.NgayBatDau,
                                  lhp.NgayKetThuc
                              }).ToListAsync();
@@ -680,7 +680,129 @@ namespace BlueSchoolSystem.APIControllers
             return Ok(response);
         }
 
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student)]
+        [HttpPost("diemdanh/checkin")]
+        public async Task<IActionResult> CheckinDiemDanh([FromBody] CheckinDiemDanhRequest model)
+        {
+            var userId = User.FindFirst("userId")?.Value;
+            var sinhVien = await _context.SinhViens.FirstOrDefaultAsync(x => x.UserId == userId);
+            if (sinhVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy thông tin sinh viên" });
 
+            // Kiểm tra buổi điểm danh hợp lệ, đang mở, đúng code, còn hạn
+            var buoi = await _context.DiemDanhs.FirstOrDefaultAsync(x =>
+                x.Id == model.DiemDanhId &&
+                x.Code == model.Code &&
+                x.ExpireAt > DateTime.Now &&
+                x.TrangThaiId == 1 // Đang mở
+            );
+            if (buoi == null)
+                return BadRequest(new { result = false, message = "Mã điểm danh không hợp lệ hoặc đã hết hạn" });
+
+            // Check đã điểm danh chưa
+            var existed = await _context.ChiTietDiemDanhs.AnyAsync(x =>
+                x.DiemDanhId == model.DiemDanhId && x.SinhVienId == sinhVien.Id
+            );
+            if (existed)
+                return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi" });
+
+            // Ghi nhận điểm danh
+            var ct = new ChiTietDiemDanh
+            {
+                DiemDanhId = model.DiemDanhId,
+                SinhVienId = sinhVien.Id,
+                ThoiGian = DateTime.Now,
+                Latitude = model.Latitude,
+                Longitude = model.Longitude,
+                DeviceId = model.DeviceId,
+                TrangThaiId = 1 // Có mặt
+            };
+            _context.ChiTietDiemDanhs.Add(ct);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { result = true, message = "Điểm danh thành công!" });
+        }
+
+        // Điểm danh qua mã code
+        [HttpPost("diemdanh/thuchien")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student)]
+        public async Task<IActionResult> DiemDanh([FromBody] DiemDanhRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Code))
+                return BadRequest(new { result = false, message = "Thiếu mã điểm danh" });
+
+            // Lấy MSSV hoặc UserName từ token (claim "username")
+            var mssv = User.FindFirst("username")?.Value;
+            if (string.IsNullOrEmpty(mssv))
+                return Unauthorized(new { result = false, message = "Không tìm thấy MSSV trong token" });
+
+            // Tìm buổi điểm danh hợp lệ
+            var now = DateTime.Now;
+            var buoi = await _context.DiemDanhs
+                .FirstOrDefaultAsync(x => x.Code == request.Code && x.ExpireAt >= now);
+
+            if (buoi == null)
+                return BadRequest(new { result = false, message = "Mã điểm danh không hợp lệ hoặc đã hết hạn" });
+
+            // Kiểm tra sinh viên có tồn tại và thuộc lớp không
+            var sinhVien = await _context.SinhViens.FirstOrDefaultAsync(x => x.MSSV == mssv);
+            if (sinhVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy sinh viên" });
+
+            var inClass = await _context.ChiTietLopHocPhans
+                .AnyAsync(x => x.LopHocPhanId == buoi.LopHocPhanId && x.SinhVienId == sinhVien.Id);
+            if (!inClass)
+                return BadRequest(new { result = false, message = "Sinh viên không thuộc lớp này" });
+
+            // Kiểm tra đã điểm danh chưa
+            var exist = await _context.ChiTietDiemDanhs
+                .AnyAsync(x => x.DiemDanhId == buoi.Id && x.SinhVienId == sinhVien.Id);
+            if (exist)
+                return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi!" });
+
+            // Lưu điểm danh SQL
+            var chiTiet = new ChiTietDiemDanh
+            {
+                DiemDanhId = buoi.Id,
+                SinhVienId = sinhVien.Id,
+                TrangThaiId = 1,
+                Latitude = request.Latitude,      
+                Longitude = request.Longitude,   
+                DeviceId = request.DeviceId,
+                ThoiGian = now,
+            };
+            _context.ChiTietDiemDanhs.Add(chiTiet);
+            await _context.SaveChangesAsync();
+
+            // --- PUSH FIREBASE ---
+            await PushAttendanceToFirebase(buoi.Id, sinhVien, now, request);
+
+            return Ok(new { result = true, message = "Điểm danh thành công!" });
+        }
+
+
+        private async Task PushAttendanceToFirebase(int diemDanhId, SinhVien sv, DateTime thoiGian, DiemDanhRequest request)
+        {
+            var firebaseClient = new Firebase.Database.FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com"); 
+            var data = new
+            {
+                id = sv.Id,
+                mssv = sv.MSSV,
+                hoVaTenDem = sv.HoVaTenDem,
+                ten = sv.Ten,
+                trangThai = 1,
+                thoiGian = thoiGian.ToString("s"),
+                latitude = request.Latitude,
+                longitude = request.Longitude,
+                deviceId = request.DeviceId
+            };
+
+            await firebaseClient
+                .Child("attendance_sessions")
+                .Child(diemDanhId.ToString())
+                .Child(sv.Id.ToString())
+                .PutAsync(data);
+        }
 
     }
 }
