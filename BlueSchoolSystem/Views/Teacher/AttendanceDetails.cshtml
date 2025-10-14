@@ -2,16 +2,17 @@
 
 @{
     var isExpired = Model.ExpireAt <= DateTime.Now;
-    // Firebase config ở đây là giả lập, thay bằng config thật của bạn!
+    var trangThaiDict = ViewBag.TrangThaiDict as Dictionary<int, string>;
 }
-<a asp-action="LopHocPhanDetails"
-   asp-controller="Teacher"
-   asp-route-maLopHocPhan="@Model.MaLopHocPhan"
-   class="btn btn-secondary mb-3 d-inline-flex align-items-center">
-    <i class="fa-solid fa-arrow-left me-2"></i>
-    Quay lại lớp học phần
-</a>
-
+<form id="formBackToClass" asp-action="BackToClassAndUpdateStatus" asp-controller="Teacher" method="post" class="d-inline">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="buoiDiemDanhId" value="@Model.Id" />
+    <input type="hidden" name="maLopHocPhan" value="@Model.MaLopHocPhan" />
+    <button type="submit" class="btn btn-secondary mb-3 d-inline-flex align-items-center">
+        <i class="fa-solid fa-arrow-left me-2"></i>
+        Quay lại lớp học phần
+    </button>
+</form>
 <h4>
     Buổi điểm danh ngày @Model.Ngay.ToString("dd/MM/yyyy")
     <span id="timer" class="badge bg-danger fs-5"></span>
@@ -51,36 +52,26 @@
                     @if (Model.SinhViens != null && Model.SinhViens.Any())
                     {
                         int stt = 1;
-                        foreach (var sv in Model.SinhViens)
+                        @foreach (var sv in Model.SinhViens)
                         {
                             <tr>
                                 <td>@stt</td>
                                 <td>@sv.MSSV</td>
                                 <td>@sv.HoVaTenDem @sv.Ten</td>
-                                
                                 <td>@sv.ThoiGian?.ToString("HH:mm:ss dd/MM/yyyy")</td>
                                 <td>
-                                    @if (sv.TrangThai == 1)
-                                    {
-                                        <span class="badge bg-success">Có mặt</span>
+                                    @{
+                                        string trangThai = (trangThaiDict != null && trangThaiDict.ContainsKey(sv.TrangThai))
+                                        ? trangThaiDict[sv.TrangThai]
+                                        : "Không rõ";
+                                        string badge = "bg-secondary";
+                                        if (trangThai == "Có mặt") badge = "bg-success";
+                                        else if (trangThai == "Vắng mặt" || trangThai == "Không phép") badge = "bg-danger";
+                                        else if (trangThai == "Đi trễ" || trangThai == "Về sớm") badge = "bg-warning text-dark";
+                                        else if (trangThai == "Có phép") badge = "bg-info";
                                     }
-                                    else
-                                    {
-                                        <span class="badge bg-danger">Vắng</span>
-                                    }
+                                    <span class="badge @badge">@trangThai</span>
                                 </td>
-                                @* <td>
-                                    <form asp-action="UpdateAttendanceStatus" asp-controller="Teacher" method="post" class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="diemDanhId" value="@Model.Id" />
-                                        <input type="hidden" name="sinhVienId" value="@sv.Id" />
-                                        <select name="trangThai" class="form-select form-select-sm d-inline" style="width:100px;">
-                                            <option value="1" selected="@(sv.TrangThai == 1 ? "selected" : null)">Có mặt</option>
-                                            <option value="0" selected="@(sv.TrangThai == 0 ? "selected" : null)">Vắng</option>
-                                        </select>
-                                        <button type="submit" class="btn btn-outline-primary btn-sm ms-1">Lưu</button>
-                                    </form>
-                                </td> *@
                             </tr>
                             stt++;
                         }
