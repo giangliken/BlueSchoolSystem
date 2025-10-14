@@ -678,6 +678,139 @@ namespace BlueSchoolSystem.APIControllers
             return Ok(response);
         }
 
+
+        // Lấy danh sách lớp học phần theo MSSV
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
+        [HttpGet("lophocphansinhvien/{mssv}")]
+        public async Task<IActionResult> GetLopHocPhanByMSSV(string mssv)
+        {
+            // MSSV từ token
+            var mssvFromToken = User.FindFirst("username")?.Value;
+            if (mssvFromToken == null)
+            {
+                return Unauthorized(new
+                {
+                    result = false,
+                    code = 401,
+                    message = "Không lấy được MSSV từ token"
+                });
+            }
+
+            if (mssvFromToken != mssv)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    result = false,
+                    code = 403,
+                    message = "Bạn không có quyền truy cập lớp học phần của sinh viên khác"
+                });
+            }
+
+            //  Truy vấn dữ liệu tương tự SQL bạn viết
+            var query = from ct in _context.ChiTietLopHocPhans
+                        join sv in _context.SinhViens on ct.SinhVienId equals sv.Id
+                        join lhp in _context.LopHocPhans on ct.LopHocPhanId equals lhp.Id
+                        join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                        join hk in _context.HocKys on lhp.HocKyId equals hk.Id
+                        where sv.MSSV == mssv
+                        group new { mh, lhp } by new { hk.Id, hk.TenHocKy, hk.NgayBatDau } into g
+                        orderby g.Key.Id
+                        select new
+                        {
+                            HocKyId = g.Key.Id,
+                            TenHocKy = g.Key.TenHocKy,
+                            NgayBatDau = g.Key.NgayBatDau,
+                            DanhSachMon = g.Select(x => new
+                            {
+                                x.mh.MaMonHoc,
+                                x.mh.TenMonHoc,
+                                x.mh.SoTinChi,
+                                LopHocPhanId = x.lhp.Id,
+                                x.lhp.MaLopHocPhan
+                            }).ToList()
+                        };
+
+            var data = await query.ToListAsync();
+
+            if (!data.Any())
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy lớp học phần cho MSSV này"
+                });
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy danh sách lớp học phần thành công",
+                soluongHocKy = data.Count,
+                data
+            });
+        }
+
+        //  Lấy các buổi điểm danh của sinh viên theo MSSV và ID lớp học phần
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
+        [HttpGet("lophocphansinhvien/{mssv}/lop/{lopHocPhanId}/diemdanh")]
+        public async Task<IActionResult> GetDiemDanhByLop(string mssv, int lopHocPhanId)
+        {
+            // 1️⃣ Xác thực MSSV từ token
+            var mssvFromToken = User.FindFirst("username")?.Value;
+            if (mssvFromToken == null)
+                return Unauthorized(new { result = false, code = 401, message = "Không lấy được MSSV từ token" });
+
+            if (mssvFromToken != mssv)
+                return StatusCode(StatusCodes.Status403Forbidden, new { result = false, code = 403, message = "Không có quyền truy cập dữ liệu của sinh viên khác" });
+
+            // 2️⃣ Kiểm tra sinh viên có thuộc lớp học phần này không
+            var isExist = await _context.ChiTietLopHocPhans
+                .Include(ct => ct.SinhVien)
+                .AnyAsync(ct => ct.LopHocPhanId == lopHocPhanId && ct.SinhVien.MSSV == mssv);
+
+            if (!isExist)
+                return NotFound(new { result = false, code = 404, message = "Sinh viên không thuộc lớp học phần này" });
+
+            // 3️⃣ Lấy danh sách buổi điểm danh
+            var data = await (from dd in _context.DiemDanhs
+                              join ctd in _context.ChiTietDiemDanhs on dd.Id equals ctd.DiemDanhId
+                              join sv in _context.SinhViens on ctd.SinhVienId equals sv.Id
+                              join tt in _context.TrangThais on ctd.TrangThaiId equals tt.Id into tts
+                              from tt in tts.DefaultIfEmpty()
+                              where sv.MSSV == mssv && dd.LopHocPhanId == lopHocPhanId
+                              orderby dd.Ngay
+                              select new
+                              {
+                                  dd.Id,
+                                  dd.Ngay,
+                                  dd.Code,
+                                  dd.GhiChu,
+                                  TrangThai = tt != null ? tt.TenTrangThai : "Chưa xác định",
+                                  ThoiGian = ctd.ThoiGian,
+                                  ctd.DeviceId,
+                                  ctd.Latitude,
+                                  ctd.Longitude,
+                                  GhiChuChiTiet = ctd.GhiChu
+                              }).ToListAsync();
+
+            if (!data.Any())
+                return NotFound(new { result = false, code = 404, message = "Không có dữ liệu điểm danh" });
+
+            // 4️⃣ Trả kết quả
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy danh sách điểm danh thành công",
+                tongSoBuoi = data.Count,
+                data
+            });
+        }
+
+
+
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student)]
         [HttpPost("diemdanh/checkin")]
         public async Task<IActionResult> CheckinDiemDanh([FromBody] CheckinDiemDanhRequest model)

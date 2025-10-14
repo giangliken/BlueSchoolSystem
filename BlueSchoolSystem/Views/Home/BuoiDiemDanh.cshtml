@@ -161,148 +161,200 @@
                 font-weight: 600;
                 box-shadow: 0 2px 6px rgba(0,0,0,0.05);
             }
-</style>
+    /* Tùy chỉnh modal chi tiết */
+    #modalViTri {
+        line-height: 1.5;
+    }
 
-<h6>Trang chủ / Học vụ / Lớp học phần</h6>
+        #modalViTri a {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+
+            #modalViTri a:hover {
+                text-decoration: underline;
+            }
+</style>
 @model List<BlueSchoolSystem.Models.ViewModel.DiemDanhViewModel>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 @{
     ViewData["Title"] = "Điểm danh";
-    var tongSoVang = Model.Count(x => x.TenTrangThai == "Vắng mặt");
+    var tongSoBuoi = Model.Count;
+    var tongVang = Model.Count(x => x.TrangThai == "Vắng mặt");
 }
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+<h6>Trang chủ / Học vụ / Lớp học phần</h6>
+
 <div class="card mt-3">
     <div class="card-body">
-@if (!string.IsNullOrEmpty(ViewBag.TenMonHoc as string))
-{
-    <div class="d-flex align-items-center mb-3">
-        <a href="javascript:history.back()" class="btn btn-outline-primary btn-lg me-3 rounded-circle shadow-sm">
-            <i class="bi bi-arrow-left fs-4"></i>
-        </a>
-        <h4 class="mb-0">Lớp: @ViewBag.TenMonHoc</h4>
-    </div>
-}
-else
-{
-    <div class="d-flex align-items-center mb-3">
-        <a href="javascript:history.back()" class="btn btn-outline-primary btn-lg me-3 rounded-circle shadow-sm">
-            <i class="bi bi-arrow-left fs-4"></i>
-        </a>
-        <h4 class="mb-0">Không có dữ liệu điểm danh của lớp</h4>
-    </div>
-}
 
-<!-- Tabs -->
-<ul class="nav nav-tabs mb-3" id="tabDiemDanh" role="tablist">
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="tab-thongbao" data-bs-toggle="tab" data-bs-target="#content-thongbao"
-                type="button" role="tab" aria-controls="content-thongbao" aria-selected="false">
-            Thông báo
-        </button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="tab-diemdanh" data-bs-toggle="tab" data-bs-target="#content-diemdanh"
-                type="button" role="tab" aria-controls="content-diemdanh" aria-selected="true">
-            Điểm danh
-        </button>
-    </li>
-</ul>
-
-<!-- Nội dung các tab -->
-<div class="tab-content">
-    <!-- Tab Thông báo -->
-    <div class="tab-pane fade" id="content-thongbao" role="tabpanel" aria-labelledby="tab-thongbao">
-        <div class="alert alert-info text-center">
-            Chưa có thông báo nào!
-        </div>
-    </div>
-
-    <!-- Tab Điểm danh -->
-    <div class="tab-pane fade show active" id="content-diemdanh" role="tabpanel" aria-labelledby="tab-diemdanh">
-
-        <!-- Tổng số buổi vắng -->
-        <div class="mb-3">
-            <strong>Tổng số buổi vắng:</strong> <span class="text-danger">@tongSoVang</span>
+        <!-- Header -->
+        <div class="d-flex align-items-center mb-3">
+            <a href="javascript:history.back()" class="btn btn-outline-primary btn-lg me-3 rounded-circle shadow-sm">
+                <i class="bi bi-arrow-left fs-4"></i>
+            </a>
+            <h4 class="mb-0">
+                @if (!string.IsNullOrEmpty(ViewBag.TenMonHoc as string))
+                {
+                    @($"Lớp: {ViewBag.TenMonHoc}")
+                }
+                else
+                {
+                    <span class="text-danger">Không có buổi điểm danh</span>
+                }
+            </h4>
         </div>
 
-        @if (!Model.Any())
-        {
-            <div class="alert alert-warning text-center">Không có dữ liệu điểm danh.</div>
-        }
-        else
-        {
-            <div class="table-responsive" style="max-width:600px;">
-                <table class="table table-bordered table-sm">
-                    <thead class="table-primary">
-                        <tr>
-                            <th style="width: 150px;">Buổi học</th>
-                            <th style="width: 120px;">Tình trạng</th>
-                            <th style="width: 100px;">Chi tiết</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var item in Model)
-                        {
-                            <tr>
-                                <td>Ngày @item.Ngay.ToString("dd/MM/yyyy")</td>
-                                <td>@item.TenTrangThai</td>
-                                <td>
-                                    @if (item.TenTrangThai == "Vắng mặt")
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3 nav-tabs-custom" id="tabDiemDanh" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" id="tab-diemdanh" data-bs-toggle="tab" data-bs-target="#content-diemdanh">
+                    Điểm danh
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="tab-thongbao" data-bs-toggle="tab" data-bs-target="#content-thongbao">
+                    Thông báo
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- Tab Điểm danh -->
+            <div class="tab-pane fade show active" id="content-diemdanh">
+                <div class="mb-3">
+                    <strong>Tổng số buổi:</strong> <span class="text-primary">@tongSoBuoi</span> |
+                    <strong>Vắng:</strong> <span class="text-danger">@tongVang</span>
+                </div>
+
+                @if (!Model.Any())
+                {
+                    <div class="alert alert-warning text-center">Không có dữ liệu điểm danh.</div>
+                }
+                else
+                {
+                    <div class="table-responsive" style="max-width:600px;">
+                        <table class="table table-bordered table-sm align-middle">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>Ngày buổi điểm danh</th>
+                                    <th>Trạng thái</th>
+                                    <th>Chi tiết</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model)
+                                {
+                                    var icon = item.TrangThai switch
                                     {
-                                        <button class="btn btn-secondary btn-sm" disabled>Chi tiết</button>
-                                    }
-                                    else
-                                    {
-                                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalChiTiet"
-                                                data-ngay="@item.Ngay.ToString("dd/MM/yyyy HH:mm:ss")"
-                                                data-ghichu="@item.GhiChu">
-                                            Chi tiết
-                                        </button>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                                        "Có mặt" => "<i class='bi bi-check-circle-fill text-success'></i>",
+                                        "Vắng mặt" => "<i class='bi bi-x-circle-fill text-danger'></i>",
+                                        _ => "<i class='bi bi-question-circle text-secondary'></i>"
+                                    };
+
+                                    <tr>
+                                        <td>@item.Ngay.ToString("dd/MM/yyyy") </td>
+                                        <td>@Html.Raw(icon) @item.TrangThai</td>
+                                        <td>
+                                            <button class="btn btn-primary btn-sm"
+                                                    @(item.TrangThai != "Có mặt" ? "disabled" : "")
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalChiTiet"
+                                                    data-ngay="@item.Ngay.ToString("dd/MM/yyyy")"
+                                                    data-thoigian="@item.ThoiGian?.ToString("HH:mm")"
+                                                    data-device="@item.DeviceId"
+                                                    data-lat="@(item.Latitude.HasValue? item.Latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                                    data-lon="@(item.Longitude.HasValue? item.Longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                                    data-ghichu="@item.GhiChuChiTiet">
+                                                Xem
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
             </div>
-        }
+
+            <!-- Tab Thông báo -->
+            <div class="tab-pane fade" id="content-thongbao">
+                <div class="alert alert-info text-center">
+                    Chưa có thông báo nào!
+                </div>
+            </div>
+        </div>
     </div>
 </div>
-    </div>
-</div>
+
 <!-- Modal Chi tiết -->
 <div class="modal fade" id="modalChiTiet" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">Chi tiết điểm danh</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <table class="table table-bordered">
-                    <tr>
-                        <th>Phương thức</th>
-                        <td id="modalGhiChu"></td>
-                    </tr>
-                    <tr>
-                        <th>Thời gian</th>
-                        <td id="modalNgay"></td>
-                    </tr>
+                    <tr><th>Phương thức</th><td id="modalGhiChu"></td></tr>
+                    <tr><th>Ngày giờ</th><td id="modalNgayGio"></td></tr>
+                    <tr><th>Thiết bị</th><td id="modalDevice"></td></tr>
+                    <tr><th>Vị trí</th><td id="modalViTri"></tr>
                 </table>
             </div>
         </div>
     </div>
 </div>
-
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        var modalChiTiet = document.getElementById('modalChiTiet');
-        modalChiTiet.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var ngay = button.getAttribute('data-ngay');
-            var ghichu = button.getAttribute('data-ghichu');
+        const modal = document.getElementById('modalChiTiet');
+        modal.addEventListener('show.bs.modal', async function (event) {
+            const btn = event.relatedTarget;
 
-            document.getElementById('modalNgay').innerText = ngay;
-            document.getElementById('modalGhiChu').innerText = ghichu;
+            const lat = btn.getAttribute('data-lat');
+            const lon = btn.getAttribute('data-lon');
+
+            document.getElementById('modalNgayGio').textContent = btn.getAttribute('data-ngay') + " " + btn.getAttribute('data-thoigian');
+            document.getElementById('modalDevice').textContent = btn.getAttribute('data-device');
+            document.getElementById('modalGhiChu').textContent = btn.getAttribute('data-ghichu');
+
+            const viTriElement = document.getElementById('modalViTri');
+
+            if (lat && lon) {
+                const latDisplay = lat.replace('.', ',');
+                const lonDisplay = lon.replace('.', ',');
+
+                viTriElement.innerHTML = `Đang lấy địa chỉ... (${latDisplay}, ${lonDisplay})`;
+
+                try {
+                    // Gọi API Nominatim OSM
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+                    const data = await response.json();
+
+                    if (data && data.display_name) {
+                        viTriElement.innerHTML = `
+                            <div>${data.display_name}</div>
+
+                        `;
+                    } else {
+                        viTriElement.innerHTML = `
+                            <div>Không xác định địa chỉ</div>
+
+                        `;
+                    }
+                } catch (err) {
+                    console.error(err);
+                    viTriElement.innerHTML = `
+                        <div>Lỗi khi lấy địa chỉ</div>
+
+                    `;
+                }
+            } else {
+                viTriElement.textContent = "Không có thông tin vị trí";
+            }
         });
     </script>
 }
