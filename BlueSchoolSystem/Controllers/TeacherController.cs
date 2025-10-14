@@ -3,6 +3,7 @@ using BlueSchoolSystem.Models.ViewModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using QRCoder;
 using System.Net.Http.Headers;
@@ -15,10 +16,11 @@ namespace BlueSchoolSystem.Controllers
     public class TeacherController : Controller
     {
         private readonly IHttpClientFactory _httpClientFactory;
-
-        public TeacherController(IHttpClientFactory httpClientFactory)
+        private readonly ApplicationDbContext _context;
+        public TeacherController(IHttpClientFactory httpClientFactory, ApplicationDbContext context)
         {
             _httpClientFactory = httpClientFactory;
+            _context = context;
         }
 
         //Trang chính
@@ -233,7 +235,57 @@ namespace BlueSchoolSystem.Controllers
             var session = JsonConvert.DeserializeObject<AttendanceSessionDetailViewModel>(result.data.ToString());
             session.QrCodeBase64 = GenerateQrBase64(session.Code);
             ViewBag.MaLopHocPhan = session.MaLopHocPhan;
+
+            // 2. Gọi API lấy trạng thái điểm danh
+            var trangThaiRes = await client.GetAsync("https://localhost:5001/api/trangthai/loai/DiemDanh");
+            if (trangThaiRes.IsSuccessStatusCode)
+            {
+                var trangThaiBody = await trangThaiRes.Content.ReadAsStringAsync();
+                dynamic trangThaiResult = JsonConvert.DeserializeObject(trangThaiBody);
+                // Tạo dictionary id => tên trạng thái
+                var trangThaiDict = new Dictionary<int, string>();
+                foreach (var item in trangThaiResult.data)
+                {
+                    int trangThaiId = (int)item.id;
+                    string ten = (string)item.tenTrangThai;
+                    trangThaiDict[trangThaiId] = ten;
+                }
+
+                ViewBag.TrangThaiDict = trangThaiDict;
+            }
+            else
+            {
+                ViewBag.TrangThaiDict = new Dictionary<int, string>(); // fallback rỗng
+            }
+
             return View(session);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> BackToClassAndUpdateStatus(int buoiDiemDanhId, string maLopHocPhan)
+        {
+            await CapNhatTrangThaiBuoiDiemDanh(buoiDiemDanhId); // Hàm này bạn đã có
+            return RedirectToAction("LopHocPhanDetails", new { maLopHocPhan });
+        }
+
+
+        private async Task CapNhatTrangThaiBuoiDiemDanh(int buoiDiemDanhId)
+        {
+            var buoi = await _context.DiemDanhs
+                .Include(d => d.TrangThai)
+                .FirstOrDefaultAsync(d => d.Id == buoiDiemDanhId);
+
+            if (buoi == null) return;
+
+            // Lấy trạng thái "Đã đóng"
+            var trangThaiDong = await _context.TrangThais
+                .FirstOrDefaultAsync(t => t.TenTrangThai == "Đã đóng" && t.LoaiTrangThai == "DiemDanh");
+            if (trangThaiDong != null)
+            {
+                buoi.TrangThaiId = trangThaiDong.Id;
+                await _context.SaveChangesAsync();
+            }
         }
 
         // POST: Đổi trạng thái điểm danh cho 1 sinh viên
