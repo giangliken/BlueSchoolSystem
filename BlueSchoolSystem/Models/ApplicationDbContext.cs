@@ -26,6 +26,7 @@ namespace BlueSchoolSystem.Models
         public DbSet<GiangVien> GiangViens { get; set; } // Bảng giảng viên
         public DbSet<LopHocPhan> LopHocPhans { get; set; } // Bảng lớp học phần
         public DbSet<LichThi> LichThis { get; set; } // Bảng lịch thi
+        public DbSet<LichHoc> LichHocs { get; set; } // Bảng buổi học
         public DbSet<ChiTietLopHocPhan> ChiTietLopHocPhans { get; set; } // Bảng chi tiết lớp học phần
         public DbSet<DiemDanh> DiemDanhs { get; set; } // Bảng điểm danh
         public DbSet<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; }

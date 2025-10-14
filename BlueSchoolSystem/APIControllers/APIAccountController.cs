@@ -127,6 +127,7 @@ namespace BlueSchoolSystem.APIControllers
                             tenSv = user.SinhViens.Ten,
                             email = user.Email,
                             ngaySinh = user.SinhViens.NgaySinh,
+                            avatar = user.SinhViens.AvatarUrl
                         }
                     });
                 }
@@ -151,6 +152,7 @@ namespace BlueSchoolSystem.APIControllers
                             tenGV = user.GiangViens.Ten,
                             email = user.Email,
                             ngaySinh = user.GiangViens.NgaySinh,
+                            avatar = user.GiangViens.AvatarUrl
                         }
                     });
                 }

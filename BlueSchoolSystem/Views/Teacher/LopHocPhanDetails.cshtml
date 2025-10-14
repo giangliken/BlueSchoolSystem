@@ -1,0 +1,143 @@
+﻿@using BlueSchoolSystem.Models.ViewModel
+@{
+    var lhp = ViewBag.LopHocPhan as LopHocPhanViewModel;
+    var sinhVienList = ViewBag.SinhVienList as List<SinhVienViewModel> ?? new List<SinhVienViewModel>();
+    var attendanceList = ViewBag.AttendanceList as List<AttendanceSessionViewModel> ?? new List<AttendanceSessionViewModel>();
+
+    // Group buổi điểm danh theo ngày
+    var grouped = attendanceList
+        .OrderByDescending(x => x.Ngay)
+        .GroupBy(x => x.Ngay.Date)
+        .ToList();
+    int rowIndex = 1;
+}
+
+@if (lhp == null)
+{
+    <div class="alert alert-danger my-4 shadow-sm">
+        <i class="fa-solid fa-circle-exclamation me-2"></i>
+        Không có dữ liệu lớp học phần!
+    </div>
+}
+else
+{
+    <div class="card shadow-sm my-3">
+        <div class="card-body">
+            <h3 class="card-title fw-bold text-primary mb-3">
+                <i class="fa-solid fa-chalkboard-user me-2"></i>
+                @lhp.TenLopHocPhan <span class="fw-normal text-secondary">(@lhp.MaLopHocPhan)</span>
+            </h3>
+            <ul class="list-group list-group-flush mb-2">
+                <li class="list-group-item ps-0">
+                    <i class="fa-solid fa-users me-1 text-success"></i>
+                    <span class="fw-semibold">Sĩ số:</span>
+                    <span class="ms-2">@lhp.SiSoThucTe</span>
+                </li>
+                <li class="list-group-item ps-0">
+                    <i class="fa-solid fa-circle-info me-1 text-info"></i>
+                    <span class="fw-semibold">Trạng thái:</span>
+                    <span class="badge bg-@((lhp.TrangThai?.TenTrangThai == "Đang mở") ? "primary" : (lhp.TrangThai?.TenTrangThai == "Đã kết thúc") ? "secondary" : "warning") ms-2">
+                        @lhp.TrangThai?.TenTrangThai
+                    </span>
+                </li>
+            </ul>
+        </div>
+    </div>
+}
+
+<div class="row mt-4 g-4">
+    <div class="col-md-6">
+        <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+            <table class="table table-bordered table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:48px;">#</th>
+                        <th>MSSV</th>
+                        <th>Họ và tên</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < sinhVienList.Count; i++)
+                    {
+                        var sv = sinhVienList[i];
+                        <tr>
+                            <td>@(i + 1)</td>
+                            <td>@sv.MSSV</td>
+                            <td>@(sv.HoVaTenDem + " " + sv.Ten)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-light border-0 d-flex align-items-center justify-content-between">
+                <h4 class="mb-0">
+                    <i class="fa-solid fa-calendar-check me-2 text-success"></i>
+                    Danh sách buổi điểm danh
+                </h4>
+                @using (Html.BeginForm(
+                                "CreateAttendanceSession",
+                                "Teacher",
+                                new { LopHocPhanId = lhp.Id },
+                                FormMethod.Post,
+                                true,
+                                new { @class = "d-inline" }
+                                ))
+                {
+                    <button type="submit" class="btn btn-primary fw-semibold d-flex align-items-center">
+                        <i class="fa-solid fa-plus me-2"></i>Điểm danh mới
+                    </button>
+                }
+
+            </div>
+            <div class="card-body p-0">
+                @if (!attendanceList.Any())
+                {
+                    <div class="text-muted fst-italic p-3">Không có buổi điểm danh nào.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:48px;">#</th>
+                                    <th>Ngày</th>
+                                    <th>Lần</th>
+                                    <th>Ghi chú</th>
+                                    <th style="width:100px;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var group in grouped)
+                                {
+                                    int lan = 1;
+                                    foreach (var att in group.OrderBy(x => x.Ngay))
+                                    {
+                                        <tr>
+                                            <td>@rowIndex</td>
+                                            <td>@group.Key.ToString("dd/MM/yyyy")</td>
+                                            <td>Lần @lan</td>
+                                            <td>@att.GhiChu</td>
+                                            <td>
+                                                <a href="@Url.Action("AttendanceDetails", "Teacher", new { id = att.Id })"
+                                                   class="btn btn-outline-primary btn-sm" title="Xem chi tiết">
+                                                    <i class="fa-solid fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        lan++;
+                                        rowIndex++;
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

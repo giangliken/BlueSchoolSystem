@@ -103,7 +103,7 @@
                         </a>
                     </li>
                     <li>
-                        <a href="/Teacher/ClassManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/ClassManager") ? "active text-white bg-primary" : "text-white")">
+                        <a href="/Teacher/LopPhuTrach" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/LopPhuTrach") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-people-roof me-2"></i>Lớp phụ trách
                         </a>
                     </li>
@@ -419,3 +419,28 @@
 
 
 </html>
+
+
+<script>
+    // Hàm phát hiện thiết bị di động (cực kỳ phổ biến)
+    function isMobile() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    window.onload = function () {
+      if (isMobile()) {
+        // Hiện popup/overlay cảnh báo
+        document.body.innerHTML = `
+          <div style="
+            display:flex;align-items:center;justify-content:center;height:100vh;width:100vw;
+            background:white;z-index:99999;position:fixed;top:0;left:0;right:0;bottom:0;
+            flex-direction:column;text-align:center;">
+            <img src='https://cdn-icons-png.flaticon.com/512/753/753345.png' width="80"/>
+            <h2 style="color:#FF4B4B;">Trang web này không hỗ trợ thiết bị di động!</h2>
+            <p>Vui lòng dùng máy tính để truy cập hệ thống.</p>
+          </div>
+        `;
+        document.body.style.overflow = "hidden";
+      }
+    }
+</script>

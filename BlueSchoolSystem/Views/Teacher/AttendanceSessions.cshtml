@@ -1,0 +1,67 @@
+﻿@using BlueSchoolSystem.Models.ViewModel
+@model List<AttendanceSessionViewModel>
+@{
+    ViewBag.Title = "Danh sách buổi điểm danh";
+    var grouped = Model
+        .GroupBy(x => x.Ngay.Date)
+        .OrderByDescending(g => g.Key)
+        .ToList();
+}
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+<h2 class="d-flex justify-content-between align-items-center">
+    Buổi điểm danh lớp học phần @ViewBag.LopHocPhanId
+    <form asp-action="CreateAttendanceSession" method="post">
+        <input type="hidden" name="LopHocPhanId" value="@ViewBag.LopHocPhanId" />
+        <button type="submit" class="btn btn-success">Tạo buổi điểm danh mới</button>
+    </form>
+
+
+</h2>
+
+@foreach (var group in grouped)
+{
+    <h4 class="mt-4 text-primary">
+        @group.Key.ToString("dd/MM/yyyy")
+    </h4>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Mã Code</th>
+                <th>Thời gian mở</th>
+                <th>Thời gian đóng</th>
+                <th>Trạng thái</th>
+                <th>Ghi chú</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @{
+                int stt = 1;
+                foreach (var session in group.OrderBy(s => s.CreatedAt))
+                {
+                    <tr>
+                        <td>@(stt++)</td>
+                        <td>@session.Code</td>
+                        <td>@session.CreatedAt.ToString("HH:mm")</td>
+                        <td>@session.ExpireAt.ToString("HH:mm")</td>
+                        <td>@session.TrangThaiId</td>
+                        <td>@session.GhiChu</td>
+                        <td>
+                            <a href="@Url.Action("AttendanceDetails", new { id = session.Id })" class="btn btn-primary btn-sm">Chi tiết</a>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}

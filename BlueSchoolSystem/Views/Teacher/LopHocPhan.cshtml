@@ -1,0 +1,96 @@
+﻿@model LopHocPhanFilterViewModel
+
+@{
+    ViewBag.Title = "Lớp học phần phụ trách";
+}
+
+@functions {
+    public int ToTiet(string? gio)
+    {
+        if (string.IsNullOrEmpty(gio)) return 0;
+        var hm = TimeSpan.Parse(gio);
+        if (hm < TimeSpan.Parse("07:30")) return 1;
+        if (hm <= TimeSpan.Parse("08:15")) return 2;
+        if (hm <= TimeSpan.Parse("09:00")) return 3;
+        if (hm <= TimeSpan.Parse("10:05")) return 4;
+        if (hm <= TimeSpan.Parse("10:50")) return 5;
+        if (hm <= TimeSpan.Parse("11:35")) return 6;
+        if (hm <= TimeSpan.Parse("13:15")) return 7;
+        if (hm <= TimeSpan.Parse("13:55")) return 8;
+        if (hm <= TimeSpan.Parse("14:45")) return 9;
+        if (hm <= TimeSpan.Parse("15:50")) return 10;
+        if (hm <= TimeSpan.Parse("16:35")) return 11;
+        if (hm <= TimeSpan.Parse("17:20")) return 12;
+        if (hm <= TimeSpan.Parse("18:45")) return 13;
+        if (hm <= TimeSpan.Parse("19:30")) return 14;
+        return 15;
+    }
+}
+
+<div class="mb-3 d-flex align-items-center justify-content-between">
+    <form method="get" asp-action="LopHocPhan" class="mb-0">
+        <select name="selectedHocKyId"
+                class="form-select fw-semibold text-primary border-primary"
+                asp-items="ViewBag.HocKyList"
+                onchange="this.form.submit()">
+        </select>
+    </form>
+</div>
+
+
+
+
+
+<table class="table table-bordered table-hover align-middle mb-0">
+    <thead class="table-dark text-center">
+        <tr>
+            <th scope="col" style="width:50px;">#</th>
+            <th scope="col">Mã lớp</th>
+            <th scope="col">Tên lớp học phần</th>
+            <th scope="col">Ngày học</th>
+            <th scope="col">Sĩ số</th>
+            <th scope="col">Thời gian giảng dạy</th>
+            <th scope="col">Trạng thái</th>
+        </tr>
+    </thead>
+    <tbody>
+        @for (int i = 0; i < Model.LopHocPhans.Count; i++)
+        {
+            var lhp = Model.LopHocPhans[i];
+            var trangThai = lhp.TrangThai?.TenTrangThai?.Trim() ?? "";
+            string rowClass = trangThai switch
+            {
+                "Đang diễn ra" => "row-open",
+                "Đã kết thúc" => "row-closed",
+                _ => "row-default"
+            };
+
+            <tr class="@rowClass"
+                style="cursor:pointer"
+                onclick="window.location='@Url.Action("LopHocPhanDetails", "Teacher", new { maLopHocPhan = lhp.MaLopHocPhan })'">
+                <td class="text-center fw-semibold">@((i + 1).ToString())</td>
+                <td>@lhp.MaLopHocPhan</td>
+                <td>@lhp.MaMonHoc - @lhp.TenMonHoc</td>
+                <td class="text-center">
+                    Thứ @lhp.Thu, tiết @ToTiet(lhp.GioBatDau)
+                    @if (!string.IsNullOrEmpty(lhp.GioKetThuc))
+                    {
+                        <span> - @ToTiet(lhp.GioKetThuc)</span>
+                    }
+                </td>
+
+                <td class="text-center">@lhp.SiSoThucTe</td>
+                <td class="text-center">
+                    @lhp.NgayBatDauLop.ToString("dd/MM/yyyy") -> @lhp.NgayKetThucLop.ToString("dd/MM/yyyy")
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-@((trangThai == "Đang mở") ? "success" : (trangThai == "Đã kết thúc" ? "secondary" : "info"))">
+                        @lhp.TrangThai?.TenTrangThai
+                    </span>
+                </td>
+            </tr>
+        }
+
+    </tbody>
+
+</table>

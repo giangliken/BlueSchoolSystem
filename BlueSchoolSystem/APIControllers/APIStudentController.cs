@@ -1,5 +1,8 @@
-﻿using BlueSchoolSystem.Models;
+﻿using Azure.Core;
+using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using Firebase.Database;
+using Firebase.Database.Query;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -327,9 +330,8 @@ namespace BlueSchoolSystem.APIControllers
                              join sv in _context.SinhViens on dk.SinhVienId equals sv.Id
                              join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
                              join gv in _context.GiangViens on lhp.GiangVienId equals gv.Id
-                             join ph in _context.PhongHocs on lhp.PhongHocId equals ph.Id
                              where sv.MSSV == mssv
-                             orderby lhp.Thu, lhp.GioBatDau
+                             //orderby lhp.Thu, lhp.GioBatDau
                              select new
                              {
                                  sv.MSSV,
@@ -338,10 +340,6 @@ namespace BlueSchoolSystem.APIControllers
                                  MaMonHoc = mh.MaMonHoc,
                                  TenMonHoc = mh.TenMonHoc,
                                  TenGiangVien = gv.HoVaTenDem + " " + gv.Ten,
-                                 MaPhongHoc = ph.MaPhongHoc,
-                                 lhp.Thu,
-                                 lhp.GioBatDau,
-                                 lhp.GioKetThuc,
                                  lhp.NgayBatDau,
                                  lhp.NgayKetThuc
                              }).ToListAsync();
@@ -680,155 +678,129 @@ namespace BlueSchoolSystem.APIControllers
             return Ok(response);
         }
 
-        // Lấy danh sách lớp học phần theo MSSV
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
-        [HttpGet("lophocphansinhvien/{mssv}")]
-        public async Task<IActionResult> GetLopHocPhanByMSSV(string mssv)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student)]
+        [HttpPost("diemdanh/checkin")]
+        public async Task<IActionResult> CheckinDiemDanh([FromBody] CheckinDiemDanhRequest model)
         {
-            // MSSV từ token
-            var mssvFromToken = User.FindFirst("username")?.Value;
-            if (mssvFromToken == null)
+            var userId = User.FindFirst("userId")?.Value;
+            var sinhVien = await _context.SinhViens.FirstOrDefaultAsync(x => x.UserId == userId);
+            if (sinhVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy thông tin sinh viên" });
+
+            // Kiểm tra buổi điểm danh hợp lệ, đang mở, đúng code, còn hạn
+            var buoi = await _context.DiemDanhs.FirstOrDefaultAsync(x =>
+                x.Id == model.DiemDanhId &&
+                x.Code == model.Code &&
+                x.ExpireAt > DateTime.Now &&
+                x.TrangThaiId == 1 // Đang mở
+            );
+            if (buoi == null)
+                return BadRequest(new { result = false, message = "Mã điểm danh không hợp lệ hoặc đã hết hạn" });
+
+            // Check đã điểm danh chưa
+            var existed = await _context.ChiTietDiemDanhs.AnyAsync(x =>
+                x.DiemDanhId == model.DiemDanhId && x.SinhVienId == sinhVien.Id
+            );
+            if (existed)
+                return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi" });
+
+            // Ghi nhận điểm danh
+            var ct = new ChiTietDiemDanh
             {
-                return Unauthorized(new
-                {
-                    result = false,
-                    code = 401,
-                    message = "Không lấy được MSSV từ token"
-                });
-            }
+                DiemDanhId = model.DiemDanhId,
+                SinhVienId = sinhVien.Id,
+                ThoiGian = DateTime.Now,
+                Latitude = model.Latitude,
+                Longitude = model.Longitude,
+                DeviceId = model.DeviceId,
+                TrangThaiId = 1 // Có mặt
+            };
+            _context.ChiTietDiemDanhs.Add(ct);
+            await _context.SaveChangesAsync();
 
-            if (mssvFromToken != mssv)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, new
-                {
-                    result = false,
-                    code = 403,
-                    message = "Bạn không có quyền truy cập lớp học phần của sinh viên khác"
-                });
-            }
-
-            //  Truy vấn dữ liệu tương tự SQL bạn viết
-            var query = from ct in _context.ChiTietLopHocPhans
-                        join sv in _context.SinhViens on ct.SinhVienId equals sv.Id
-                        join lhp in _context.LopHocPhans on ct.LopHocPhanId equals lhp.Id
-                        join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
-                        join hk in _context.HocKys on lhp.HocKyId equals hk.Id
-                        where sv.MSSV == mssv
-                        group new { mh, lhp } by new { hk.Id, hk.TenHocKy, hk.NgayBatDau } into g
-                        orderby g.Key.Id
-                        select new
-                        {
-                            HocKyId = g.Key.Id,
-                            TenHocKy = g.Key.TenHocKy,
-                            NgayBatDau = g.Key.NgayBatDau,
-                            DanhSachMon = g.Select(x => new
-                            {
-                                x.mh.MaMonHoc,
-                                x.mh.TenMonHoc,
-                                x.mh.SoTinChi,
-                                LopHocPhanId = x.lhp.Id,
-                                x.lhp.MaLopHocPhan
-                            }).ToList()
-                        };
-
-            var data = await query.ToListAsync();
-
-            if (!data.Any())
-            {
-                return NotFound(new
-                {
-                    result = false,
-                    code = 404,
-                    message = "Không tìm thấy lớp học phần cho MSSV này"
-                });
-            }
-
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = "Lấy danh sách lớp học phần thành công",
-                soluongHocKy = data.Count,
-                data
-            });
+            return Ok(new { result = true, message = "Điểm danh thành công!" });
         }
 
-        //  Lấy các buổi điểm danh của sinh viên theo MSSV và ID lớp học phần
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
-        [HttpGet("lophocphansinhvien/{mssv}/lop/{lopHocPhanId}/diemdanh")]
-        public async Task<IActionResult> GetDiemDanhByLop(string mssv, int lopHocPhanId)
+        // Điểm danh qua mã code
+        [HttpPost("diemdanh/thuchien")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student)]
+        public async Task<IActionResult> DiemDanh([FromBody] DiemDanhRequest request)
         {
-            // 🔹 1. Lấy MSSV từ token
-            var mssvFromToken = User.FindFirst("username")?.Value;
-            if (mssvFromToken == null)
-                return Unauthorized(new
-                {
-                    result = false,
-                    code = 401,
-                    message = "Không lấy được MSSV từ token"
-                });
+            if (string.IsNullOrWhiteSpace(request.Code))
+                return BadRequest(new { result = false, message = "Thiếu mã điểm danh" });
 
-            if (mssvFromToken != mssv)
-                return StatusCode(StatusCodes.Status403Forbidden, new
-                {
-                    result = false,
-                    code = 403,
-                    message = "Không có quyền truy cập dữ liệu của sinh viên khác"
-                });
+            // Lấy MSSV hoặc UserName từ token (claim "username")
+            var mssv = User.FindFirst("username")?.Value;
+            if (string.IsNullOrEmpty(mssv))
+                return Unauthorized(new { result = false, message = "Không tìm thấy MSSV trong token" });
 
-            // 🔹 2. Kiểm tra sinh viên có thuộc lớp học phần này không
-            var isExist = await _context.ChiTietLopHocPhans
-                .Include(ct => ct.SinhVien)
-                .AnyAsync(ct => ct.LopHocPhanId == lopHocPhanId && ct.SinhVien.MSSV == mssv);
+            // Tìm buổi điểm danh hợp lệ
+            var now = DateTime.Now;
+            var buoi = await _context.DiemDanhs
+                .FirstOrDefaultAsync(x => x.Code == request.Code && x.ExpireAt >= now);
 
-            if (!isExist)
-                return NotFound(new
-                {
-                    result = false,
-                    code = 404,
-                    message = "Sinh viên không thuộc lớp học phần này"
-                });
+            if (buoi == null)
+                return BadRequest(new { result = false, message = "Mã điểm danh không hợp lệ hoặc đã hết hạn" });
 
-            // 🔹 3. Lấy danh sách buổi điểm danh và trạng thái của sinh viên
-            var query = from dd in _context.DiemDanhs
-                        join ctd in _context.ChiTietDiemDanhs on dd.Id equals ctd.DiemDanhId
-                        join sv in _context.SinhViens on ctd.SinhVienId equals sv.Id
-                        join tt in _context.TrangThais on ctd.TrangThaiId equals tt.Id into tts
-                        from tt in tts.DefaultIfEmpty()
-                        where sv.MSSV == mssv && dd.LopHocPhanId == lopHocPhanId
-                        orderby dd.Ngay
-                        select new
-                        {
-                            dd.Ngay,
-                            dd.Code,
-                            dd.GhiChu,
-                            TenTrangThai = tt.TenTrangThai,
-                            ctd.ThoiGian,
-                            ctd.DeviceId,
-                            GhiChuChiTiet = ctd.GhiChu
-                        };
+            // Kiểm tra sinh viên có tồn tại và thuộc lớp không
+            var sinhVien = await _context.SinhViens.FirstOrDefaultAsync(x => x.MSSV == mssv);
+            if (sinhVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy sinh viên" });
 
-            var data = await query.ToListAsync();
+            var inClass = await _context.ChiTietLopHocPhans
+                .AnyAsync(x => x.LopHocPhanId == buoi.LopHocPhanId && x.SinhVienId == sinhVien.Id);
+            if (!inClass)
+                return BadRequest(new { result = false, message = "Sinh viên không thuộc lớp này" });
 
-            if (!data.Any())
-                return NotFound(new
-                {
-                    result = false,
-                    code = 404,
-                    message = "Không có dữ liệu điểm danh"
-                });
+            // Kiểm tra đã điểm danh chưa
+            var exist = await _context.ChiTietDiemDanhs
+                .AnyAsync(x => x.DiemDanhId == buoi.Id && x.SinhVienId == sinhVien.Id);
+            if (exist)
+                return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi!" });
 
-            // 🔹 4. Trả kết quả
-            return Ok(new
+            // Lưu điểm danh SQL
+            var chiTiet = new ChiTietDiemDanh
             {
-                result = true,
-                code = 200,
-                message = "Lấy danh sách điểm danh thành công",
-                soluong = data.Count,
-                data
-            });
+                DiemDanhId = buoi.Id,
+                SinhVienId = sinhVien.Id,
+                TrangThaiId = 1,
+                Latitude = request.Latitude,      
+                Longitude = request.Longitude,   
+                DeviceId = request.DeviceId,
+                ThoiGian = now,
+            };
+            _context.ChiTietDiemDanhs.Add(chiTiet);
+            await _context.SaveChangesAsync();
+
+            // --- PUSH FIREBASE ---
+            await PushAttendanceToFirebase(buoi.Id, sinhVien, now, request);
+
+            return Ok(new { result = true, message = "Điểm danh thành công!" });
         }
 
+
+        private async Task PushAttendanceToFirebase(int diemDanhId, SinhVien sv, DateTime thoiGian, DiemDanhRequest request)
+        {
+            var firebaseClient = new Firebase.Database.FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com"); 
+            var data = new
+            {
+                id = sv.Id,
+                mssv = sv.MSSV,
+                hoVaTenDem = sv.HoVaTenDem,
+                ten = sv.Ten,
+                trangThai = 1,
+                thoiGian = thoiGian.ToString("s"),
+                latitude = request.Latitude,
+                longitude = request.Longitude,
+                deviceId = request.DeviceId
+            };
+
+            await firebaseClient
+                .Child("attendance_sessions")
+                .Child(diemDanhId.ToString())
+                .Child(sv.Id.ToString())
+                .PutAsync(data);
+        }
 
     }
 }
