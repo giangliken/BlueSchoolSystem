@@ -2,18 +2,22 @@
 {
     public class ThoiKhoaBieuViewModel
     {
-        public string MSSV { get; set; }
-        public string MaLopHocPhan { get; set; }
-        public string TenLopHocPhan { get; set; }
-        public string MaMonHoc { get; set; }
-        public string TenMonHoc { get; set; }
-        public string TenGiangVien { get; set; }
-        public string MaPhongHoc { get; set; }
-        public int Thu { get; set; }
+
+        public string MaLopHocPhan { get; set; } = string.Empty;
+        public string TenLopHocPhan { get; set; } = string.Empty;
+        public string MaMonHoc { get; set; } = string.Empty;
+        public string TenMonHoc { get; set; } = string.Empty;
+        public string TenGiangVien { get; set; } = string.Empty;
+        public string MaPhongHoc { get; set; } = string.Empty;
+
+        public DateTime NgayHoc { get; set; }
         public string? GioBatDau { get; set; }
         public string? GioKetThuc { get; set; }
+
+        public int TietBatDau { get; set; }
+        public int SoTiet { get; set; }
+
         public DateTime NgayBatDau { get; set; }
         public DateTime NgayKetThuc { get; set; }
-
     }
 }
