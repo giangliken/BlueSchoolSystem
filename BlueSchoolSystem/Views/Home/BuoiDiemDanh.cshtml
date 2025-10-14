@@ -174,6 +174,7 @@
             #modalViTri a:hover {
                 text-decoration: underline;
             }
+
 </style>
 @model List<BlueSchoolSystem.Models.ViewModel.DiemDanhViewModel>
 @{
@@ -262,8 +263,7 @@
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#modalChiTiet"
                                                     data-ngay="@item.Ngay.ToString("dd/MM/yyyy")"
-                                                    data-thoigian="@item.ThoiGian?.ToString("HH:mm")"
-                                                    data-device="@item.DeviceId"
+                                                    data-thoigian="@item.ThoiGian?.ToString("HH:mm dd/MM/yyyy ")"
                                                     data-lat="@(item.Latitude.HasValue? item.Latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
                                                     data-lon="@(item.Longitude.HasValue? item.Longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
                                                     data-ghichu="@item.GhiChuChiTiet">
@@ -298,10 +298,18 @@
             </div>
             <div class="modal-body">
                 <table class="table table-bordered">
-                    <tr><th>Phương thức</th><td id="modalGhiChu"></td></tr>
-                    <tr><th>Ngày giờ</th><td id="modalNgayGio"></td></tr>
-                    <tr><th>Thiết bị</th><td id="modalDevice"></td></tr>
-                    <tr><th>Vị trí</th><td id="modalViTri"></tr>
+                    <tr>
+                        <th style="width: 150px; white-space: nowrap;">Phương thức</th>
+                        <td id="modalGhiChu"></td>
+                    </tr>
+                    <tr>
+                        <th style="white-space: nowrap;">Thời gian</th>
+                        <td id="modalNgayGio"></td>
+                    </tr>
+                    <tr>
+                        <th style="white-space: nowrap;">Vị trí</th>
+                        <td id="modalViTri"></td>
+                    </tr>
                 </table>
             </div>
         </div>
@@ -314,13 +322,16 @@
         modal.addEventListener('show.bs.modal', async function (event) {
             const btn = event.relatedTarget;
 
+            // Lấy trực tiếp thời gian đầy đủ
+            const thoigian = btn.getAttribute('data-thoigian'); // ví dụ: "03/09/2025 16:20:14"
+            document.getElementById('modalNgayGio').textContent = thoigian || '';
+
+            // Ghi chú
+            document.getElementById('modalGhiChu').textContent = btn.getAttribute('data-ghichu') || '';
+
+            // Vị trí
             const lat = btn.getAttribute('data-lat');
             const lon = btn.getAttribute('data-lon');
-
-            document.getElementById('modalNgayGio').textContent = btn.getAttribute('data-ngay') + " " + btn.getAttribute('data-thoigian');
-            document.getElementById('modalDevice').textContent = btn.getAttribute('data-device');
-            document.getElementById('modalGhiChu').textContent = btn.getAttribute('data-ghichu');
-
             const viTriElement = document.getElementById('modalViTri');
 
             if (lat && lon) {
@@ -330,27 +341,17 @@
                 viTriElement.innerHTML = `Đang lấy địa chỉ... (${latDisplay}, ${lonDisplay})`;
 
                 try {
-                    // Gọi API Nominatim OSM
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
                     const data = await response.json();
 
                     if (data && data.display_name) {
-                        viTriElement.innerHTML = `
-                            <div>${data.display_name}</div>
-
-                        `;
+                        viTriElement.innerHTML = `<div>${data.display_name}</div>`;
                     } else {
-                        viTriElement.innerHTML = `
-                            <div>Không xác định địa chỉ</div>
-
-                        `;
+                        viTriElement.innerHTML = `<div>Không xác định địa chỉ</div>`;
                     }
                 } catch (err) {
                     console.error(err);
-                    viTriElement.innerHTML = `
-                        <div>Lỗi khi lấy địa chỉ</div>
-
-                    `;
+                    viTriElement.innerHTML = `<div>Lỗi khi lấy địa chỉ</div>`;
                 }
             } else {
                 viTriElement.textContent = "Không có thông tin vị trí";
