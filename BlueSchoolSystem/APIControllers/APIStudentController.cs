@@ -370,26 +370,26 @@ namespace BlueSchoolSystem.APIControllers
             {
                 int ToTiet(TimeSpan gio)
                 {
-                    if (gio <= TimeSpan.Parse("07:30")) return 1;
-                    if (gio <= TimeSpan.Parse("08:15")) return 2;
-                    if (gio <= TimeSpan.Parse("09:00")) return 3;
-                    if (gio <= TimeSpan.Parse("10:05")) return 4;
-                    if (gio <= TimeSpan.Parse("10:50")) return 5;
-                    if (gio <= TimeSpan.Parse("11:35")) return 6;
-                    if (gio <= TimeSpan.Parse("13:15")) return 7;
-                    if (gio <= TimeSpan.Parse("13:55")) return 8;
-                    if (gio <= TimeSpan.Parse("14:45")) return 9;
-                    if (gio <= TimeSpan.Parse("15:50")) return 10;
-                    if (gio <= TimeSpan.Parse("16:35")) return 11;
-                    if (gio <= TimeSpan.Parse("17:20")) return 12;
-                    if (gio <= TimeSpan.Parse("18:45")) return 13;
-                    if (gio <= TimeSpan.Parse("19:30")) return 14;
+                    if (gio <= TimeSpan.Parse("6:45")) return 1;
+                    if (gio <= TimeSpan.Parse("07:30")) return 2;
+                    if (gio <= TimeSpan.Parse("08:15")) return 3;
+                    if (gio <= TimeSpan.Parse("09:20")) return 4;
+                    if (gio <= TimeSpan.Parse("10:05")) return 5;
+                    if (gio <= TimeSpan.Parse("10:50")) return 6;
+                    if (gio <= TimeSpan.Parse("12:30")) return 7;
+                    if (gio <= TimeSpan.Parse("13:10")) return 8;
+                    if (gio <= TimeSpan.Parse("14:00")) return 9;
+                    if (gio <= TimeSpan.Parse("15:05")) return 10;
+                    if (gio <= TimeSpan.Parse("15:50")) return 11;
+                    if (gio <= TimeSpan.Parse("16:35")) return 12;
+                    if (gio <= TimeSpan.Parse("18:00")) return 13;
+                    if (gio <= TimeSpan.Parse("18:45")) return 14;
                     return 15;
                 }
 
                 int tietBatDau = ToTiet(item.GioBatDau);
                 int tietKetThuc = ToTiet(item.GioKetThuc);
-                int soTiet = tietKetThuc - tietBatDau + 1;
+                int soTiet = tietKetThuc - tietBatDau ;
 
                 return new ThoiKhoaBieuViewModel
                 {
