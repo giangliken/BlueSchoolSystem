@@ -1,5 +1,6 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using BlueSchoolSystem.Services;
 using Firebase.Database.Query;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -676,8 +677,8 @@ namespace BlueSchoolSystem.APIControllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
         [HttpPost("lophocphan/{maLopHocPhan}/guithongbao")]
         public async Task<IActionResult> GuiThongBaoLopHocPhan(
-    string maLopHocPhan,
-    [FromBody] GuiThongBaoLopRequest model)
+        string maLopHocPhan,
+        [FromBody] GuiThongBaoLopRequest model)
         {
             var senderUserId = User.FindFirst("userId")?.Value;
             if (string.IsNullOrEmpty(senderUserId))
@@ -722,9 +723,16 @@ namespace BlueSchoolSystem.APIControllers
             {
                 await PushNotificationToFirebase(tb.ReceiverUserId, tb);
                 var user = await _context.Users.FindAsync(tb.ReceiverUserId);
+
                 if (!string.IsNullOrEmpty(user?.FcmToken))
                 {
-                    await SendFcmPush(user.FcmToken, tb.Title, tb.Content);
+                    var tenLop = chiTietList.FirstOrDefault()?.LopHocPhan?.TenLopHocPhan ?? "Lớp học phần";
+
+                    // Title là tên lớp, body là tiêu đề thông báo hoặc nội dung
+                    var fcmTitle = $"{tenLop} - Thông báo mới";
+                    var fcmBody = tb.Title; // Hoặc tb.Content nếu bạn muốn
+
+                    await SendFcmPush(user.FcmToken, fcmTitle, fcmBody);
                 }
             }
 
@@ -764,31 +772,9 @@ namespace BlueSchoolSystem.APIControllers
 
         private async Task SendFcmPush(string fcmToken, string title, string body)
         {
-            var serverKey = "YOUR_SERVER_KEY_FROM_FIREBASE";
-            var message = new
-            {
-                to = fcmToken,
-                notification = new
-                {
-                    title = title,
-                    body = body,
-                },
-                data = new
-                {
-                    click_action = "FLUTTER_NOTIFICATION_CLICK",
-                    customKey = "customValue"
-                }
-            };
-
-            using var client = new HttpClient();
-            client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", "key=" + serverKey);
-
-            var json = System.Text.Json.JsonSerializer.Serialize(message);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("https://fcm.googleapis.com/fcm/send", content);
-
-            // Optionally: handle response if needed
+            await FcmService.SendNotificationAsync(fcmToken, title, body);
         }
+
 
 
 
