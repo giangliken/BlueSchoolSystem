@@ -1,0 +1,361 @@
+﻿<style>
+    /* Card */
+    .card {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1.5px solid #dee2e6; /* ✅ viền ngoài */
+        padding: 15px;
+        background-color: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    /* Header */
+    .card-header {
+        background: linear-gradient(90deg, #0dcaf0, #0d9dfd);
+        color: white;
+        font-weight: bold;
+        border-bottom: none !important;
+    }
+
+        .card-header h6 {
+            color: white;
+            margin: 0;
+        }
+
+    /* Custom dropdown */
+    .custom-select {
+        border: 1px solid #0d6efd;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 1rem;
+        font-weight: 500;
+        color: #0d6efd;
+        background-color: #fff;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        min-width: 300px;
+        height: 42px;
+    }
+
+        .custom-select:focus {
+            outline: none;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, .25);
+            border-color: #0b5ed7;
+        }
+
+        .custom-select:hover {
+            border-color: #0b5ed7;
+            box-shadow: 0 0 6px rgba(13, 110, 253, 0.3);
+        }
+
+    /* Table */
+    .table-responsive {
+        max-height: 500px;
+        overflow: auto;
+    }
+
+    table.table {
+        border-radius: 8px;
+        overflow: hidden;
+        width: 100%;
+        table-layout: auto;
+    }
+
+    thead.table-primary {
+        background: linear-gradient(90deg, #0d6efd, #0d9dfd) !important;
+        color: #fff !important;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    /* Sticky columns */
+    th.sticky-col, td.sticky-col {
+        position: sticky;
+        left: 0;
+        background: #f8f9fa !important;
+        z-index: 3;
+        font-weight: 600;
+        border-right: 1px solid #dee2e6;
+    }
+
+    th.sticky-col-2, td.sticky-col-2 {
+        position: sticky;
+        left: 70px;
+        background: #f8f9fa !important;
+        z-index: 3;
+        border-right: 1px solid #dee2e6;
+    }
+
+    /* Row hover & alternate */
+    tbody tr:nth-child(even) {
+        background-color: #fafbfc;
+    }
+
+    tbody tr:hover {
+        background-color: #eaf3ff !important;
+    }
+
+    /* STT column */
+    td.sticky-col {
+        text-align: center;
+        font-weight: bold;
+        color: #0d6efd;
+    }
+
+    /* Borders */
+    .table-bordered th, .table-bordered td {
+        border: 1px solid #dee2e6;
+        vertical-align: middle;
+    }
+
+    /* Căn giữa dữ liệu trong bảng */
+    .table td, .table th {
+        text-align: center;
+        vertical-align: middle;
+    }
+
+        /* Riêng cột Tên môn học thì căn trái */
+        .table td.ten-monhoc, .table th.ten-monhoc {
+            text-align: left;
+        }
+
+    /* Điều chỉnh độ rộng cột */
+    th.stt-col, td.stt-col {
+        width: 30px;
+    }
+
+    th.ma-col, td.ma-col {
+        width: 80px;
+    }
+
+    th.ten-col, td.ten-col {
+        width: 200px;
+    }
+
+    /* Tabs */
+    .nav-tabs-custom {
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        gap: 12px;
+    }
+
+        .nav-tabs-custom .nav-link {
+            border: none;
+            background: transparent;
+            color: #6c757d;
+            font-weight: 500;
+            padding: 8px 20px;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
+        }
+
+            .nav-tabs-custom .nav-link:hover {
+                color: #0d6efd;
+                background-color: #f8f9fa;
+            }
+
+            .nav-tabs-custom .nav-link.active {
+                background-color: #0d6efd;
+                color: #fff;
+                font-weight: 600;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            }
+    /* Tùy chỉnh modal chi tiết */
+    #modalViTri {
+        line-height: 1.5;
+    }
+
+        #modalViTri a {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+
+            #modalViTri a:hover {
+                text-decoration: underline;
+            }
+
+</style>
+@model List<BlueSchoolSystem.Models.ViewModel.DiemDanhViewModel>
+@{
+    ViewData["Title"] = "Điểm danh";
+    var tongSoBuoi = Model.Count;
+    var tongVang = Model.Count(x => x.TrangThai == "Vắng mặt");
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+<h6>Trang chủ / Học vụ / Lớp học phần</h6>
+
+<div class="card mt-3">
+    <div class="card-body">
+
+        <!-- Header -->
+        <div class="d-flex align-items-center mb-3">
+            <a href="javascript:history.back()" class="btn btn-outline-primary btn-lg me-3 rounded-circle shadow-sm">
+                <i class="bi bi-arrow-left fs-4"></i>
+            </a>
+            <h4 class="mb-0">
+                @if (!string.IsNullOrEmpty(ViewBag.TenMonHoc as string))
+                {
+                    @($"Lớp: {ViewBag.TenMonHoc}")
+                }
+                else
+                {
+                    <span class="text-danger">Không có buổi điểm danh</span>
+                }
+            </h4>
+        </div>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3 nav-tabs-custom" id="tabDiemDanh" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" id="tab-diemdanh" data-bs-toggle="tab" data-bs-target="#content-diemdanh">
+                    Điểm danh
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="tab-thongbao" data-bs-toggle="tab" data-bs-target="#content-thongbao">
+                    Thông báo
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- Tab Điểm danh -->
+            <div class="tab-pane fade show active" id="content-diemdanh">
+                <div class="mb-3">
+                    <strong>Tổng số buổi:</strong> <span class="text-primary">@tongSoBuoi</span> |
+                    <strong>Vắng:</strong> <span class="text-danger">@tongVang</span>
+                </div>
+
+                @if (!Model.Any())
+                {
+                    <div class="alert alert-warning text-center">Không có dữ liệu điểm danh.</div>
+                }
+                else
+                {
+                    <div class="table-responsive" style="max-width:600px;">
+                        <table class="table table-bordered table-sm align-middle">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>Ngày buổi điểm danh</th>
+                                    <th>Trạng thái</th>
+                                    <th>Chi tiết</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model)
+                                {
+                                    var icon = item.TrangThai switch
+                                    {
+                                        "Có mặt" => "<i class='bi bi-check-circle-fill text-success'></i>",
+                                        "Vắng mặt" => "<i class='bi bi-x-circle-fill text-danger'></i>",
+                                        _ => "<i class='bi bi-question-circle text-secondary'></i>"
+                                    };
+
+                                    <tr>
+                                        <td>@item.Ngay.ToString("dd/MM/yyyy") </td>
+                                        <td>@Html.Raw(icon) @item.TrangThai</td>
+                                        <td>
+                                            <button class="btn btn-primary btn-sm"
+                                                    @(item.TrangThai != "Có mặt" ? "disabled" : "")
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalChiTiet"
+                                                    data-ngay="@item.Ngay.ToString("dd/MM/yyyy")"
+                                                    data-thoigian="@item.ThoiGian?.ToString("HH:mm dd/MM/yyyy ")"
+                                                    data-lat="@(item.Latitude.HasValue? item.Latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                                    data-lon="@(item.Longitude.HasValue? item.Longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                                    data-ghichu="@item.GhiChuChiTiet">
+                                                Xem
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <!-- Tab Thông báo -->
+            <div class="tab-pane fade" id="content-thongbao">
+                <div class="alert alert-info text-center">
+                    Chưa có thông báo nào!
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Chi tiết -->
+<div class="modal fade" id="modalChiTiet" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Chi tiết điểm danh</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-bordered">
+                    <tr>
+                        <th style="width: 150px; white-space: nowrap;">Phương thức</th>
+                        <td id="modalGhiChu"></td>
+                    </tr>
+                    <tr>
+                        <th style="white-space: nowrap;">Thời gian</th>
+                        <td id="modalNgayGio"></td>
+                    </tr>
+                    <tr>
+                        <th style="white-space: nowrap;">Vị trí</th>
+                        <td id="modalViTri"></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const modal = document.getElementById('modalChiTiet');
+        modal.addEventListener('show.bs.modal', async function (event) {
+            const btn = event.relatedTarget;
+
+            // Lấy trực tiếp thời gian đầy đủ
+            const thoigian = btn.getAttribute('data-thoigian'); // ví dụ: "03/09/2025 16:20:14"
+            document.getElementById('modalNgayGio').textContent = thoigian || '';
+
+            // Ghi chú
+            document.getElementById('modalGhiChu').textContent = btn.getAttribute('data-ghichu') || '';
+
+            // Vị trí
+            const lat = btn.getAttribute('data-lat');
+            const lon = btn.getAttribute('data-lon');
+            const viTriElement = document.getElementById('modalViTri');
+
+            if (lat && lon) {
+                const latDisplay = lat.replace('.', ',');
+                const lonDisplay = lon.replace('.', ',');
+
+                viTriElement.innerHTML = `Đang lấy địa chỉ... (${latDisplay}, ${lonDisplay})`;
+
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+                    const data = await response.json();
+
+                    if (data && data.display_name) {
+                        viTriElement.innerHTML = `<div>${data.display_name}</div>`;
+                    } else {
+                        viTriElement.innerHTML = `<div>Không xác định địa chỉ</div>`;
+                    }
+                } catch (err) {
+                    console.error(err);
+                    viTriElement.innerHTML = `<div>Lỗi khi lấy địa chỉ</div>`;
+                }
+            } else {
+                viTriElement.textContent = "Không có thông tin vị trí";
+            }
+        });
+    </script>
+}

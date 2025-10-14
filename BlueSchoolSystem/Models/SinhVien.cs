@@ -63,6 +63,5 @@ namespace BlueSchoolSystem.Models
 
         public List<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; } = new();
 
-
     }
 }

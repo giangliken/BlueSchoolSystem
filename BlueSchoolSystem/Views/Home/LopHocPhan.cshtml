@@ -1,5 +1,235 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
-@{
-}
+﻿<style>
+    /* ✅ Thêm viền bao quanh toàn trang */
+    .lop-hoc-phan-container {
+        border: 1.5px solid #dee2e6;
+        border-radius: 12px;
+        padding: 20px;
+        background-color: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    /* Header */
+    h6 {
+        font-weight: 600;
+        margin-bottom: 15px;
+    }
+
+    /* Tabs */
+    .nav-tabs-custom {
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        gap: 12px;
+    }
+
+        .nav-tabs-custom .nav-link {
+            border: none;
+            background: transparent;
+            color: #6c757d;
+            font-weight: 500;
+            padding: 8px 20px;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
+        }
+
+            .nav-tabs-custom .nav-link:hover {
+                color: #0d6efd;
+                background-color: #f8f9fa;
+            }
+
+            .nav-tabs-custom .nav-link.active {
+                background-color: #0d6efd;
+                color: #fff;
+                font-weight: 600;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            }
+
+    /* Table */
+    table.table {
+        width: 100%;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: collapse;
+        table-layout: fixed; /* ✅ Quan trọng: giúp hàng full width */
+    }
+
+    thead {
+        background: linear-gradient(90deg, #0d6efd, #0d9dfd);
+        color: #fff;
+    }
+
+    .table th, .table td {
+        text-align: center;
+        vertical-align: middle;
+        border: 1px solid #dee2e6;
+        padding: 8px;
+        word-wrap: break-word;
+    }
+
+        .table td.ten-monhoc, .table th.ten-monhoc {
+            text-align: left;
+        }
+
+    tbody tr:nth-child(even) {
+        background-color: #fafbfc;
+    }
+
+    /* Hover khi rê chuột vào hàng môn học */
+    .table tbody tr.row-selected {
+        background-color: #000 !important;
+        color: #fff !important;
+        font-weight: 600;
+        transition: background-color 0.1s ease-in-out;
+    }
+
+        /* Ngăn hover ghi đè màu khi đã chọn */
+        .table tbody tr.row-selected:hover {
+            background-color: #000 !important;
+            color: #fff !important;
+        }
+
+    /* Hiệu ứng khi rê chuột vào hàng môn học */
+    .table tbody tr:hover {
+        background-color: #000 !important; /* Màu nền xám nhạt */
+        transition: background-color 0.15s ease-in-out;
+        cursor: pointer;
+    }
+</style>
+
+
+@model List<BlueSchoolSystem.Models.ViewModel.LopHocPhanHocKyViewModel>
+<h6>Trang chủ / Học vụ / Lớp học phần</h6>
+<div class="lop-hoc-phan-container">
+
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-danger text-center">Không có dữ liệu lớp học phần</div>
+    }
+    else
+    {
+        <ul class="nav nav-tabs mb-3" id="hocKyTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active"
+                        id="tab-all"
+                        data-bs-toggle="tab"
+                        data-bs-target="#content-all"
+                        type="button" role="tab"
+                        aria-controls="content-all"
+                        aria-selected="true">
+                    Tất cả
+                </button>
+            </li>
+
+            @foreach (var hk in Model)
+            {
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link"
+                            id="tab-@hk.HocKyId"
+                            data-bs-toggle="tab"
+                            data-bs-target="#content-@hk.HocKyId"
+                            type="button" role="tab"
+                            aria-controls="content-@hk.HocKyId"
+                            aria-selected="false">
+                        @hk.TenHocKy
+                    </button>
+                </li>
+            }
+        </ul>
+
+        <div class="tab-content" id="hocKyTabsContent">
+            <!-- Tất cả -->
+            <div class="tab-pane fade show active" id="content-all" role="tabpanel">
+                @foreach (var hk in Model)
+                {
+                    <h6 class="mt-3 mb-2 text-primary fw-bold">@hk.TenHocKy</h6>
+                    <table class="table table-bordered mb-4">
+                        <thead>
+                            <tr>
+                                <th style="width:70px;">Mã MH</th>
+                                <th style="width:200px;" class="ten-monhoc">Tên môn học</th>
+                                <th style="width:50px;">Số tín chỉ</th>
+                                <th style="width:80px;">Lớp học phần</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (hk.DanhSachMon?.Any() == true)
+                            {
+                                foreach (var mon in hk.DanhSachMon)
+                                {
+                                    <tr data-href="@Url.Action("BuoiDiemDanh", "Home", new { lopHocPhanId = mon.LopHocPhanId, tenMonHoc = mon.TenMonHoc })">
+                                        <td>@mon.MaMonHoc</td>
+                                        <td class="ten-monhoc">@mon.TenMonHoc</td>
+                                        <td>@mon.SoTinChi</td>
+                                        <td>@mon.MaLopHocPhan</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr><td colspan="4" class="text-center text-muted">Không có môn học nào</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+
+            <!-- Riêng từng học kỳ -->
+            @foreach (var hk in Model)
+            {
+                <div class="tab-pane fade" id="content-@hk.HocKyId" role="tabpanel">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Mã MH</th>
+                                <th class="ten-monhoc">Tên môn học</th>
+                                <th>Số tín chỉ</th>
+                                <th>Lớp học phần</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (hk.DanhSachMon?.Any() == true)
+                            {
+                                foreach (var mon in hk.DanhSachMon)
+                                {
+                                    <tr data-href="@Url.Action("BuoiDiemDanh", "Home", new { lopHocPhanId = mon.LopHocPhanId, tenMonHoc = mon.TenMonHoc })">
+                                        <td>@mon.MaMonHoc</td>
+                                        <td class="ten-monhoc">@mon.TenMonHoc</td>
+                                        <td>@mon.SoTinChi</td>
+                                        <td>@mon.MaLopHocPhan</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr><td colspan="4" class="text-center text-muted">Không có môn học nào</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const rows = document.querySelectorAll("table.table tbody tr");
+
+        rows.forEach(row => {
+            row.addEventListener("click", function () {
+                // Xóa chọn ở tất cả dòng
+                rows.forEach(r => r.classList.remove("row-selected"));
+                // Thêm chọn cho dòng hiện tại
+                this.classList.add("row-selected");
+
+                // Lấy URL
+                const url = this.getAttribute("data-href");
+
+                // Cho hiệu ứng đổi màu hiển thị rồi mới chuyển trang
+                setTimeout(() => {
+                    window.location.href = url;
+                }, 300); // 0.3s là vừa đủ để thấy rõ nền đen
+            });
+        });
+    });
+</script>

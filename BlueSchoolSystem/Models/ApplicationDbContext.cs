@@ -5,14 +5,14 @@ using System.Reflection.Emit;
 
 namespace BlueSchoolSystem.Models
 {
-    public class ApplicationDbContext: IdentityDbContext<ApplicationUser>
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
-        { 
+        {
         }
 
         //bảng lưu trữ hoạt động người dùng
-        
+
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<PasswordResetOTP> PasswordResetOTPs { get; set; } // Bảng lưu trữ mã OTP để đặt lại mật khẩu
@@ -57,7 +57,7 @@ namespace BlueSchoolSystem.Models
                 .HasOne(bd => bd.SinhVien)
                 .WithMany(sv => sv.BangDiems)
                 .HasForeignKey(bd => bd.SinhVienId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<BangDiem>()
                 .HasOne(bd => bd.LopHocPhan)
@@ -87,13 +87,13 @@ namespace BlueSchoolSystem.Models
                 .HasOne(dd => dd.TrangThai)
                 .WithMany()
                 .HasForeignKey(dd => dd.TrangThaiId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<LichThi>()
                    .HasOne(l => l.TrangThai)
                    .WithMany()
                    .HasForeignKey(l => l.TrangThaiId)
-                   .OnDelete(DeleteBehavior.Restrict); 
+                   .OnDelete(DeleteBehavior.Restrict);
 
         }
     }
