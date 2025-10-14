@@ -783,13 +783,11 @@ namespace BlueSchoolSystem.APIControllers
                               orderby dd.Ngay
                               select new
                               {
-                                  dd.Id,
                                   dd.Ngay,
                                   dd.Code,
                                   dd.GhiChu,
                                   TrangThai = tt != null ? tt.TenTrangThai : "Chưa xác định",
                                   ThoiGian = ctd.ThoiGian,
-                                  ctd.DeviceId,
                                   ctd.Latitude,
                                   ctd.Longitude,
                                   GhiChuChiTiet = ctd.GhiChu
