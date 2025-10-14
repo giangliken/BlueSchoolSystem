@@ -5,6 +5,7 @@ namespace BlueSchoolSystem.Models
 {
     public class ApplicationUser: IdentityUser
     {
+        public string? FcmToken { get; set; }
 
         public virtual SinhVien? SinhViens { get; set; }
         public virtual GiangVien? GiangViens { get; set; }
