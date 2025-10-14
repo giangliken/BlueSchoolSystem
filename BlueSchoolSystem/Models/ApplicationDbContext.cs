@@ -5,14 +5,14 @@ using System.Reflection.Emit;
 
 namespace BlueSchoolSystem.Models
 {
-    public class ApplicationDbContext: IdentityDbContext<ApplicationUser>
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
-        { 
+        {
         }
 
         //bảng lưu trữ hoạt động người dùng
-        
+
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<PasswordResetOTP> PasswordResetOTPs { get; set; } // Bảng lưu trữ mã OTP để đặt lại mật khẩu
@@ -29,7 +29,7 @@ namespace BlueSchoolSystem.Models
         public DbSet<LichHoc> LichHocs { get; set; } // Bảng buổi học
         public DbSet<ChiTietLopHocPhan> ChiTietLopHocPhans { get; set; } // Bảng chi tiết lớp học phần
         public DbSet<DiemDanh> DiemDanhs { get; set; } // Bảng điểm danh
-        public DbSet<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; }
+        public DbSet<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; } // Bảng chi tiết điểm danh
         public DbSet<PhongHoc> PhongHocs { get; set; } // Bảng phòng học
         public DbSet<BangDiem> BangDiems { get; set; } // Bảng điểm
         public DbSet<DangKyHocPhan> DangKyHocPhans { get; set; } // Bảng đăng ký học phần
@@ -55,25 +55,12 @@ namespace BlueSchoolSystem.Models
                 .HasOne(bd => bd.SinhVien)
                 .WithMany(sv => sv.BangDiems)
                 .HasForeignKey(bd => bd.SinhVienId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<BangDiem>()
                 .HasOne(bd => bd.LopHocPhan)
                 .WithMany(lhp => lhp.BangDiems)
                 .HasForeignKey(bd => bd.LopHocPhanId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-
-            builder.Entity<DiemDanh>()
-                .HasOne(dd => dd.TrangThai)
-                .WithMany()
-                .HasForeignKey(dd => dd.TrangThaiId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<DiemDanh>()
-                .HasOne(dd => dd.LopHocPhan)
-                .WithMany(lhp => lhp.DiemDanhs)
-                .HasForeignKey(dd => dd.LopHocPhanId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<ChiTietDiemDanh>()
@@ -94,11 +81,17 @@ namespace BlueSchoolSystem.Models
                 .HasForeignKey(ct => ct.DiemDanhId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.Entity<DiemDanh>()
+                .HasOne(dd => dd.TrangThai)
+                .WithMany()
+                .HasForeignKey(dd => dd.TrangThaiId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.Entity<LichThi>()
                    .HasOne(l => l.TrangThai)
                    .WithMany()
                    .HasForeignKey(l => l.TrangThaiId)
-                   .OnDelete(DeleteBehavior.Restrict); 
+                   .OnDelete(DeleteBehavior.Restrict);
 
         }
     }
