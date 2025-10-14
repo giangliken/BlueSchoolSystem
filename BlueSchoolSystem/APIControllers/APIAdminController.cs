@@ -12,9 +12,11 @@ namespace BlueSchoolSystem.APIControllers
     public class APIAdminController : ControllerBase
     {
         private readonly IActivityLogService _activityLogService;
-        public APIAdminController(IActivityLogService activityLogService)
+        private readonly ApplicationDbContext _context;
+        public APIAdminController(IActivityLogService activityLogService, ApplicationDbContext context)
         {
             _activityLogService = activityLogService;
+            _context = context;
         }
 
         //Ghi log hệ thống
@@ -61,6 +63,35 @@ namespace BlueSchoolSystem.APIControllers
                 data = logs
             });
 
+        }
+
+
+        //Lấy trạng thái theo loại
+        [HttpGet("trangthai/loai/{loai}")]
+        public async Task<IActionResult> GetTrangThaiByLoai(string loai)
+        {
+            if (string.IsNullOrWhiteSpace(loai))
+                return BadRequest(new { result = false, message = "Thiếu loại trạng thái" });
+
+            var list = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == loai)
+                .OrderBy(t => t.Id)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.TenTrangThai,
+                    t.MoTa,
+                    t.LoaiTrangThai
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                result = true,
+                message = "Lấy trạng thái thành công",
+                soluong = list.Count,
+                data = list
+            });
         }
     }
 }

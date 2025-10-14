@@ -342,7 +342,7 @@ namespace BlueSchoolSystem.APIControllers
                 select new
                 {
                     lhp.MaLopHocPhan,
-                    lhp.TenLopHocPhan,
+                    //lhp.TenLopHocPhan,
                     MaMonHoc = mh.MaMonHoc,
                     TenMonHoc = mh.TenMonHoc,
                     TenGiangVien = gv != null ? (gv.HoVaTenDem + " " + gv.Ten) : "Chưa có giảng viên",
@@ -394,7 +394,7 @@ namespace BlueSchoolSystem.APIControllers
                 return new ThoiKhoaBieuViewModel
                 {
                     MaLopHocPhan = item.MaLopHocPhan,
-                    TenLopHocPhan = item.TenLopHocPhan,
+                    //TenLopHocPhan = item.TenLopHocPhan,
                     MaMonHoc = item.MaMonHoc,
                     TenMonHoc = item.TenMonHoc,
                     TenGiangVien = item.TenGiangVien,
@@ -875,12 +875,22 @@ namespace BlueSchoolSystem.APIControllers
             if (sinhVien == null)
                 return NotFound(new { result = false, message = "Không tìm thấy thông tin sinh viên" });
 
+            var trangThaiCoMatId = _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Có mặt")
+                .Select(t => t.Id)
+                .FirstOrDefault();
+
+            var trangThaiBuoiDiemDanhId = _context.TrangThais
+           .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+           .Select(t => t.Id)
+           .FirstOrDefault();
+
             // Kiểm tra buổi điểm danh hợp lệ, đang mở, đúng code, còn hạn
             var buoi = await _context.DiemDanhs.FirstOrDefaultAsync(x =>
                 x.Id == model.DiemDanhId &&
                 x.Code == model.Code &&
                 x.ExpireAt > DateTime.Now &&
-                x.TrangThaiId == 1 // Đang mở
+                x.TrangThaiId == trangThaiBuoiDiemDanhId
             );
             if (buoi == null)
                 return BadRequest(new { result = false, message = "Mã điểm danh không hợp lệ hoặc đã hết hạn" });
@@ -901,7 +911,7 @@ namespace BlueSchoolSystem.APIControllers
                 Latitude = model.Latitude,
                 Longitude = model.Longitude,
                 DeviceId = model.DeviceId,
-                TrangThaiId = 1 // Có mặt
+                TrangThaiId = trangThaiCoMatId 
             };
             _context.ChiTietDiemDanhs.Add(ct);
             await _context.SaveChangesAsync();
@@ -946,12 +956,22 @@ namespace BlueSchoolSystem.APIControllers
             if (exist)
                 return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi!" });
 
+            var trangThaiCoMatId = _context.TrangThais
+            .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Có mặt")
+            .Select(t => t.Id)
+            .FirstOrDefault();
+
+            var trangThaiBuoiDiemDanhId = _context.TrangThais
+           .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+           .Select(t => t.Id)
+           .FirstOrDefault();
+
             // Lưu điểm danh SQL
             var chiTiet = new ChiTietDiemDanh
             {
                 DiemDanhId = buoi.Id,
                 SinhVienId = sinhVien.Id,
-                TrangThaiId = 1,
+                TrangThaiId = trangThaiCoMatId,
                 Latitude = request.Latitude,      
                 Longitude = request.Longitude,   
                 DeviceId = request.DeviceId,
@@ -963,13 +983,13 @@ namespace BlueSchoolSystem.APIControllers
             await _context.SaveChangesAsync();
 
             // --- PUSH FIREBASE ---
-            await PushAttendanceToFirebase(buoi.Id, sinhVien, now, request);
+            await PushAttendanceToFirebase(buoi.Id, sinhVien, now, trangThaiCoMatId, request);
 
             return Ok(new { result = true, message = "Điểm danh thành công!" });
         }
 
 
-        private async Task PushAttendanceToFirebase(int diemDanhId, SinhVien sv, DateTime thoiGian, DiemDanhRequest request)
+        private async Task PushAttendanceToFirebase(int diemDanhId, SinhVien sv, DateTime thoiGian, int trangThaiCoMatId, DiemDanhRequest request)
         {
             var firebaseClient = new Firebase.Database.FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com"); 
             var data = new
@@ -978,7 +998,7 @@ namespace BlueSchoolSystem.APIControllers
                 mssv = sv.MSSV,
                 hoVaTenDem = sv.HoVaTenDem,
                 ten = sv.Ten,
-                trangThai = 1,
+                trangThai = trangThaiCoMatId,
                 thoiGian = thoiGian.ToString("s"),
                 latitude = request.Latitude,
                 longitude = request.Longitude,

@@ -487,6 +487,11 @@ namespace BlueSchoolSystem.APIControllers
                 return BadRequest(new { result = false, message = "Không tạo được mã điểm danh, thử lại sau!" });
             }
 
+            var trangThaiBuoiDiemDanhId = _context.TrangThais
+            .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+            .Select(t => t.Id)
+            .FirstOrDefault();
+
             var buoi = new DiemDanh
             {
                 LopHocPhanId = lopHocPhanId,
@@ -495,7 +500,7 @@ namespace BlueSchoolSystem.APIControllers
                 CreatedAt = DateTime.Now,
                 ExpireAt = model.ExpireAt ?? DateTime.Now.AddMinutes(20),
                 GhiChu = model.GhiChu,
-                TrangThaiId = 1 // Đang mở
+                TrangThaiId = trangThaiBuoiDiemDanhId,
             };
             _context.DiemDanhs.Add(buoi);
             await _context.SaveChangesAsync();
@@ -751,6 +756,18 @@ namespace BlueSchoolSystem.APIControllers
         private async Task PushNotificationToFirebase(string receiverUserId, ThongBao tb)
         {
             var firebaseClient = new Firebase.Database.FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com");
+            var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.UserId == tb.SenderUserId);
+            var senderName = giangVien != null ? $"{giangVien.HoVaTenDem} {giangVien.Ten}" : "Hệ thống";
+
+            // Lấy lớp học phần
+            var lopHocPhan = await _context.ChiTietLopHocPhans
+                .Include(ct => ct.LopHocPhan)
+                    .ThenInclude(mh =>mh.MonHoc)
+                .Where(ct => ct.SinhVien.UserId == receiverUserId)
+                .Select(ct => ct.LopHocPhan)
+                .FirstOrDefaultAsync();
+
+            var tenMonHoc = lopHocPhan?.MonHoc?.TenMonHoc ?? "Không rõ tên môn học";
 
             var data = new
             {
@@ -759,7 +776,10 @@ namespace BlueSchoolSystem.APIControllers
                 content = tb.Content,
                 time = tb.Time.ToString("s"),
                 type = tb.Type,
-                senderUserId = tb.SenderUserId
+                senderUserId = tb.SenderUserId,
+                senderName = senderName,
+                tenMonHoc = tenMonHoc,
+                maLopHocPhan = lopHocPhan?.MaLopHocPhan
             };
 
             // Push lên nhánh notification riêng cho từng user
