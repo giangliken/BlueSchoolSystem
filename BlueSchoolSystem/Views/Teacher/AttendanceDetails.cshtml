@@ -92,6 +92,19 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <script>
+        var trangThaiDict = @Html.Raw(Json.Serialize(trangThaiDict ?? new Dictionary<int, string>()));
+
+        function getTrangThaiBadge(trangThai, trangThaiDict) {
+            let label = trangThaiDict[trangThai] || "Không rõ";
+            let badge = "bg-secondary";
+            if (label === "Có mặt") badge = "bg-success";
+            else if (label === "Vắng mặt" || label === "Không phép") badge = "bg-danger";
+            else if (label === "Đi trễ" || label === "Về sớm") badge = "bg-warning text-dark";
+            else if (label === "Có phép") badge = "bg-info";
+            return `<span class="badge ${badge}">${label}</span>`;
+        }
+
+
         // 1. Firebase config - điền config thật của bạn ở đây!
                 var firebaseConfig = {
           apiKey: "AIzaSyD2Uh_6wINLjM99TZ64cIdR330cWPrJ3ws",
@@ -116,34 +129,28 @@
         });
 
         // 3. Render bảng điểm danh
-        function renderAttendanceTable(data) {
+                function renderAttendanceTable(data) {
             let tbody = document.getElementById("attendance-table-body");
             let html = "";
             let stt = 1;
-
             if (!data || Object.keys(data).length === 0) {
                 html = `<tr><td colspan="6">Chưa có sinh viên điểm danh.</td></tr>`;
             } else {
                 Object.values(data).forEach(sv => {
                     html += `
-                    <tr>
-                        <td>${stt++}</td>
-                        <td>${sv.mssv}</td>
-                        <td>${sv.hoVaTenDem} ${sv.ten}</td>
-                      
-                        <td>${sv.thoiGian ? new Date(sv.thoiGian).toLocaleString('vi-VN') : ""}</td>
-                         <td>
-                            ${sv.trangThai == 1
-                                ? '<span class="badge bg-success">Có mặt</span>'
-                                : '<span class="badge bg-danger">Vắng</span>'
-                            }
-                        </td>
-                    </tr>
+                        <tr>
+                            <td>${stt++}</td>
+                            <td>${sv.mssv}</td>
+                            <td>${sv.hoVaTenDem} ${sv.ten}</td>
+                            <td>${sv.thoiGian ? new Date(sv.thoiGian).toLocaleString('vi-VN') : ""}</td>
+                            <td>${getTrangThaiBadge(sv.trangThai, trangThaiDict)}</td>
+                        </tr>
                     `;
                 });
             }
             tbody.innerHTML = html;
         }
+
 
         // 4. Timer countdown (giữ nguyên code cũ của bạn)
         var expireAt = "@Model.ExpireAt.ToString("yyyy-MM-ddTHH:mm:ss")";

@@ -1,4 +1,5 @@
 ﻿@using BlueSchoolSystem.Models.ViewModel
+@using System.Text.Json
 @{
     var token = Context.Session.GetString("access_token");
 
@@ -26,6 +27,30 @@
 <button type="button" class="btn btn-warning fw-semibold ms-2" data-bs-toggle="modal" data-bs-target="#modalTaoThongBao">
     <i class="fa-solid fa-bell me-1"></i> Tạo thông báo cho lớp này
 </button>
+
+<button class="btn btn-dark fw-semibold mb-2" data-bs-toggle="modal" data-bs-target="#modalGroupChat">
+    <i class="fa-solid fa-comments me-2"></i> Nhóm chat lớp học phần
+</button>
+
+<div class="modal fade" id="modalGroupChat" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nhóm chat - @lhp?.TenMonHoc (@lhp?.MaLopHocPhan)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="chat-messages" style="height:400px;overflow-y:auto;padding:1rem;background:#f9f9f9"></div>
+            </div>
+            <div class="modal-footer">
+                <input type="text" id="chatInput" class="form-control" autocomplete="off" placeholder="Nhập tin nhắn..." style="flex:1;max-width:80%">
+                <button type="button" id="btnSendChat" class="btn btn-primary ms-2">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @if (lhp == null)
 {
@@ -106,7 +131,6 @@ else
                         <i class="fa-solid fa-plus me-2"></i>Điểm danh mới
                     </button>
                 }
-
             </div>
             <div class="card-body p-0">
                 @if (!attendanceList.Any())
@@ -180,68 +204,151 @@ else
                     <button type="submit" id="btnGuiThongBao" class="btn btn-primary fw-semibold">
                         <i class="fa-solid fa-paper-plane me-1"></i> Gửi thông báo
                     </button>
-
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-
 @section Scripts {
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
     <script>
-        window.__accessToken = @Html.Raw(Json.Serialize(token ?? ""));
+         window.__accessToken = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(token ?? ""));
     </script>
 
     <script>
-                document.getElementById('formTaoThongBao').addEventListener('submit', function(e) {
-            e.preventDefault();
+        function b64uToBytes(s){
+            s = s.replace(/-/g, '+').replace(/_/g, '/');
+            while (s.length % 4) s += '=';
+            const bin = atob(s);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes;
+        }
 
-            const title = document.getElementById('thongBaoTitle').value;
-            const content = document.getElementById('thongBaoContent').value;
-            var token = window.__accessToken;
-            const maLopHocPhan = '@lhp.MaLopHocPhan';
-            const baseurl = window.location.origin;
+        function parseJwt(t){
+            if(!t) return null;
+            if(t.startsWith('Bearer ')) t = t.slice(7);
+            const p = t.split('.');
+            if (p.length < 2) return null;
+            try{
+                const json = new TextDecoder('utf-8').decode(b64uToBytes(p[1]));
+                return JSON.parse(json);
+            }catch(e){
+                console.error('parseJwt error', e);
+                return null;
+            }
+        }
+        const payload  = parseJwt(window.__accessToken) || {};
+        const userId   = payload.userId || "";
+        const username = payload.username || "";
+        const fullname = payload.fullname || "";
+        const email    = payload.email || "";
+        const roleRaw  = payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || "";
+    </script>
 
-            // Disable form và show loading
-            const btn = document.getElementById('btnGuiThongBao');
-            btn.disabled = true;
-            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Đang gửi...`;
+    <script>
 
-            fetch(`${baseurl}/api/lophocphan/${maLopHocPhan}/guithongbao`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
-                body: JSON.stringify({
-                    Title: title,
-                    Content: content
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                btn.disabled = false;
-                btn.innerHTML = `<i class="fa-solid fa-paper-plane me-1"></i> Gửi thông báo`;
-                if (data.result) {
-                    $('#modalTaoThongBao').modal('hide');
-                    alert(data.message ?? 'Gửi thông báo thành công!');
-                    location.reload();
-                } else {
-                    alert('Lỗi: ' + (data.message ?? 'Không xác định!'));
-                }
-            })
-            .catch(err => {
-                btn.disabled = false;
-                btn.innerHTML = `<i class="fa-solid fa-paper-plane me-1"></i> Gửi thông báo`;
-                alert('Gửi thông báo thất bại!');
-                console.error(err);
-            });
+        // 1) Firebase config & init
+        const firebaseConfig = {
+            apiKey: "AIzaSyD2Uh_6wINLjM99TZ64cIdR330cWPrJ3ws",
+            authDomain: "bluenet-e6525.firebaseapp.com",
+            databaseURL: "https://bluenet-e6525-default-rtdb.firebaseio.com",
+            projectId: "bluenet-e6525",
+            storageBucket: "bluenet-e6525.firebasestorage.app",
+            messagingSenderId: "682840647075",
+            appId: "1:682840647075:web:ed799955c38a40f2526616",
+            measurementId: "G-RXWF28P678"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+
+        function ready(fn){ if (document.readyState !== 'loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+
+        function formatTime(ts){ return new Date(ts||Date.now()).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}); }
+
+        const roleMap = { "Student":"Sinh viên", "Teacher":"Giảng viên", "Admin":"Quản trị" };
+        const userRole = roleMap[roleRaw] || roleRaw || "Sinh viên";
+
+              ready(function () {
+          // 1) Khóa phòng chat: ViewBag trước, querystring sau
+          const maLopHocPhan = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.MaLopHocPhan ?? ""));
+          const qsKey = new URLSearchParams(location.search).get('maLopHocPhan') || "";
+          const roomKey = maLopHocPhan || qsKey;
+
+          // 2) Thông tin người dùng lấy HOÀN TOÀN từ token đã decode
+          const displayName = (fullname || username || email || "Người dùng").trim();
+          const uid = (userId || "").trim();
+
+          // 3) DOM
+          const btn   = document.getElementById('btnSendChat');
+          const input = document.getElementById('chatInput');
+          const box   = document.getElementById('chat-messages');
+          if (!btn || !box) { console.warn('[chat] thiếu nút/khung chat'); return; }
+
+          // 4) Hàm gửi
+          function send(content){
+            if (!roomKey){ alert('Thiếu mã lớp (maLopHocPhan).'); return; }
+            if (!uid){ alert('Token không có userId.'); return; }
+            const msg = (content||"").trim();
+            if (!msg){ input?.focus(); return; }
+
+            const ref = firebase.database().ref('chats/'+ roomKey +'/messages');
+            ref.push({
+              senderId:   uid,
+              senderName: displayName,   // <-- sẽ là fullName nếu có
+              role:       userRole,      // "Sinh viên"/"Giảng viên"/"Quản trị"
+              content:    msg,
+              createdAt:  Date.now()
+            }).then(()=>{ if (input) input.value=''; })
+              .catch(err=>{ alert('Lỗi khi gửi: ' + (err?.message || 'Unknown')); console.error(err); });
+          }
+
+          // 5) Gửi bằng nút & phím Enter
+          btn.addEventListener('click', ()=> send(input?.value || ""));
+          input?.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(input.value); }
+          });
+
+          // 6) Render tin nhắn
+          function renderMsg(m){
+            const mine = m.senderId === uid;
+            const time = formatTime(m.createdAt);
+            if (mine){
+              box.innerHTML += `
+                <div class="text-end mb-2">
+                  <div class="d-inline-block px-3 py-2 rounded-3 shadow-sm" style="background:#2f80ff;color:#fff;max-width:70%;">
+                    ${ (m.content||'').replace(/\n/g,'<br>') }
+                    <div class="small text-end" style="opacity:.85;margin-top:2px;">${time}</div>
+                  </div>
+                </div>`;
+            } else {
+              box.innerHTML += `
+                <div class="text-start mb-2">
+                  <div class="d-inline-block px-3 py-2 rounded-3 shadow-sm" style="background:#2f80ff;color:#fff;max-width:70%;">
+                    <div style="font-weight:700;color:#fff;">
+                      ${m.senderName||'Người dùng'}
+                      ${ m.role ? `<span class="ms-2" style="font-weight:500;background:#1f2937;color:#93c5fd;border-radius:999px;padding:2px 8px;font-size:.75rem;">${m.role}</span>` : '' }
+                    </div>
+                    <div>${ (m.content||'').replace(/\n/g,'<br>') }</div>
+                    <div class="small" style="opacity:.85;margin-top:2px;">${time}</div>
+                  </div>
+                </div>`;
+            }
+            box.scrollTop = box.scrollHeight;
+          }
+
+          // 7) Lắng nghe tin mới
+          if (roomKey){
+            const ref = firebase.database().ref('chats/'+ roomKey +'/messages');
+            ref.limitToLast(100).on('child_added', s => { const m = s.val(); if (m) renderMsg(m); });
+          } else {
+            console.warn('Không có maLopHocPhan để join phòng chat.');
+          }
         });
-
-
     </script>
-
 }
 

@@ -156,7 +156,7 @@
                             {
                                 foreach (var mon in hk.DanhSachMon)
                                 {
-                                    <tr data-href="@Url.Action("BuoiDiemDanh", "Home", new { lopHocPhanId = mon.LopHocPhanId, tenMonHoc = mon.TenMonHoc })">
+                                    <tr data-href="@Url.Action("BuoiDiemDanh", "Home", new { lopHocPhanId = mon.LopHocPhanId, tenMonHoc = mon.TenMonHoc, maLopHocPhan = mon.MaLopHocPhan })">
                                         <td>@mon.MaMonHoc</td>
                                         <td class="ten-monhoc">@mon.TenMonHoc</td>
                                         <td>@mon.SoTinChi</td>

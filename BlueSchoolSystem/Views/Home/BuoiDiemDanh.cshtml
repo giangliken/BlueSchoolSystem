@@ -189,6 +189,29 @@
 
 <div class="card mt-3">
     <div class="card-body">
+        <button class="btn btn-dark fw-semibold mb-2" data-bs-toggle="modal" data-bs-target="#modalGroupChat">
+            <i class="fa-solid fa-comments me-2"></i> Nhóm chat lớp học phần
+        </button>
+
+        <div class="modal fade" id="modalGroupChat" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Nhóm chat - @ViewBag.TenMonHoc</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div id="chat-messages" style="height:400px;overflow-y:auto;padding:1rem;background:#f6f7f9"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <input type="text" id="chatInput" class="form-control" autocomplete="off" placeholder="Nhập tin nhắn..." style="flex:1;max-width:80%">
+                        <button type="button" id="btnSendChat" class="btn btn-primary ms-2">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Header -->
         <div class="d-flex align-items-center mb-3">
@@ -316,46 +339,154 @@
     </div>
 </div>
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <!-- expose token (giống GV) -->
     <script>
-        const modal = document.getElementById('modalChiTiet');
-        modal.addEventListener('show.bs.modal', async function (event) {
-            const btn = event.relatedTarget;
+        window.__accessToken = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                (ViewBag.AccessToken ?? Context.Session.GetString("access_token") ?? "")
+            ));
+</script>
 
-            // Lấy trực tiếp thời gian đầy đủ
-            const thoigian = btn.getAttribute('data-thoigian'); // ví dụ: "03/09/2025 16:20:14"
-            document.getElementById('modalNgayGio').textContent = thoigian || '';
+    <!-- JWT helpers -->
+    <script>
+        function b64uToBytes(s){
+            s = s.replace(/-/g, '+').replace(/_/g, '/');
+            while (s.length % 4) s += '=';
+            const bin = atob(s);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes;
+        }
 
-            // Ghi chú
-            document.getElementById('modalGhiChu').textContent = btn.getAttribute('data-ghichu') || '';
-
-            // Vị trí
-            const lat = btn.getAttribute('data-lat');
-            const lon = btn.getAttribute('data-lon');
-            const viTriElement = document.getElementById('modalViTri');
-
-            if (lat && lon) {
-                const latDisplay = lat.replace('.', ',');
-                const lonDisplay = lon.replace('.', ',');
-
-                viTriElement.innerHTML = `Đang lấy địa chỉ... (${latDisplay}, ${lonDisplay})`;
-
-                try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
-                    const data = await response.json();
-
-                    if (data && data.display_name) {
-                        viTriElement.innerHTML = `<div>${data.display_name}</div>`;
-                    } else {
-                        viTriElement.innerHTML = `<div>Không xác định địa chỉ</div>`;
-                    }
-                } catch (err) {
-                    console.error(err);
-                    viTriElement.innerHTML = `<div>Lỗi khi lấy địa chỉ</div>`;
-                }
-            } else {
-                viTriElement.textContent = "Không có thông tin vị trí";
+        function parseJwt(t){
+            if(!t) return null;
+            if(t.startsWith('Bearer ')) t = t.slice(7);
+            const p = t.split('.');
+            if (p.length < 2) return null;
+            try{
+              const json = new TextDecoder('utf-8').decode(b64uToBytes(p[1]));
+              return JSON.parse(json);
+            }catch(e){
+              console.error('parseJwt error', e);
+              return null;
             }
+        }
+
+
+        const payload  = parseJwt(window.__accessToken) || {};
+        const userId   = payload.userId || "";                
+        const username = payload.username || "";    
+        const fullname = payload.fullname || "";
+        const email    = payload.email || "";
+        const roleRaw  = payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || "";
+
+    </script>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyD2Uh_6wINLjM99TZ64cIdR330cWPrJ3ws",
+          authDomain: "bluenet-e6525.firebaseapp.com",
+          databaseURL: "https://bluenet-e6525-default-rtdb.firebaseio.com",
+          projectId: "bluenet-e6525",
+          storageBucket: "bluenet-e6525.firebasestorage.app",
+          messagingSenderId: "682840647075",
+          appId: "1:682840647075:web:ed799955c38a40f2526616",
+          measurementId: "G-RXWF28P678"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+        function ready(fn){ if (document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+        function formatTime(ts){ return new Date(ts||Date.now()).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}); }
+
+        const roleMap = { "Student":"Sinh viên", "Teacher":"Giảng viên", "Admin":"Quản trị" };
+        const userRole = roleMap[roleRaw] || roleRaw || "Sinh viên"; 
+
+        ready(function () {
+          // Lấy mã học phần từ ViewBag
+          const maLopHocPhan = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.MaLopHocPhan ?? ""));
+          // nếu vì lý do gì ViewBag rỗng, fallback querystring:
+          const maLopFromQs = new URLSearchParams(location.search).get('maLopHocPhan') || "";
+          const roomKey = maLopHocPhan || maLopFromQs;
+
+          // Dùng tên hiển thị: ưu tiên username, fallback email
+        const displayName = fullname
+          ? (username ? `${fullname} (${username})` : fullname)
+          : (username || "Người dùng");
+          // Kiểm tra token hết hạn (nếu muốn chặn gửi)
+          const nowSec = Math.floor(Date.now()/1000);
+          const expired = typeof payload.exp === "number" && payload.exp <= nowSec;
+
+          const btn   = document.getElementById('btnSendChat');
+          const input = document.getElementById('chatInput');
+          const box   = document.getElementById('chat-messages');
+
+          if (!btn) return;
+
+          function send(content){
+            if (!roomKey){ alert('Thiếu mã lớp (maLopHocPhan).'); return; }
+            if (!userId){ alert('Token không có userId.'); return; }
+            if (expired){ alert('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại để gửi tin nhắn.'); return; }
+            if (!content?.trim()){ input?.focus(); return; }
+
+            const ref = firebase.database().ref('chats/'+ roomKey +'/messages');
+            ref.push({
+              senderId:   userId,       
+              senderName: displayName,  
+              role:       userRole,     
+              content:    content.trim(),
+              createdAt:  Date.now()
+            })
+            .then(()=>{ if (input) input.value=''; })
+            .catch(e=>{ alert('Lỗi gửi: ' + (e?.message || 'Unknown')); console.error(e); });
+          }
+
+          // Gửi bằng nút
+          btn.addEventListener('click', function(){
+            send(input?.value || "");
+          });
+          // Gửi bằng Enter
+          input?.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(input.value); }
+          });
+
+          function renderMsg(m){
+            const mine = m.senderId === userId;
+            const time = formatTime(m.createdAt);
+            if (mine){
+              box.innerHTML += `
+                <div class="text-end mb-2">
+                  <div class="d-inline-block px-3 py-2 rounded-3 shadow-sm" style="background:#2f80ff;color:#fff;max-width:70%;">
+                    ${ (m.content||'').replace(/\n/g,'<br>') }
+                    <div class="small text-end" style="opacity:.85;margin-top:2px;">${time}</div>
+                  </div>
+                </div>`;
+            } else {
+              box.innerHTML += `
+                <div class="text-start mb-2">
+                  <div class="d-inline-block px-3 py-2 rounded-3 shadow-sm" style="background:#2f80ff;color:#fff;max-width:70%;">
+                    <div style="font-weight:700;color:#fff;">
+                      ${m.senderName||'Người dùng'}
+                      ${ m.role ? `<span class="ms-2" style="font-weight:500;background:#1f2937;color:#93c5fd;border-radius:999px;padding:2px 8px;font-size:.75rem;">${m.role}</span>` : '' }
+                    </div>
+                    <div>${ (m.content||'').replace(/\n/g,'<br>') }</div>
+                    <div class="small" style="opacity:.85;margin-top:2px;">${time}</div>
+                  </div>
+                </div>`;
+            }
+            box.scrollTop = box.scrollHeight;
+          }
+
+          // Lắng nghe tin mới
+          if (roomKey){
+            const ref = firebase.database().ref('chats/'+ roomKey +'/messages');
+            ref.limitToLast(100).on('child_added', s => { const m = s.val(); if (m) renderMsg(m); });
+          } else {
+            console.warn('Không có maLopHocPhan để join phòng chat.');
+          }
         });
+
     </script>
 }
+
