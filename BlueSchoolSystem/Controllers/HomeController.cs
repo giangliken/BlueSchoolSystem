@@ -385,8 +385,12 @@ namespace BlueSchoolSystem.Controllers
         // Hiện buổi điểm danh
         [Authorize]
         [HttpGet]
-        public async Task<IActionResult> BuoiDiemDanh(int lopHocPhanId, string tenMonHoc)
+        public async Task<IActionResult> BuoiDiemDanh(int lopHocPhanId, string tenMonHoc, string maLopHocPhan)
         {
+            ViewBag.TenMonHoc = tenMonHoc;
+            ViewBag.LopHocPhanId = lopHocPhanId;
+            ViewBag.MaLopHocPhan = maLopHocPhan;
+
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
 
@@ -426,7 +430,7 @@ namespace BlueSchoolSystem.Controllers
              );
 
             var model = apiResponse?.Data ?? new List<DiemDanhViewModel>();
-            ViewBag.TenMonHoc = tenMonHoc;
+
             return View(model);
         }
 
