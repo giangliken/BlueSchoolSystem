@@ -260,49 +260,122 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
-        // Lấy lịch giảng dạy của giảng viên
+        // Lấy danh sách lịch giảng dạy theo mã giảng viên
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
-        [HttpGet("lichgiangday/{maGiangVien}")]
-        public async Task<IActionResult> GetThoiKhoaBieuByMaGV(string maGiangVien)
+        [HttpGet("lichgiangday/{magv}")]
+        public async Task<IActionResult> GetLichGiangDayByMaGV(string magv)
         {
-            var gv = await _context.GiangViens.AsNoTracking()
-                        .FirstOrDefaultAsync(x => x.MaGiangVien == maGiangVien);
-            if (gv == null)
-                return NotFound(new { result = false, code = 404, message = "Không tìm thấy mã giảng viên" });
-            var tkb = await (from lhp in _context.LopHocPhans
-                             join mh in _context.MonHocs on lhp.MonHocId equals mh.Id into _mh
-                             from mh in _mh.DefaultIfEmpty()
-                             where lhp.GiangVienId == gv.Id
-                             //orderby lhp.Thu, lhp.GioBatDau
-                             select new
-                             {
-                                 gv.MaGiangVien,
-                                 HoTen = gv.HoVaTenDem + " " + gv.Ten,
-                                 GiangVienId = gv.Id,
-                                 LopHocPhanId = lhp.Id,
-                                 lhp.MaLopHocPhan,
-                                 lhp.TenLopHocPhan,
-                                 lhp.MoTa,
-                                 lhp.MonHocId,
-                                 MaMonHoc = mh != null ? mh.MaMonHoc : null,
-                                 TenMonHoc = mh != null ? mh.TenMonHoc : null,
-                                 lhp.NgayBatDau,
-                                 lhp.NgayKetThuc,
-                                 lhp.SiSo,
-                                 lhp.TrangThai
-                             }).ToListAsync();
+            // 🔹 Lấy mã giảng viên từ JWT claim
+            var magvFromToken = User.FindFirst("username")?.Value;
 
-            if (!tkb.Any())
+            if (magvFromToken == null)
             {
-                return NotFound(new { result = false, code = 404, message = "Không có thời khóa biểu" });
+                return Unauthorized(new
+                {
+                    result = false,
+                    code = 401,
+                    message = "Không lấy được mã giảng viên từ token"
+                });
             }
+
+            // 🔹 Giảng viên chỉ được xem lịch của chính mình (trừ admin)
+            var isAdmin = User.IsInRole(SD.Role_Admin);
+            if (!isAdmin && magvFromToken != magv)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    result = false,
+                    code = 403,
+                    message = "Bạn không có quyền truy cập lịch giảng dạy của giảng viên khác"
+                });
+            }
+
+            // 🔹 Lấy danh sách lịch giảng dạy (join LichHoc, LopHocPhan, MonHoc, PhongHoc)
+            var lichData = await (
+                from lhp in _context.LopHocPhans
+                join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                join gv in _context.GiangViens on lhp.GiangVienId equals gv.Id
+                join lh in _context.LichHocs on lhp.Id equals lh.LopHocPhanId
+                join ph in _context.PhongHocs on lh.PhongHocId equals ph.Id into gph
+                from ph in gph.DefaultIfEmpty() // cho phép null
+                where gv.MaGiangVien == magv
+                orderby lh.Ngay, lh.GioBatDau
+                select new
+                {
+                    lhp.MaLopHocPhan,
+                    //lhp.TenLopHocPhan,
+                    MaMonHoc = mh.MaMonHoc,
+                    TenMonHoc = mh.TenMonHoc,
+                    MaPhongHoc = ph != null ? ph.MaPhongHoc : "Chưa có phòng",
+                    lh.Ngay,
+                    lh.GioBatDau,
+                    lh.GioKetThuc,
+                    lhp.NgayBatDau,
+                    lhp.NgayKetThuc,
+                    SoLuongSinhVien = _context.ChiTietLopHocPhans.Count(ct => ct.LopHocPhanId == lhp.Id)
+                }
+            ).ToListAsync();
+
+            if (!lichData.Any())
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy lịch giảng dạy cho giảng viên này"
+                });
+            }
+
+            // 🔹 Tính tiết bắt đầu và số tiết
+            int ToTiet(TimeSpan gio)
+            {
+                if (gio <= TimeSpan.Parse("6:45")) return 1;
+                if (gio <= TimeSpan.Parse("07:30")) return 2;
+                if (gio <= TimeSpan.Parse("08:15")) return 3;
+                if (gio <= TimeSpan.Parse("09:20")) return 4;
+                if (gio <= TimeSpan.Parse("10:05")) return 5;
+                if (gio <= TimeSpan.Parse("10:50")) return 6;
+                if (gio <= TimeSpan.Parse("12:30")) return 7;
+                if (gio <= TimeSpan.Parse("13:10")) return 8;
+                if (gio <= TimeSpan.Parse("14:00")) return 9;
+                if (gio <= TimeSpan.Parse("15:05")) return 10;
+                if (gio <= TimeSpan.Parse("15:50")) return 11;
+                if (gio <= TimeSpan.Parse("16:35")) return 12;
+                if (gio <= TimeSpan.Parse("18:00")) return 13;
+                if (gio <= TimeSpan.Parse("18:45")) return 14;
+                return 15;
+            }
+
+            var lichGiangDay = lichData.Select(item =>
+            {
+                int tietBatDau = ToTiet(item.GioBatDau);
+                int tietKetThuc = ToTiet(item.GioKetThuc);
+                int soTiet = tietKetThuc - tietBatDau;
+
+                return new
+                {
+                    item.MaLopHocPhan,
+                    item.MaMonHoc,
+                    item.TenMonHoc,
+                    item.MaPhongHoc,
+                    item.Ngay,
+                    GioBatDau = item.GioBatDau.ToString(@"hh\:mm"),
+                    GioKetThuc = item.GioKetThuc.ToString(@"hh\:mm"),
+                    item.NgayBatDau,
+                    item.NgayKetThuc,
+                    TietBatDau = tietBatDau,
+                    SoTiet = soTiet,
+                    item.SoLuongSinhVien
+                };
+            }).ToList();
+
             return Ok(new
             {
                 result = true,
                 code = 200,
-                message = "Lấy thời khóa biểu thành công",
-                soluong = tkb.Count,
-                data = tkb
+                message = "Lấy lịch giảng dạy thành công",
+                soluong = lichGiangDay.Count,
+                data = lichGiangDay
             });
         }
 
