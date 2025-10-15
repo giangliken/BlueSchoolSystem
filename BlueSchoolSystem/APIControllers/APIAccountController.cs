@@ -334,6 +334,34 @@ namespace BlueSchoolSystem.APIControllers
                 new("email", user.Email),
             };
 
+            string? fullName = null;
+
+            if (roles.Contains("Student"))
+            {
+                var sv = user.SinhViens;
+                if(sv != null)
+                {
+                    fullName = sv.HoVaTenDem + " " + sv.Ten;
+                }
+
+            } else if (roles.Contains("Teacher"))
+            {
+                var gv = user.GiangViens;
+                if (gv != null)
+                {
+                    fullName = gv.HoVaTenDem + " " + gv.Ten;
+                }
+            } else if (roles.Contains("Admin"))
+            {
+                fullName = "Quản trị viên";
+            }
+            else
+            {
+                fullName = "Người dùng";
+            }
+
+            claims.Add(new Claim("fullname", fullName));
+
             foreach (var role in roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));

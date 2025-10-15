@@ -534,7 +534,7 @@ namespace BlueSchoolSystem.APIControllers
 
         //  Hàm tính tổng hợp toàn bộ điểm
         private (double tongDiemHe4TichLuy, int tongTinChiTichLuy, int tongTinChiDat)
-    TinhTongHop(IEnumerable<DiemMonHocViewModel> allDiem)
+        TinhTongHop(IEnumerable<DiemMonHocViewModel> allDiem)
         {
             double tongDiemHe4TichLuy = 0;
             int tongTinChiTichLuy = 0;
@@ -644,6 +644,10 @@ namespace BlueSchoolSystem.APIControllers
             return tichLuyList;
         }
 
+
+        ////Lấy thông tin họ và tên của sinh viên khi biết mssv
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student + "," + SD.Role_Admin)]
+        //[HttpGet("layhovatensinhvien/{mssv}")]
 
 
 
