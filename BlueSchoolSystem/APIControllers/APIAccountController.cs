@@ -594,5 +594,44 @@ namespace BlueSchoolSystem.APIControllers
         public class UpdateFcmTokenRequest { public string FcmToken { get; set; } }
 
 
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest req)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { result = false, code = 400, message = "Dữ liệu không hợp lệ" });
+
+            var userId = User.FindFirst("userId")?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { result = false, code = 401, message = "Không xác định được người dùng" });
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                return NotFound(new { result = false, code = 404, message = "Không tìm thấy user" });
+
+            var change = await _userManager.ChangePasswordAsync(user, req.CurrentPassword, req.NewPassword);
+            if (!change.Succeeded)
+                return BadRequest(new
+                {
+                    result = false,
+                    code = 400,
+                    message = "Đổi mật khẩu thất bại",
+                    errors = change.Errors
+                });
+
+            // Revoke tất cả refresh tokens của user này
+            var tokens = _context.RefreshTokens.Where(t => t.UserId == user.Id && !t.IsRevoked);
+            await tokens.ForEachAsync(t => t.IsRevoked = true);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.",
+                require_relogin = true
+            });
+        }
+
     }
 }
