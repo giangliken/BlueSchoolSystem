@@ -693,6 +693,7 @@ namespace BlueSchoolSystem.APIControllers
             var chiTietList = await _context.ChiTietLopHocPhans
                 .Include(ct => ct.SinhVien)
                 .Include(ct => ct.LopHocPhan)
+                    .ThenInclude(ct => ct.MonHoc)
                 .Where(ct => ct.LopHocPhan.MaLopHocPhan == maLopHocPhan)
                 .ToListAsync();
 
@@ -724,19 +725,18 @@ namespace BlueSchoolSystem.APIControllers
             await _context.ThongBaos.AddRangeAsync(thongBaos);
             await _context.SaveChangesAsync();
 
+            var tenLop = chiTietList.FirstOrDefault()?.LopHocPhan?.MonHoc?.TenMonHoc ?? "Lớp học phần";
+
+
             foreach (var tb in thongBaos)
             {
-                await PushNotificationToFirebase(tb.ReceiverUserId, tb);
+                await PushNotificationToFirebase(tb.ReceiverUserId, tb, maLopHocPhan);
                 var user = await _context.Users.FindAsync(tb.ReceiverUserId);
 
                 if (!string.IsNullOrEmpty(user?.FcmToken))
                 {
-                    var tenLop = chiTietList.FirstOrDefault()?.LopHocPhan?.TenLopHocPhan ?? "Lớp học phần";
-
-                    // Title là tên lớp, body là tiêu đề thông báo hoặc nội dung
                     var fcmTitle = $"{tenLop} - Thông báo mới";
-                    var fcmBody = tb.Title; // Hoặc tb.Content nếu bạn muốn
-
+                    var fcmBody = tb.Title; 
                     await SendFcmPush(user.FcmToken, fcmTitle, fcmBody);
                 }
             }
@@ -744,7 +744,6 @@ namespace BlueSchoolSystem.APIControllers
             return Ok(new { result = true, message = $"Đã gửi thông báo cho {svUserIds.Count} sinh viên trong lớp!" });
         }
 
-        // DTO nhận body
         public class GuiThongBaoLopRequest
         {
             public string Title { get; set; }
@@ -753,21 +752,26 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
-        private async Task PushNotificationToFirebase(string receiverUserId, ThongBao tb)
+        private async Task PushNotificationToFirebase(string receiverUserId, ThongBao tb, string maLopHocPhan)
         {
             var firebaseClient = new Firebase.Database.FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com");
             var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.UserId == tb.SenderUserId);
             var senderName = giangVien != null ? $"{giangVien.HoVaTenDem} {giangVien.Ten}" : "Hệ thống";
 
-            // Lấy lớp học phần
-            var lopHocPhan = await _context.ChiTietLopHocPhans
-                .Include(ct => ct.LopHocPhan)
-                    .ThenInclude(mh =>mh.MonHoc)
-                .Where(ct => ct.SinhVien.UserId == receiverUserId)
-                .Select(ct => ct.LopHocPhan)
-                .FirstOrDefaultAsync();
+            var lopInfo = await _context.ChiTietLopHocPhans
+                .Where(ct => ct.SinhVien.UserId == receiverUserId
+                          && ct.LopHocPhan.MaLopHocPhan == maLopHocPhan)
+                .Select(ct => new
+                {
+                    ct.LopHocPhan.MaLopHocPhan,
+                    TenMonHoc = ct.LopHocPhan.MonHoc.TenMonHoc
+                })
+                .AsNoTracking()
+                .SingleOrDefaultAsync();
 
-            var tenMonHoc = lopHocPhan?.MonHoc?.TenMonHoc ?? "Không rõ tên môn học";
+            var tenMonHoc = lopInfo?.TenMonHoc ?? "Không rõ tên môn học";
+            var maLhp = lopInfo?.MaLopHocPhan; 
+
 
             var data = new
             {
@@ -779,7 +783,7 @@ namespace BlueSchoolSystem.APIControllers
                 senderUserId = tb.SenderUserId,
                 senderName = senderName,
                 tenMonHoc = tenMonHoc,
-                maLopHocPhan = lopHocPhan?.MaLopHocPhan
+                maLopHocPhan = maLhp
             };
 
             // Push lên nhánh notification riêng cho từng user
@@ -794,10 +798,6 @@ namespace BlueSchoolSystem.APIControllers
         {
             await FcmService.SendNotificationAsync(fcmToken, title, body);
         }
-
-
-
-
 
     }
 }
