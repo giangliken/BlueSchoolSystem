@@ -123,6 +123,8 @@ namespace BlueSchoolSystem.Controllers
             ViewBag.LopHocPhan = lopHocPhan;
             ViewBag.SinhVienList = listSV;
             ViewBag.AttendanceList = listAttendance;
+            ViewBag.MaLopHocPhan = maLopHocPhan;
+
 
             return View();
         }
