@@ -118,19 +118,20 @@ else
                     <i class="fa-solid fa-calendar-check me-2 text-success"></i>
                     Danh sách buổi điểm danh
                 </h4>
-                @using (Html.BeginForm(
-                                "CreateAttendanceSession",
-                                "Teacher",
-                                new { LopHocPhanId = lhp.Id },
-                                FormMethod.Post,
-                                true,
-                                new { @class = "d-inline" }
-                                ))
+                @if (lhp != null)
                 {
-                    <button type="submit" class="btn btn-primary fw-semibold d-flex align-items-center">
-                        <i class="fa-solid fa-plus me-2"></i>Điểm danh mới
-                    </button>
+                    <form asp-action="CreateAttendanceSession"
+                          asp-controller="Teacher"
+                          method="post"
+                          class="d-inline"
+                          asp-antiforgery="true">
+                        <input type="hidden" name="LopHocPhanId" value="@lhp.Id" />
+                        <button type="submit" class="btn btn-primary fw-semibold d-flex align-items-center">
+                            <i class="fa-solid fa-plus me-2"></i>Điểm danh mới
+                        </button>
+                    </form>
                 }
+
             </div>
             <div class="card-body p-0">
                 @if (!attendanceList.Any())
@@ -185,21 +186,31 @@ else
 <div class="modal fade" id="modalTaoThongBao" tabindex="-1" aria-labelledby="modalTaoThongBaoLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="formTaoThongBao" autocomplete="off">
+            <form id="formTaoThongBao"
+                  asp-action="GuiThongBaoLopHocPhan"
+                  asp-controller="Teacher"
+                  asp-route-maLopHocPhan="@(lhp?.MaLopHocPhan)"
+                  method="post"
+                  asp-antiforgery="true"
+                  autocomplete="off">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modalTaoThongBaoLabel">Gửi thông báo cho lớp học phần</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
+
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="thongBaoTitle" class="form-label">Tiêu đề</label>
-                        <input type="text" class="form-control" id="thongBaoTitle" name="Title" required maxlength="200" placeholder="Nhập tiêu đề thông báo">
+                        <input type="text" class="form-control" id="thongBaoTitle" name="Title"
+                               required maxlength="200" placeholder="Nhập tiêu đề thông báo">
                     </div>
                     <div class="mb-3">
                         <label for="thongBaoContent" class="form-label">Nội dung</label>
-                        <textarea class="form-control" id="thongBaoContent" name="Content" rows="4" required maxlength="2000" placeholder="Nhập nội dung thông báo"></textarea>
+                        <textarea class="form-control" id="thongBaoContent" name="Content"
+                                  rows="4" required maxlength="2000" placeholder="Nhập nội dung thông báo"></textarea>
                     </div>
                 </div>
+
                 <div class="modal-footer">
                     <button type="submit" id="btnGuiThongBao" class="btn btn-primary fw-semibold">
                         <i class="fa-solid fa-paper-plane me-1"></i> Gửi thông báo
@@ -209,6 +220,7 @@ else
         </div>
     </div>
 </div>
+
 
 @section Scripts {
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
