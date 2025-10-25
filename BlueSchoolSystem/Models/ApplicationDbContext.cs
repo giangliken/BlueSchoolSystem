@@ -37,6 +37,9 @@ namespace BlueSchoolSystem.Models
         public DbSet<ThongBao> ThongBaos { get; set; }
 
 
+        public DbSet<UserFaceTemplate> UserFaceTemplates { get; set; }
+        public DbSet<FaceVerifyLog> FaceVerifyLogs { get; set; }
+
         //Table lưu trạng thái của hệ thống
         public DbSet<TrangThai> TrangThais { get; set; } // Bảng trạng thái của hệ thống
         protected override void OnModelCreating(ModelBuilder builder)
@@ -94,6 +97,30 @@ namespace BlueSchoolSystem.Models
                    .WithMany()
                    .HasForeignKey(l => l.TrangThaiId)
                    .OnDelete(DeleteBehavior.Restrict);
+
+
+            builder.Entity<UserFaceTemplate>(e =>
+            {
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Embedding).HasColumnType("varbinary(max)");
+                e.Property(x => x.Model).HasMaxLength(100);
+                e.HasOne(x => x.User)
+                    .WithMany() 
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(x => new { x.UserId, x.IsActive });
+                e.ToTable("UserFaceTemplates");
+            });
+
+            //  Cấu hình FaceVerifyLog (audit)
+            builder.Entity<FaceVerifyLog>(e =>
+            {
+                e.HasKey(x => x.Id);
+                e.HasIndex(x => new { x.UserId, x.At });
+                e.Property(x => x.Score).HasColumnType("real"); // float32
+                e.ToTable("FaceVerifyLogs");
+            });
 
         }
     }

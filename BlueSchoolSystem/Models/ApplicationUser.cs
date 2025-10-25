@@ -7,6 +7,10 @@ namespace BlueSchoolSystem.Models
     {
         public string? FcmToken { get; set; }
 
+        public bool FaceRegistered { get; set; } = false;
+        public DateTimeOffset? FaceRegisteredAt { get; set; }
+        public string? FaceNotes { get; set; }
+
         public virtual SinhVien? SinhViens { get; set; }
         public virtual GiangVien? GiangViens { get; set; }
         [Required(ErrorMessage =("Số điện thoại là bắt buộc"))]
