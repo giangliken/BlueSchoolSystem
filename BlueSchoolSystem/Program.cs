@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using OfficeOpenXml;
 using System.Text;
@@ -93,7 +94,8 @@ builder.Services.AddAuthentication()
          ValidateIssuerSigningKey = true,
          ValidIssuer = jwtSettings.Issuer,
          ValidAudience = jwtSettings.Audience,
-         IssuerSigningKey = new SymmetricSecurityKey(key)
+         IssuerSigningKey = new SymmetricSecurityKey(key),
+         ClockSkew = TimeSpan.Zero
      };
  });
 
@@ -143,6 +145,12 @@ builder.Services.AddRazorPages();
 
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
+builder.Services.AddMemoryCache();
+
+builder.Services.AddSingleton<IFaceTicketStore, EFMemoryFaceTicketStore>();
+builder.Services.Configure<FaceVerifyOptions>(builder.Configuration.GetSection("FaceVerify"));
+
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -163,6 +171,10 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+
+var loc = app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>();
+app.UseRequestLocalization(loc.Value);
+
 app.UseSession();
 app.UseCors("AllowAll");
 app.UseAuthentication();
