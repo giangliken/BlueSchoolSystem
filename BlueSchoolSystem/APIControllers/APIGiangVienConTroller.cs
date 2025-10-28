@@ -1,6 +1,7 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
 using BlueSchoolSystem.Services;
+using Firebase.Database;
 using Firebase.Database.Query;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Reflection.Metadata;
 using System.Text;
 
@@ -467,6 +469,26 @@ namespace BlueSchoolSystem.APIControllers
             if (lopHocPhan == null || lopHocPhan.GiangVienId != giangVien.Id)
                 return StatusCode(403, new { result = false, message = "Không có quyền truy cập lớp học phần này" });
 
+
+            var danhSachSinhVien = await _context.ChiTietLopHocPhans
+                .Where(ct => ct.LopHocPhanId == lopHocPhanId)
+                .Select(ct => new
+                {
+                    SinhVienId = ct.SinhVienId,
+                    MSSV = ct.SinhVien.MSSV,
+                    HoTen = (
+                        (ct.SinhVien.HoVaTenDem ?? "") + " " + (ct.SinhVien.Ten ?? "")
+                    ).Trim()
+                })
+                .AsNoTracking()
+                .OrderBy(x => x.HoTen)
+                .ToListAsync();
+
+
+            if (!danhSachSinhVien.Any())
+                return BadRequest(new { result = false, message = "Lớp chưa có danh sách sinh viên, không thể tạo buổi điểm danh." });
+
+
             // Sinh mã code ngắn gọn
             string code;
             var random = new Random();
@@ -492,6 +514,15 @@ namespace BlueSchoolSystem.APIControllers
             .Select(t => t.Id)
             .FirstOrDefault();
 
+            var trangThaiChuaDiemDanhId = await _context.TrangThais
+            .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Vắng mặt")
+            .Select(t => t.Id)
+            .FirstOrDefaultAsync();
+
+            if (trangThaiBuoiDiemDanhId == 0 || trangThaiChuaDiemDanhId == 0)
+                return BadRequest(new { result = false, message = "Thiếu cấu hình trạng thái điểm danh (Đang diễn ra/Chưa điểm danh)." });
+
+
             var buoi = new DiemDanh
             {
                 LopHocPhanId = lopHocPhanId,
@@ -504,6 +535,23 @@ namespace BlueSchoolSystem.APIControllers
             };
             _context.DiemDanhs.Add(buoi);
             await _context.SaveChangesAsync();
+
+            var details = danhSachSinhVien.Select(x => new ChiTietDiemDanh
+            {
+                DiemDanhId = buoi.Id,
+                SinhVienId = (int)x.SinhVienId,
+                TrangThaiId = trangThaiChuaDiemDanhId,
+                ThoiGian = DateTime.MinValue 
+            });
+
+            _context.ChiTietDiemDanhs.AddRange(details);
+            await _context.SaveChangesAsync();
+
+            // Lấy mã LHP + danh sách SV để seed
+            var maLop = lopHocPhan.MaLopHocPhan;
+            var danhSachHoTen = danhSachSinhVien.Select(x => (x.MSSV, x.HoTen));
+            await PushSessionSeedToFirebase(buoi, maLop, danhSachHoTen, trangThaiChuaDiemDanhId);
+
 
             return Ok(new
             {
@@ -522,6 +570,50 @@ namespace BlueSchoolSystem.APIControllers
                 }
             });
         }
+
+        private async Task PushSessionSeedToFirebase(
+        DiemDanh buoi,
+        string maLopHocPhan,
+        IEnumerable<(string MSSV, string HoTen)> sinhViens,
+        int trangThaiVangId)
+        {
+            // NOTE: dùng path "attendancesessions" để khớp Flutter
+            var fb = new Firebase.Database.FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com");
+
+            // 1) push metadata buổi
+            var meta = new
+            {
+                code = buoi.Code,
+                maLopHocPhan = maLopHocPhan,
+                ngay = buoi.Ngay.ToString("yyyy-MM-dd"),
+                createdAt = buoi.CreatedAt.ToString("s"),
+                expireAt = buoi.ExpireAt.ToString("s")
+            };
+            await fb.Child("attendancesessions")
+                    .Child(buoi.Id.ToString())
+                    .PatchAsync(meta);
+
+            // 2) seed students map
+            var students = new Dictionary<string, object>();
+            foreach (var sv in sinhViens)
+            {
+                students[sv.MSSV] = new
+                {
+                    studentId = sv.MSSV,
+                    studentName = sv.HoTen,
+                    status = "Vắng",               // hoặc "Chưa điểm danh" tùy UI
+                    statusId = trangThaiVangId,    // map với SQL
+                    timecheckedin = (string?)null,
+                    bluetoothID = (string?)null
+                };
+            }
+
+            await fb.Child("attendancesessions")
+                    .Child(buoi.Id.ToString())
+                    .Child("students")
+                    .PutAsync(students);
+        }
+
 
 
         // GET: api/buoidiemdanh/{diemDanhId}/chitiet
@@ -647,35 +739,182 @@ namespace BlueSchoolSystem.APIControllers
         }
 
         [HttpPost("diemdanh/capnhattrangthai")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme,
+           Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
         public async Task<IActionResult> UpdateTrangThaiDiemDanh([FromBody] UpdateTrangThaiModel model)
         {
-            var chiTiet = await _context.ChiTietDiemDanhs
-                .FirstOrDefaultAsync(x => x.DiemDanhId == model.DiemDanhId && x.SinhVienId == model.SinhVienId);
-            if (chiTiet == null)
+            if (model.DiemDanhId <= 0)
+                return BadRequest(new { result = false, message = "Thiếu DiemDanhId" });
+
+            // tìm SV theo Id hoặc MSSV
+            var sv = model.SinhVienId > 0
+                ? await _context.SinhViens.FindAsync(model.SinhVienId)
+                : !string.IsNullOrWhiteSpace(model.MSSV)
+                    ? await _context.SinhViens.FirstOrDefaultAsync(x => x.MSSV == model.MSSV)
+                    : null;
+
+            if (sv == null)
+                return NotFound(new { result = false, message = "Không tìm thấy sinh viên" });
+
+            // map trạng thái: ưu tiên id, fallback theo text ("Có mặt", "Đi trễ", "Vắng", "Vắng có phép")
+            int trangThaiId = 0;
+            if (model.TrangThaiId.HasValue) trangThaiId = model.TrangThaiId.Value;
+            else if (!string.IsNullOrWhiteSpace(model.TrangThaiText))
             {
-                // Nếu chưa có thì tạo mới (trường hợp chỉnh cho sinh viên bị vắng)
-                chiTiet = new ChiTietDiemDanh
+                trangThaiId = await _context.TrangThais
+                    .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == model.TrangThaiText)
+                    .Select(t => t.Id)
+                    .FirstOrDefaultAsync();
+            }
+            if (trangThaiId == 0)
+                return BadRequest(new { result = false, message = "Trạng thái không hợp lệ" });
+
+            // upsert ChiTietDiemDanh
+            var ct = await _context.ChiTietDiemDanhs
+                .FirstOrDefaultAsync(x => x.DiemDanhId == model.DiemDanhId && x.SinhVienId == sv.Id);
+
+            if (ct == null)
+            {
+                ct = new ChiTietDiemDanh
                 {
                     DiemDanhId = model.DiemDanhId,
-                    SinhVienId = model.SinhVienId,
-                    TrangThaiId = model.TrangThai,
-                    ThoiGian = DateTime.Now
+                    SinhVienId = sv.Id
                 };
-                _context.ChiTietDiemDanhs.Add(chiTiet);
+                _context.ChiTietDiemDanhs.Add(ct);
             }
-            else
-            {
-                chiTiet.TrangThaiId = model.TrangThai;
-                chiTiet.ThoiGian = DateTime.Now;
-            }
+
+            ct.TrangThaiId = trangThaiId;
+            ct.ThoiGian = DateTime.Now;
+            ct.GhiChu = model.Source ?? "Manual/BLE";
+
             await _context.SaveChangesAsync();
+
+            // lấy text trạng thái để đẩy Firebase cho app
+            var statusText = await _context.TrangThais
+                .Where(t => t.Id == trangThaiId)
+                .Select(t => t.TenTrangThai)
+                .FirstOrDefaultAsync() ?? "Không rõ";
+
+            // push lên Realtime DB (đã có helper này trước đó)
+            await PushStatusToFirebaseBoth(
+                model.DiemDanhId,
+                sv.MSSV,
+                $"{sv.HoVaTenDem} {sv.Ten}".Trim(),
+                trangThaiId,
+                statusText,
+                ct.ThoiGian
+            );
+
             return Ok(new { result = true });
         }
+
         public class UpdateTrangThaiModel
         {
             public int DiemDanhId { get; set; }
-            public int SinhVienId { get; set; }
-            public int TrangThai { get; set; }
+            public int? SinhVienId { get; set; }         // optional
+            public string? MSSV { get; set; }            // optional (dùng cái nào cũng được)
+            public int? TrangThaiId { get; set; }        // optional
+            public string? TrangThaiText { get; set; }   // optional: "Có mặt" | "Đi trễ" | "Vắng" | "Vắng có phép"
+            public string? Source { get; set; }          // "BLE" | "Manual"
+        }
+
+
+        private async Task PushStatusToFirebaseBoth(
+    int diemDanhId,
+    string mssv,
+    string hoTenDayDu,        // ví dụ: "Nguyễn Văn A"
+    int trangThaiId,          // Id trong bảng TrangThai
+    string trangThaiText,     // "Có mặt" | "Đi trễ" | "Vắng" | "Vắng có phép"
+    DateTime thoiGian,
+    int? sinhVienId = null,   // Id SV trong SQL (để đẩy nhánh web cũ)
+    double? latitude = null,
+    double? longitude = null,
+    string? deviceId = null,  // BLE DeviceId nếu có
+    string? source = null     // "BLE" | "Manual" | "QR"
+)
+        {
+            var fb = new FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com");
+            string sessionKey = diemDanhId.ToString(CultureInfo.InvariantCulture);
+
+            // Tách "Họ và tên đệm" / "Tên" để nhánh web cũ vẫn chuẩn cấu trúc
+            var (hoVaTenDem, ten) = SplitName(hoTenDayDu);
+
+            // =========================
+            // 1) Nhánh WEB cũ: "attendance_sessions/{diemDanhId}/{sinhVienId}"
+            //    Web razor đang đọc: id, mssv, hoVaTenDem, ten, trangThai (int), thoiGian (ISO)
+            // =========================
+            if (sinhVienId.HasValue)
+            {
+                var webDoc = new
+                {
+                    id = sinhVienId.Value,
+                    mssv = mssv,
+                    hoVaTenDem = hoVaTenDem,
+                    ten = ten,
+                    trangThai = trangThaiId,
+                    thoiGian = thoiGian.ToString("s", CultureInfo.InvariantCulture),
+                    latitude,
+                    longitude,
+                    deviceId,
+                    source = source ?? "Manual"
+                };
+
+                await fb
+                    .Child("attendance_sessions")
+                    .Child(sessionKey)
+                    .Child(sinhVienId.Value.ToString(CultureInfo.InvariantCulture))
+                    .PutAsync(webDoc);
+            }
+
+            // =========================
+            // 2) Nhánh APP mới: "attendancesessions/{diemDanhId}/students/{MSSV}"
+            //    App Flutter đang đọc: studentId, studentName, status (text), statusId (int),
+            //    timecheckedin (HH:mm hoặc "Chưa điểm danh"), bluetoothID
+            // =========================
+            var appDoc = new
+            {
+                studentId = mssv,
+                studentName = hoTenDayDu,
+                status = trangThaiText,
+                statusId = trangThaiId,
+                timecheckedin = (trangThaiText == "Có mặt" || trangThaiText == "Đi trễ")
+                    ? thoiGian.ToString("HH:mm")
+                    : "Chưa điểm danh",
+                bluetoothID = deviceId,
+                latitude,
+                longitude,
+                deviceId,
+                source = source ?? "Manual",
+                updatedAt = thoiGian.ToString("s", CultureInfo.InvariantCulture)
+            };
+
+            // Patch để không ghi đè các field khác (ví dụ đã seed sẵn)
+            await fb
+                .Child("attendancesessions")
+                .Child(sessionKey)
+                .Child("students")
+                .Child(mssv)
+                .PatchAsync(appDoc);
+
+            // Optional: cập nhật metadata buổi (cho tiện debug/hiển thị)
+            await fb
+                .Child("attendancesessions")
+                .Child(sessionKey)
+                .PatchAsync(new
+                {
+                    lastUpdateAt = thoiGian.ToString("s", CultureInfo.InvariantCulture),
+                    lastUpdateSource = source ?? "Manual"
+                });
+        }
+
+        private static (string hoVaTenDem, string ten) SplitName(string full)
+        {
+            if (string.IsNullOrWhiteSpace(full)) return ("", "");
+            var parts = full.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 1) return ("", parts[0]);
+            var ten = parts[^1];
+            var hoVaTenDem = string.Join(' ', parts[..^1]);
+            return (hoVaTenDem, ten);
         }
 
 

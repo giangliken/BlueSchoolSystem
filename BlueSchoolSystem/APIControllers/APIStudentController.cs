@@ -879,17 +879,17 @@ namespace BlueSchoolSystem.APIControllers
             if (sinhVien == null)
                 return NotFound(new { result = false, message = "Không tìm thấy thông tin sinh viên" });
 
-            var trangThaiCoMatId = _context.TrangThais
+            var trangThaiCoMatId = await _context.TrangThais
                 .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Có mặt")
                 .Select(t => t.Id)
-                .FirstOrDefault();
+                .FirstOrDefaultAsync();
 
-            var trangThaiBuoiDiemDanhId = _context.TrangThais
-           .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
-           .Select(t => t.Id)
-           .FirstOrDefault();
+            var trangThaiBuoiDiemDanhId = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+                .Select(t => t.Id)
+                .FirstOrDefaultAsync();
 
-            // Kiểm tra buổi điểm danh hợp lệ, đang mở, đúng code, còn hạn
+            // Buổi hợp lệ + đúng code + còn hạn + đang mở
             var buoi = await _context.DiemDanhs.FirstOrDefaultAsync(x =>
                 x.Id == model.DiemDanhId &&
                 x.Code == model.Code &&
@@ -899,29 +899,38 @@ namespace BlueSchoolSystem.APIControllers
             if (buoi == null)
                 return BadRequest(new { result = false, message = "Mã điểm danh không hợp lệ hoặc đã hết hạn" });
 
-            // Check đã điểm danh chưa
-            var existed = await _context.ChiTietDiemDanhs.AnyAsync(x =>
-                x.DiemDanhId == model.DiemDanhId && x.SinhVienId == sinhVien.Id
-            );
-            if (existed)
-                return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi" });
+            // Tìm dòng đã seed cho SV trong buổi này
+            var ct = await _context.ChiTietDiemDanhs
+                .FirstOrDefaultAsync(x => x.DiemDanhId == buoi.Id && x.SinhVienId == sinhVien.Id);
 
-            // Ghi nhận điểm danh
-            var ct = new ChiTietDiemDanh
+            // Nếu chưa seed (fallback), tạo mới; nếu đã seed thì update
+            if (ct == null)
             {
-                DiemDanhId = model.DiemDanhId,
-                SinhVienId = sinhVien.Id,
-                ThoiGian = DateTime.Now,
-                Latitude = model.Latitude,
-                Longitude = model.Longitude,
-                DeviceId = model.DeviceId,
-                TrangThaiId = trangThaiCoMatId 
-            };
-            _context.ChiTietDiemDanhs.Add(ct);
-            await _context.SaveChangesAsync();
+                ct = new ChiTietDiemDanh
+                {
+                    DiemDanhId = buoi.Id,
+                    SinhVienId = sinhVien.Id,
+                };
+                _context.ChiTietDiemDanhs.Add(ct);
+            }
+            else
+            {
+                // Idempotent: nếu đã có mặt rồi thì không cho điểm danh lại
+                var coMatId = trangThaiCoMatId;
+                if (ct.TrangThaiId == coMatId)
+                    return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi" });
+            }
 
+            ct.TrangThaiId = trangThaiCoMatId;
+            ct.ThoiGian = DateTime.Now;
+            ct.Latitude = model.Latitude;
+            ct.Longitude = model.Longitude;
+            ct.DeviceId = model.DeviceId;
+
+            await _context.SaveChangesAsync();
             return Ok(new { result = true, message = "Điểm danh thành công!" });
         }
+
 
         // Điểm danh qua mã code
         [HttpPost("diemdanh/thuchien")]
@@ -931,20 +940,24 @@ namespace BlueSchoolSystem.APIControllers
             if (string.IsNullOrWhiteSpace(request.Code))
                 return BadRequest(new { result = false, message = "Thiếu mã điểm danh" });
 
-            // Lấy MSSV hoặc UserName từ token (claim "username")
             var mssv = User.FindFirst("username")?.Value;
             if (string.IsNullOrEmpty(mssv))
                 return Unauthorized(new { result = false, message = "Không tìm thấy MSSV trong token" });
 
-            // Tìm buổi điểm danh hợp lệ
             var now = DateTime.Now;
+
+            // Buổi còn hạn (nên check thêm 'Đang diễn ra' cho đồng nhất)
+            var trangThaiBuoiDiemDanhId = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+                .Select(t => t.Id)
+                .FirstOrDefaultAsync();
+
             var buoi = await _context.DiemDanhs
-                .FirstOrDefaultAsync(x => x.Code == request.Code && x.ExpireAt >= now);
+                .FirstOrDefaultAsync(x => x.Code == request.Code && x.ExpireAt >= now && x.TrangThaiId == trangThaiBuoiDiemDanhId);
 
             if (buoi == null)
                 return BadRequest(new { result = false, message = "Mã điểm danh không hợp lệ hoặc đã hết hạn" });
 
-            // Kiểm tra sinh viên có tồn tại và thuộc lớp không
             var sinhVien = await _context.SinhViens.FirstOrDefaultAsync(x => x.MSSV == mssv);
             if (sinhVien == null)
                 return NotFound(new { result = false, message = "Không tìm thấy sinh viên" });
@@ -954,67 +967,80 @@ namespace BlueSchoolSystem.APIControllers
             if (!inClass)
                 return BadRequest(new { result = false, message = "Sinh viên không thuộc lớp này" });
 
-            // Kiểm tra đã điểm danh chưa
-            var exist = await _context.ChiTietDiemDanhs
-                .AnyAsync(x => x.DiemDanhId == buoi.Id && x.SinhVienId == sinhVien.Id);
-            if (exist)
-                return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi!" });
+            var trangThaiCoMatId = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Có mặt")
+                .Select(t => t.Id)
+                .FirstOrDefaultAsync();
 
-            var trangThaiCoMatId = _context.TrangThais
-            .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Có mặt")
-            .Select(t => t.Id)
-            .FirstOrDefault();
+            // Lấy dòng đã seed và update
+            var ct = await _context.ChiTietDiemDanhs
+                .FirstOrDefaultAsync(x => x.DiemDanhId == buoi.Id && x.SinhVienId == sinhVien.Id);
 
-            var trangThaiBuoiDiemDanhId = _context.TrangThais
-           .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
-           .Select(t => t.Id)
-           .FirstOrDefault();
-
-            // Lưu điểm danh SQL
-            var chiTiet = new ChiTietDiemDanh
+            if (ct == null)
             {
-                DiemDanhId = buoi.Id,
-                SinhVienId = sinhVien.Id,
-                TrangThaiId = trangThaiCoMatId,
-                Latitude = request.Latitude,      
-                Longitude = request.Longitude,   
-                DeviceId = request.DeviceId,
-                ThoiGian = now,
-                GhiChu = "Điểm danh QR",
-         
-            };
-            _context.ChiTietDiemDanhs.Add(chiTiet);
+                ct = new ChiTietDiemDanh
+                {
+                    DiemDanhId = buoi.Id,
+                    SinhVienId = sinhVien.Id,
+                };
+                _context.ChiTietDiemDanhs.Add(ct);
+            }
+            else
+            {
+                if (ct.TrangThaiId == trangThaiCoMatId)
+                    return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi!" });
+            }
+
+            ct.TrangThaiId = trangThaiCoMatId;
+            ct.Latitude = request.Latitude;
+            ct.Longitude = request.Longitude;
+            ct.DeviceId = request.DeviceId;
+            ct.ThoiGian = now;
+            ct.GhiChu = "Điểm danh QR";
+
             await _context.SaveChangesAsync();
 
-            // --- PUSH FIREBASE ---
+            // Nếu có push Firebase thì giữ nguyên:
             await PushAttendanceToFirebase(buoi.Id, sinhVien, now, trangThaiCoMatId, request);
 
             return Ok(new { result = true, message = "Điểm danh thành công!" });
         }
 
 
-        private async Task PushAttendanceToFirebase(int diemDanhId, SinhVien sv, DateTime thoiGian, int trangThaiCoMatId, DiemDanhRequest request)
+
+        private async Task PushAttendanceToFirebase(
+        int diemDanhId,
+        SinhVien sv,
+        DateTime thoiGian,
+        int trangThaiId,
+        DiemDanhRequest request)
         {
-            var firebaseClient = new Firebase.Database.FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com"); 
-            var data = new
+            var statusText = await _context.TrangThais
+                .Where(t => t.Id == trangThaiId)
+                .Select(t => t.TenTrangThai)
+                .FirstOrDefaultAsync() ?? "Có mặt";
+
+            var fb = new Firebase.Database.FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com");
+
+            var payload = new
             {
-                id = sv.Id,
-                mssv = sv.MSSV,
-                hoVaTenDem = sv.HoVaTenDem,
-                ten = sv.Ten,
-                trangThai = trangThaiCoMatId,
-                thoiGian = thoiGian.ToString("s"),
+                studentId = sv.MSSV,
+                studentName = $"{(sv.HoVaTenDem ?? "").Trim()} {(sv.Ten ?? "").Trim()}".Trim(),
+                status = statusText,
+                statusId = trangThaiId,
+                timecheckedin = new[] { "Có mặt", "Đi trễ" }.Contains(statusText) ? thoiGian.ToString("HH:mm") : null,
+                bluetoothID = request.DeviceId,
                 latitude = request.Latitude,
-                longitude = request.Longitude,
-                deviceId = request.DeviceId
+                longitude = request.Longitude
             };
 
-            await firebaseClient
-                .Child("attendance_sessions")
-                .Child(diemDanhId.ToString())
-                .Child(sv.Id.ToString())
-                .PutAsync(data);
+            await fb.Child("attendancesessions")
+                    .Child(diemDanhId.ToString())
+                    .Child("students")
+                    .Child(sv.MSSV)
+                    .PatchAsync(payload);
         }
+
 
     }
 }
