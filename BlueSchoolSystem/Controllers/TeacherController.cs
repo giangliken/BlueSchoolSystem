@@ -300,7 +300,6 @@ namespace BlueSchoolSystem.Controllers
             if (!string.IsNullOrEmpty(token))
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            // Gửi request update trạng thái (tự làm API backend nếu chưa có)
             var postData = new
             {
                 DiemDanhId = diemDanhId,
