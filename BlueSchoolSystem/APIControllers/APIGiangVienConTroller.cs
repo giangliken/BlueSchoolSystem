@@ -674,8 +674,8 @@ namespace BlueSchoolSystem.APIControllers
                 {
                     studentId = sv.MSSV,
                     studentName = sv.HoTen,
-                    status = "Vắng",               // hoặc "Chưa điểm danh" tùy UI
-                    statusId = trangThaiVangId,    // map với SQL
+                    status = "Vắng mặt",               
+                    statusId = trangThaiVangId,    
                     timecheckedin = (string?)null,
                     bluetoothID = (string?)null
                 };
@@ -893,18 +893,18 @@ namespace BlueSchoolSystem.APIControllers
 
 
         private async Task PushStatusToFirebaseBoth(
-    int diemDanhId,
-    string mssv,
-    string hoTenDayDu,        // ví dụ: "Nguyễn Văn A"
-    int trangThaiId,          // Id trong bảng TrangThai
-    string trangThaiText,     // "Có mặt" | "Đi trễ" | "Vắng" | "Vắng có phép"
-    DateTime thoiGian,
-    int? sinhVienId = null,   // Id SV trong SQL (để đẩy nhánh web cũ)
-    double? latitude = null,
-    double? longitude = null,
-    string? deviceId = null,  // BLE DeviceId nếu có
-    string? source = null     // "BLE" | "Manual" | "QR"
-)
+        int diemDanhId,
+        string mssv,
+        string hoTenDayDu,        // ví dụ: "Nguyễn Văn A"
+        int trangThaiId,          // Id trong bảng TrangThai
+        string trangThaiText,     // "Có mặt" | "Đi trễ" | "Vắng" | "Vắng có phép"
+        DateTime thoiGian,
+        int? sinhVienId = null,   // Id SV trong SQL (để đẩy nhánh web cũ)
+        double? latitude = null,
+        double? longitude = null,
+        string? deviceId = null,  // BLE DeviceId nếu có
+        string? source = null     // "BLE" | "Manual" | "QR"
+        )
         {
             var fb = new FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com");
             string sessionKey = diemDanhId.ToString(CultureInfo.InvariantCulture);
