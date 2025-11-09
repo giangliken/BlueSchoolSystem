@@ -31,6 +31,7 @@ namespace BlueSchoolSystem.Models
         public DbSet<DiemDanh> DiemDanhs { get; set; } // Bảng điểm danh
         public DbSet<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; } // Bảng chi tiết điểm danh
         public DbSet<PhongHoc> PhongHocs { get; set; } // Bảng phòng học
+        public DbSet<CoSo> CoSos { get; set; } // Bảng cơ sở
         public DbSet<BangDiem> BangDiems { get; set; } // Bảng điểm
         public DbSet<DangKyHocPhan> DangKyHocPhans { get; set; } // Bảng đăng ký học phần
         public DbSet<HocKy> HocKys { get; set; } // Bảng học kỳ
@@ -66,6 +67,12 @@ namespace BlueSchoolSystem.Models
                 .HasOne(bd => bd.LopHocPhan)
                 .WithMany(lhp => lhp.BangDiems)
                 .HasForeignKey(bd => bd.LopHocPhanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PhongHoc>()
+                .HasOne(ph => ph.CoSo)
+                .WithMany(cs => cs.PhongHocs)
+                .HasForeignKey(ph => ph.CoSoId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<ChiTietDiemDanh>()
