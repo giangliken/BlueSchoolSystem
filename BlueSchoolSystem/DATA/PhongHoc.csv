@@ -1,53 +1,53 @@
-"Id","MaPhongHoc","TenPhongHoc","SoChoNgoi","MoTa"
-1,E1.01.01,Phòng CNTT,50,""
-2,E1.01.02,Phòng CNTT,50,""
-3,E1.01.03,Phòng CNTT,50,""
-4,E1.01.04,Phòng CNTT,50,""
-5,E1.01.05,Phòng CNTT,50,""
-6,E1.01.06,Phòng CNTT,50,""
-7,E1.01.07,Phòng CNTT,50,""
-8,E1.01.08,Phòng CNTT,50,""
-9,E1.01.09,Phòng CNTT,50,""
-10,E1.01.10,Phòng CNTT,50,""
-11,E2.01.01,Phòng CNTT,50,""
-12,E2.01.02,Phòng CNTT,50,""
-13,E2.01.03,Phòng CNTT,50,""
-14,E2.01.04,Phòng CNTT,50,""
-15,E2.01.05,Phòng CNTT,50,""
-16,E2.01.06,Phòng CNTT,50,""
-17,E2.01.07,Phòng CNTT,50,""
-18,E2.01.08,Phòng CNTT,50,""
-19,E2.01.09,Phòng CNTT,50,""
-20,E2.01.10,Phòng CNTT,50,""
-21,E1.03.01,Phòng CNTT,50,Phòng học lý thuyết
-22,E1.03.02,Phòng CNTT,50,Phòng học lý thuyết
-23,E1.03.03,Phòng CNTT,50,Phòng học lý thuyết
-24,E1.03.04,Phòng CNTT,50,Phòng học lý thuyết
-25,E1.04.01,Phòng Thực hành,50,Phòng thực hành máy tính
-26,E1.04.02,Phòng Thực hành,50,Phòng thực hành máy tính
-27,E1.04.03,Phòng Thực hành,50,Phòng thực hành máy tính
-28,E1.04.04,Phòng Thực hành,50,Phòng thực hành máy tính
-29,E1.05.01,Phòng CNTT,50,Phòng học lý thuyết
-30,E1.05.02,Phòng CNTT,50,Phòng học lý thuyết
-31,E1.05.03,Phòng CNTT,50,Phòng học lý thuyết
-32,E1.05.04,Phòng CNTT,50,Phòng học lý thuyết
-33,E1.06.01,Phòng CNTT,50,Phòng học lý thuyết
-34,E1.06.02,Phòng CNTT,50,Phòng học lý thuyết
-35,E1.06.03,Phòng CNTT,50,Phòng học lý thuyết
-36,E1.06.04,Phòng CNTT,50,Phòng học lý thuyết
-37,E1.07.01,Phòng CNTT,50,Phòng học lý thuyết
-38,E1.07.02,Phòng CNTT,50,Phòng học lý thuyết
-39,E1.07.03,Phòng CNTT,50,Phòng học lý thuyết
-40,E1.07.04,Phòng CNTT,50,Phòng học lý thuyết
-41,E1.08.01,Phòng CNTT,50,Phòng học lý thuyết
-42,E1.08.02,Phòng CNTT,50,Phòng học lý thuyết
-43,E1.08.03,Phòng CNTT,50,Phòng học lý thuyết
-44,E1.08.04,Phòng CNTT,50,Phòng học lý thuyết
-45,E1.09.01,Phòng CNTT,50,Phòng học lý thuyết
-46,E1.09.02,Phòng CNTT,50,Phòng học lý thuyết
-47,E1.09.03,Phòng CNTT,50,Phòng học lý thuyết
-48,E1.09.04,Phòng CNTT,50,Phòng học lý thuyết
-49,E1.10.01,Phòng Thực hành,50,Phòng thực hành máy tính
-50,E1.10.02,Phòng Thực hành,50,Phòng thực hành máy tính
-51,E1.10.03,Phòng Thực hành,50,Phòng thực hành máy tính
-52,E1.10.04,Phòng Thực hành,50,Phòng thực hành máy tính
+﻿Id,MaPhongHoc,TenPhongHoc,SoChoNgoi,MoTa,CoSoId
+1,E1.01.01,Phòng CNTT,50,,5
+2,E1.01.02,Phòng CNTT,50,,5
+3,E1.01.03,Phòng CNTT,50,,5
+4,E1.01.04,Phòng CNTT,50,,5
+5,E1.01.05,Phòng CNTT,50,,5
+6,E1.01.06,Phòng CNTT,50,,5
+7,E1.01.07,Phòng CNTT,50,,5
+8,E1.01.08,Phòng CNTT,50,,5
+9,E1.01.09,Phòng CNTT,50,,5
+10,E1.01.10,Phòng CNTT,50,,5
+11,E2.01.01,Phòng CNTT,50,,5
+12,E2.01.02,Phòng CNTT,50,,5
+13,E2.01.03,Phòng CNTT,50,,5
+14,E2.01.04,Phòng CNTT,50,,5
+15,E2.01.05,Phòng CNTT,50,,5
+16,E2.01.06,Phòng CNTT,50,,5
+17,E2.01.07,Phòng CNTT,50,,5
+18,E2.01.08,Phòng CNTT,50,,5
+19,E2.01.09,Phòng CNTT,50,,5
+20,E2.01.10,Phòng CNTT,50,,5
+21,E1.03.01,Phòng CNTT,50,Phòng học lý thuyết,5
+22,E1.03.02,Phòng CNTT,50,Phòng học lý thuyết,5
+23,E1.03.03,Phòng CNTT,50,Phòng học lý thuyết,5
+24,E1.03.04,Phòng CNTT,50,Phòng học lý thuyết,5
+25,E1.04.01,Phòng Thực hành,50,Phòng thực hành máy tính,5
+26,E1.04.02,Phòng Thực hành,50,Phòng thực hành máy tính,5
+27,E1.04.03,Phòng Thực hành,50,Phòng thực hành máy tính,5
+28,E1.04.04,Phòng Thực hành,50,Phòng thực hành máy tính,5
+29,E1.05.01,Phòng CNTT,50,Phòng học lý thuyết,5
+30,E1.05.02,Phòng CNTT,50,Phòng học lý thuyết,5
+31,E1.05.03,Phòng CNTT,50,Phòng học lý thuyết,5
+32,E1.05.04,Phòng CNTT,50,Phòng học lý thuyết,5
+33,E1.06.01,Phòng CNTT,50,Phòng học lý thuyết,5
+34,E1.06.02,Phòng CNTT,50,Phòng học lý thuyết,5
+35,E1.06.03,Phòng CNTT,50,Phòng học lý thuyết,5
+36,E1.06.04,Phòng CNTT,50,Phòng học lý thuyết,5
+37,E1.07.01,Phòng CNTT,50,Phòng học lý thuyết,5
+38,E1.07.02,Phòng CNTT,50,Phòng học lý thuyết,5
+39,E1.07.03,Phòng CNTT,50,Phòng học lý thuyết,5
+40,E1.07.04,Phòng CNTT,50,Phòng học lý thuyết,5
+41,E1.08.01,Phòng CNTT,50,Phòng học lý thuyết,5
+42,E1.08.02,Phòng CNTT,50,Phòng học lý thuyết,5
+43,E1.08.03,Phòng CNTT,50,Phòng học lý thuyết,5
+44,E1.08.04,Phòng CNTT,50,Phòng học lý thuyết,5
+45,E1.09.01,Phòng CNTT,50,Phòng học lý thuyết,5
+46,E1.09.02,Phòng CNTT,50,Phòng học lý thuyết,5
+47,E1.09.03,Phòng CNTT,50,Phòng học lý thuyết,5
+48,E1.09.04,Phòng CNTT,50,Phòng học lý thuyết,5
+49,E1.10.01,Phòng Thực hành,50,Phòng thực hành máy tính,5
+50,E1.10.02,Phòng Thực hành,50,Phòng thực hành máy tính,5
+51,E1.10.03,Phòng Thực hành,50,Phòng thực hành máy tính,5
+52,E1.10.04,Phòng Thực hành,50,Phòng thực hành máy tính,5
