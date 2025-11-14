@@ -1137,7 +1137,6 @@ namespace BlueSchoolSystem.Controllers
                 return RedirectToAction("ClassManager");
             }
 
-            var chiTiet = lopHoc.ChiTietLopHocs.FirstOrDefault();
 
             // 1. Tạo SelectList cho Ngành học (Giữ nguyên)
             ViewBag.NganhList = new SelectList(
@@ -1147,25 +1146,37 @@ namespace BlueSchoolSystem.Controllers
                 lopHoc.NganhId // Ngành hiện tại
             );
 
+            var chiTiet = lopHoc.ChiTietLopHocs.FirstOrDefault();
+            var currentLopId = lopHoc.Id;
+
             // 2. Lấy danh sách nguồn (source list) dùng chung
             var sinhViens = await _context.SinhViens
+                // LỌC: CHỈ LẤY SINH VIÊN THUỘC LỚP HIỆN TẠI
+                .Where(sv => sv.LopId == currentLopId) // <== ĐIỀU KIỆN MỚI
                 .Select(sv => new { Id = sv.Id, HoTen = sv.HoVaTenDem + " " + sv.Ten + " (" + sv.MSSV + ")" })
                 .OrderBy(sv => sv.HoTen)
                 .ToListAsync();
 
             var giangViens = await _context.GiangViens
-                .Select(gv => new { Id = gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten + " (" + gv.MaGiangVien + ")" })
-                .OrderBy(gv => gv.HoTen)
-                .ToListAsync();
+    .Select(gv => new
+    {
+        Id = gv.Id,
+        HoTen = gv.HoVaTenDem + " " + gv.Ten + " (" + gv.MaGiangVien + ")",
 
-            // --- TẠO SELECTLIST CHO CÁC VAI TRÒ CÁN SỰ/GV CHỦ NHIỆM ---
+        // Đếm số lớp giảng viên này đang phụ trách, Lọc trực tiếp trên context
+        SoLopDamNhan = _context.ChiTietLopHocs.Count(ct => ct.GiangVienId == gv.Id)
+    })
+    // Lọc: Giảng viên chỉ được phụ trách tối đa 5 lớp.
+    // PHẢI dùng Id của chiTiet để so sánh giảng viên hiện tại của lớp đó
+    .Where(gv => gv.SoLopDamNhan < 5 || gv.Id == chiTiet.GiangVienId)
+    .OrderBy(gv => gv.HoTen)
+    .ToListAsync();
 
-            // Giảng viên Chủ nhiệm
+            // Tạo SelectList cho Giảng viên (Trợ lý)
             ViewBag.GiangVienList = new SelectList(
                 giangViens,
                 "Id",
                 "HoTen",
-                // TRUYỀN ID CỦA GIẢNG VIÊN HIỆN TẠI VÀO ĐÂY
                 chiTiet?.GiangVienId
             );
 
