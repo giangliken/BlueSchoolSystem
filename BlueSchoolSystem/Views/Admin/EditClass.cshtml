@@ -1,0 +1,149 @@
+﻿@model BlueSchoolSystem.Models.LopHoc
+
+@{
+    ViewData["Title"] = "Chỉnh Sửa Lớp Học";
+    var nganhList = ViewBag.NganhList as SelectList;
+    var giangVienList = ViewBag.GiangVienList as SelectList;
+
+    // Lấy các ID cán sự hiện tại từ ViewBag của phương thức GET
+    var lopTruongList = ViewBag.LopTruongList as SelectList;
+    var lopPhoList = ViewBag.LopPhoList as SelectList;
+    var biThuList = ViewBag.BiThuList as SelectList;
+    var currentGiangVienId = ViewBag.CurrentGiangVienId;
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4 text-gray-800">Chỉnh Sửa Lớp Học: **@Model.MaLop**</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-10">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Thông tin lớp</h6>
+                </div>
+                <div class="card-body">
+                    <form asp-action="EditClass">
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                        <input type="hidden" asp-for="Id" />
+
+                        @if (TempData["Error"] != null)
+                        {
+                            <div class="alert alert-danger">@TempData["Error"]</div>
+                        }
+
+                        <div class="form-group">
+                            <label asp-for="MaLop" class="control-label">Mã Lớp</label>
+                            <input asp-for="MaLop" class="form-control" readonly />
+                            <span asp-validation-for="MaLop" class="text-danger"></span>
+                        </div>
+
+                        <div class="form-group">
+                            <label asp-for="TenLop" class="control-label">Tên Lớp</label>
+                            <input asp-for="TenLop" class="form-control" readonly />
+                            <span asp-validation-for="TenLop" class="text-danger"></span>
+                        </div>
+
+
+                        <div class="form-group">
+                            <label asp-for="NganhId" class="control-label">Ngành Học</label>
+
+                            @{
+                                // Lấy Text (tên ngành) của Ngành đang được chọn từ SelectList
+                                var selectedNganhText = nganhList.FirstOrDefault(i => i.Value == Model.NganhId.ToString())?.Text ?? "Chưa có ngành";
+                            }
+                            <input value="@selectedNganhText" class="form-control" readonly />
+
+                            <input type="hidden" asp-for="NganhId" />
+
+                        </div>
+
+                        <hr />
+
+                        <h6 class="font-weight-bold text-info mt-4 mb-3">Thông tin Cán sự & Giảng viên</h6>
+
+                        <div class="form-group">
+                            <label for="GiangVienId" class="control-label">Giảng viên chủ nhiệm</label>
+                            <select name="GiangVienId" id="GiangVienId" class="form-control select-searchable" asp-items="giangVienList">
+                                <option value="0">-- Bỏ trống --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="LopTruongId" class="control-label">Lớp trưởng</label>
+                            <select name="LopTruongId" id="LopTruongId" class="form-control select-searchable" asp-items="lopTruongList">
+                                <option value="0">-- Bỏ trống --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="LopPhoId" class="control-label">Lớp phó</label>
+                            <select name="LopPhoId" id="LopPhoId" class="form-control select-searchable" asp-items="lopPhoList">
+                                <option value="0">-- Bỏ trống --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="BiThuId" class="control-label">Bí thư</label>
+                            <select name="BiThuId" id="BiThuId" class="form-control select-searchable" asp-items="biThuList">
+                                <option value="0">-- Bỏ trống --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Lưu Thay Đổi
+                            </button>
+                            <a asp-action="ClassDetails" asp-route-id="@Model.Id" class="btn btn-secondary ml-2">
+                                <i class="fas fa-arrow-left"></i> Hủy
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+
+    <link href="https://raw.githack.com/ttskch/select2-bootstrap4-theme/master/dist/select2-bootstrap4.css" rel="stylesheet">
+
+
+    <script>
+        $(document).ready(function() {
+
+            // Khởi tạo Select2 với theme Bootstrap4 (phổ biến trong các template Admin)
+            $('.select-searchable').select2({
+                // Sử dụng 'bootstrap4' thay vì 'bootstrap' cho giao diện hiện đại
+                theme: 'bootstrap4',
+
+                placeholder: 'Gõ tên hoặc mã để tìm kiếm',
+                allowClear: true,
+
+                // Thuộc tính quan trọng: Đảm bảo Select2 không ẩn đi nếu chỉ có một option
+                minimumResultsForSearch: 1 // Hiển thị ô tìm kiếm ngay cả với ít options
+            });
+
+            // Xử lý placeholder cho phép xóa: Select2 có thể không chọn được option đầu tiên
+            // Cần code này để đảm bảo placeholder hoạt động đúng khi allowClear: true
+            $('.select-searchable').on('select2:select', function (e) {
+                var data = e.params.data;
+                if (data.id === "0") {
+                    $(this).val(null).trigger('change');
+                }
+            });
+        });
+    </script>
+}
