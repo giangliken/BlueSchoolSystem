@@ -1,4 +1,5 @@
-﻿using CsvHelper;
+﻿using BlueSchoolSystem.Models.ViewModel;
+using CsvHelper;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -170,6 +171,29 @@ namespace BlueSchoolSystem.Models
                 }
             }
 
+            //Load dữ liệu cho Cơ Sở Phòng Học
+            if( !await context.CoSos.AnyAsync())
+            {
+                var path = Path.Combine(Directory.GetCurrentDirectory(), "DATA", "CoSo.csv");
+                using (var reader = new StreamReader(path))
+                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                {
+                    var records = csv.GetRecords<CoSo>().ToList();
+                    context.Database.OpenConnection();
+                    try
+                    {
+                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT CoSos ON");
+                        context.CoSos.AddRange(records);
+                        await context.SaveChangesAsync();
+                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT CoSos OFF");
+                    }
+                    finally
+                    {
+                        context.Database.CloseConnection();
+                    }
+                }
+            }
+
 
             // Load dữ liệu cho Phòng học
             if (!await context.PhongHocs.AnyAsync())
@@ -178,6 +202,7 @@ namespace BlueSchoolSystem.Models
                 using (var reader = new StreamReader(path))
                 using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                 {
+                    csv.Context.RegisterClassMap<PhongHocMap>();
                     var records = csv.GetRecords<PhongHoc>().ToList();
 
                     context.Database.OpenConnection();
@@ -194,6 +219,8 @@ namespace BlueSchoolSystem.Models
                     }
                 }
             }
+
+
 
             //Load dữ liệu cho Môn học
             if (!await context.MonHocs.AnyAsync())
