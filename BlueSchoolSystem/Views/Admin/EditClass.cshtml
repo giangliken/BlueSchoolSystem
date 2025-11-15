@@ -5,8 +5,7 @@
     var nganhList = ViewBag.NganhList as SelectList;
     var giangVienList = ViewBag.GiangVienList as SelectList;
 
-    // Lấy các ID cán sự hiện tại từ ViewBag của phương thức GET
-    var lopTruongList = ViewBag.LopTruongList as SelectList;
+    var lopTruongList = ViewBag.LopTruongList as SelectList;
     var lopPhoList = ViewBag.LopPhoList as SelectList;
     var biThuList = ViewBag.BiThuList as SelectList;
     var currentGiangVienId = ViewBag.CurrentGiangVienId;
@@ -44,7 +43,8 @@
 
                         <div class="form-group">
                             <label asp-for="TenLop" class="control-label">Tên Lớp</label>
-                            <input asp-for="TenLop" class="form-control" readonly /> <span asp-validation-for="TenLop" class="text-danger"></span>
+                            <input asp-for="TenLop" class="form-control" readonly />
+                            <span asp-validation-for="TenLop" class="text-danger"></span>
                         </div>
 
 
@@ -52,7 +52,7 @@
                             <label asp-for="NganhId" class="control-label">Ngành Học</label>
 
                             @{
-                                // Lấy Text (tên ngành) của Ngành đang được chọn từ SelectList
+
                                 var selectedNganhText = nganhList.FirstOrDefault(i => i.Value == Model.NganhId.ToString())?.Text ?? "Chưa có ngành";
                             }
                             <input value="@selectedNganhText" class="form-control" readonly />
@@ -97,7 +97,7 @@
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-save"></i> Lưu Thay Đổi
                             </button>
-                            <a asp-action="ClassDetails" asp-route-id="@Model.Id" class="btn btn-secondary ml-2">
+                            <a asp-action="ClassDetails" asp-route-maLop="@Model.MaLop" class="btn btn-secondary ml-2">
                                 <i class="fas fa-arrow-left"></i> Hủy
                             </a>
                         </div>
@@ -121,9 +121,8 @@
 
 
     <style>
-        /* CSS Tùy chỉnh để ép Select2 khớp chiều cao */
+
         .select2-container--bootstrap4 .select2-selection {
-            /* Chiều cao chuẩn của form-control trong Bootstrap 4 */
             height: calc(1.5em + .75rem + 2px) !important;
             padding-top: .375rem;
             padding-bottom: .375rem;
@@ -131,51 +130,71 @@
     </style>
 
     <script>
-        // Hàm vô hiệu hóa các sinh viên đã được chọn
-        function disableSelectedOptions() {
-            var allSelects = ['#LopTruongId', '#LopPhoId', '#BiThuId'];
-            var selectedIds = [];
+        var studentSelectIds = ['#LopTruongId', '#LopPhoId', '#BiThuId'];
 
-            // 1. Lấy tất cả các ID sinh viên đang được chọn (trừ '0' - Bỏ trống)
-            allSelects.forEach(function(selectId) {
+       
+        function customMatcher(params, data) {
+
+            if ($(data.element).prop('disabled')) {
+                return null;
+            }
+
+            if ($.trim(params.term) === '') {
+                return data;
+            }
+
+  
+            if (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) {
+                return data;
+            }
+
+            return null;
+        }
+
+
+        function synchronizeStudentSelections() {
+            var allSelectedIds = [];
+
+          
+            studentSelectIds.forEach(function(selectId) {
                 var val = $(selectId).val();
                 if (val && val !== '0') {
-                    selectedIds.push(val);
+                    allSelectedIds.push(val);
                 }
             });
 
-            // 2. Lặp qua tất cả các Select2 và vô hiệu hóa các ID đã chọn
-            allSelects.forEach(function(selectId) {
-                $(selectId).find('option').each(function() {
+
+            studentSelectIds.forEach(function(selectId) {
+                var currentSelectedValue = $(selectId).val();
+                var $select = $(selectId);
+
+                $select.find('option').each(function() {
                     var optionValue = $(this).val();
 
                     if (optionValue !== '0') {
-                        var disable = selectedIds.includes(optionValue);
+                        var shouldBeDisabled = allSelectedIds.includes(optionValue) && optionValue !== currentSelectedValue;
 
-                        // Vô hiệu hóa option nếu nó nằm trong danh sách đã chọn KHÁC dropdown hiện tại
-                        if (disable && optionValue !== $(selectId).val()) {
-                             $(this).prop('disabled', true);
-                        } else {
-                            $(this).prop('disabled', false);
-                        }
+             
+                        $(this).prop('disabled', shouldBeDisabled);
                     }
                 });
-                // Kích hoạt lại Select2 để cập nhật giao diện
-                $(selectId).trigger('change.select2');
+
+
+
+                $select.trigger('change');
             });
         }
 
         $(document).ready(function() {
 
-            // Khởi tạo Select2 với theme Bootstrap4
             $('.select-searchable').select2({
                 theme: 'bootstrap4',
                 placeholder: 'Gõ tên hoặc mã để tìm kiếm',
                 allowClear: true,
-                minimumResultsForSearch: 1
+                minimumResultsForSearch: 1,
+                matcher: customMatcher 
             });
 
-            // Xử lý placeholder cho phép xóa
             $('.select-searchable').on('select2:select', function (e) {
                 var data = e.params.data;
                 if (data.id === "0") {
@@ -183,13 +202,13 @@
                 }
             });
 
-            // Áp dụng logic vô hiệu hóa khi có thay đổi (cho 3 dropdown sinh viên)
+
             $('#LopTruongId, #LopPhoId, #BiThuId').on('change', function() {
-                disableSelectedOptions();
+                synchronizeStudentSelections();
             });
 
-            // Áp dụng logic vô hiệu hóa khi trang load lần đầu (cho các giá trị đã chọn trước)
-            disableSelectedOptions();
+
+            setTimeout(synchronizeStudentSelections, 50);
         });
     </script>
 }
