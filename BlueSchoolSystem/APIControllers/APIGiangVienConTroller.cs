@@ -1111,5 +1111,38 @@ namespace BlueSchoolSystem.APIControllers
             await FcmService.SendNotificationAsync(fcmToken, title, body);
         }
 
+
+
+        public class UpdateStatusRequest
+        {
+            public int DiemDanhId { get; set; }
+            public int SinhVienId { get; set; }
+            public int TrangThaiId { get; set; }
+        }
+
+        // POST: api/buoidiemdanh/capnhat-trangthai
+        [HttpPost("buoidiemdanh/capnhat-trangthai")]
+        public async Task<IActionResult> UpdateStudentStatus([FromBody] UpdateStatusRequest req)
+        {
+            if (req == null)
+                return BadRequest("Invalid request");
+
+            // tìm chi tiết điểm danh theo buổi + sinh viên
+            var chitiet = await _context.ChiTietDiemDanhs
+                .FirstOrDefaultAsync(x =>
+                    x.DiemDanhId == req.DiemDanhId &&
+                    x.SinhVienId == req.SinhVienId);
+
+            if (chitiet == null)
+                return NotFound("Không tìm thấy bản ghi điểm danh");
+
+            chitiet.TrangThaiId = req.TrangThaiId;
+            chitiet.ThoiGian = DateTime.Now; // cập nhật lại thời gian chỉnh sửa
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true });
+        }
     }
+
 }
