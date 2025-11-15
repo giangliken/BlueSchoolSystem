@@ -20,10 +20,22 @@
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card text-center p-3">
-            <img id="qr-img" src="data:image/png;base64,@Model.QrCodeBase64" style="width:200px;@(isExpired ? "opacity:0.3;" : "")" />
+            <div class="d-flex justify-content-center">
+                <img id="qr-img"
+                     src="data:image/png;base64,@Model.QrCodeBase64"
+                     style="width:200px;@(isExpired ? "opacity:0.3;" : "")" />
+            </div>
             <div class="mt-2 fw-semibold text-primary">
                 Mã điểm danh: <span id="ma-code">@(!isExpired ? Model.Code : "")</span>
             </div>
+
+            <button type="button"
+                    id="btn-open-qr-fullscreen"
+                    class="btn btn-outline-primary btn-sm mt-2">
+                <i class="fa-solid fa-maximize"></i> Phóng to mã QR
+            </button>
+
+
             <form asp-action="RegenerateAttendanceCode" asp-controller="Teacher" asp-route-id="@Model.Id" method="post" class="mt-2">
                 @Html.AntiForgeryToken()
                 <button type="submit" class="btn btn-warning btn-sm" @(isExpired ? "" : "disabled")>
@@ -85,6 +97,82 @@
         </div>
     </div>
 </div>
+
+<div id="qr-fullscreen-overlay" class="qr-fullscreen-overlay d-none">
+    <div class="qr-fullscreen-inner">
+        <button type="button"
+                id="btn-close-qr-fullscreen"
+                class="btn btn-light btn-sm position-absolute top-0 end-0 m-3">
+            <i class="fa-solid fa-xmark"></i> Thu nhỏ
+        </button>
+
+        <div class="qr-fullscreen-content d-flex flex-column flex-md-row gap-4 align-items-start">
+            <!-- Bên trái: QR + mã -->
+            <div class="qr-fullscreen-left text-center flex-shrink-0">
+                <img id="qr-fullscreen-img"
+                     src=""
+                     class="qr-fullscreen-img" />
+
+                <div class="mt-3 fw-semibold text-white fs-5">
+                    Mã điểm danh: <span id="ma-code-full"></span>
+                </div>
+            </div>
+
+            <!-- Bên phải: danh sách tên -->
+            <div class="qr-fullscreen-right w-100">
+                <h5 class="text-white mb-2">
+                    Danh sách sinh viên đã điểm danh (chỉ hiển thị tên)
+                </h5>
+                <div class="qr-fullscreen-list mt-2">
+                    <ul id="qr-fullscreen-names" class="list-group list-group-flush bg-transparent">
+                        @* JS sẽ fill dữ liệu *@
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<style>
+    .qr-fullscreen-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .qr-fullscreen-inner {
+        position: relative;
+        max-width: 900px; /* cho rộng ra để chia 2 cột */
+        width: 100%;
+        padding: 1.5rem;
+        color: #fff;
+    }
+
+    .qr-fullscreen-img {
+        width: 340px;
+        max-width: 100%;
+    }
+
+    .qr-fullscreen-list {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+        .qr-fullscreen-list .list-group-item {
+            background: transparent;
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.15);
+            padding-block: 4px;
+        }
+</style>
+
+
 
 @section Scripts {
     <!-- Firebase SDK v8 -->
@@ -236,6 +324,14 @@
                 `;
             });
             tbody.innerHTML = html;
+
+        // Nếu đang ở chế độ zoom QR thì auto cập nhật lại danh sách "Có mặt"
+        const overlay = document.getElementById("qr-fullscreen-overlay");
+        if (overlay && !overlay.classList.contains("d-none")) {
+            if (typeof buildNameListForFullscreen === "function") {
+                buildNameListForFullscreen();
+            }
+        }
         }
 
         // ===== 5) Countdown giữ nguyên =====
@@ -258,6 +354,82 @@
             }
         }
         updateTimer();
+
+         // ===== 6) Fullscreen QR + danh sách chỉ tên =====
+        const btnOpenQr = document.getElementById("btn-open-qr-fullscreen");
+        const btnCloseQr = document.getElementById("btn-close-qr-fullscreen");
+        const overlayQr = document.getElementById("qr-fullscreen-overlay");
+        const imgQrFull = document.getElementById("qr-fullscreen-img");
+        const spanCodeFull = document.getElementById("ma-code-full");
+        const ulNames = document.getElementById("qr-fullscreen-names");
+
+        // Build danh sách chỉ tên từ bảng hiện tại
+                function buildNameListForFullscreen() {
+            ulNames.innerHTML = "";
+
+            const rows = document.querySelectorAll("#attendance-table-body tr");
+            rows.forEach(tr => {
+                const tds = tr.querySelectorAll("td");
+                // cần đủ 5 cột: #, MSSV, Họ tên, Thời gian, Trạng thái
+                if (tds.length >= 5) {
+                    const name = tds[2].textContent.trim();   // cột Họ tên
+                    const statusText = tds[4].textContent.trim(); // cột Trạng thái (text trong badge)
+
+                    // chỉ lấy những dòng có trạng thái "Có mặt"
+                    if (name &&
+                        name !== "Chưa có sinh viên điểm danh." &&
+                        statusText.indexOf("Có mặt") !== -1) {
+
+                        const li = document.createElement("li");
+                        li.className = "list-group-item";
+                        li.textContent = name;
+                        ulNames.appendChild(li);
+                    }
+                }
+            });
+
+            if (!ulNames.children.length) {
+                const li = document.createElement("li");
+                li.className = "list-group-item";
+                li.textContent = "Chưa có sinh viên có mặt.";
+                ulNames.appendChild(li);
+            }
+        }
+
+
+        if (btnOpenQr) {
+            btnOpenQr.addEventListener("click", function () {
+                // sync QR + code
+                const qrImg = document.getElementById("qr-img");
+                const codeSpan = document.getElementById("ma-code");
+
+                imgQrFull.src = qrImg ? qrImg.src : "";
+                spanCodeFull.textContent = codeSpan ? codeSpan.textContent : "";
+
+                // build list tên
+                buildNameListForFullscreen();
+
+                overlayQr.classList.remove("d-none");
+                document.body.style.overflow = "hidden"; // khóa scroll nền
+            });
+        }
+
+        if (btnCloseQr) {
+            btnCloseQr.addEventListener("click", function () {
+                overlayQr.classList.add("d-none");
+                document.body.style.overflow = "";
+            });
+        }
+
+        // click nền đen để đóng
+        if (overlayQr) {
+            overlayQr.addEventListener("click", function (e) {
+                if (e.target === overlayQr) {
+                    overlayQr.classList.add("d-none");
+                    document.body.style.overflow = "";
+                }
+            });
+        }
     </script>
 }
 
