@@ -179,11 +179,12 @@ namespace BlueSchoolSystem.Controllers
 
             var response = await client.PostAsync($"https://localhost:5001/api/lophocphan/{LopHocPhanId}/buoidiemdanh/tao", content);
 
+            var body = await response.Content.ReadAsStringAsync();
+
             // Trong controller, khi POST tạo mới xong:
             if (response.IsSuccessStatusCode)
             {
                 // Parse id của buổi điểm danh vừa tạo từ response
-                var body = await response.Content.ReadAsStringAsync();
                 dynamic result = JsonConvert.DeserializeObject(body);
                 int newSessionId = result.data.id; // nhớ đúng key (id hoặc Id)
 
@@ -192,6 +193,8 @@ namespace BlueSchoolSystem.Controllers
             }
             else
             {
+                TempData["Error"] = $"Tạo buổi điểm danh thất bại! (HTTP {(int)response.StatusCode} - {response.StatusCode})";
+                TempData["ErrorDetail"] = body; // ông có thể show ra View để coi
                 TempData["Error"] = "Tạo buổi điểm danh thất bại!";
                 return RedirectToAction("AttendanceSessions", new { id = LopHocPhanId });
             }
