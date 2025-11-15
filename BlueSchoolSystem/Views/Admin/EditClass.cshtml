@@ -132,57 +132,60 @@
     <script>
         var studentSelectIds = ['#LopTruongId', '#LopPhoId', '#BiThuId'];
 
-       
-        function customMatcher(params, data) {
 
+        function customMatcher(params, data) {
             if ($(data.element).prop('disabled')) {
                 return null;
             }
-
             if ($.trim(params.term) === '') {
                 return data;
             }
-
-  
             if (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) {
                 return data;
             }
-
             return null;
         }
 
 
-        function synchronizeStudentSelections() {
-            var allSelectedIds = [];
+            function synchronizeStudentSelections() {
+        var allSelectedIds = [];
+        studentSelectIds.forEach(function(selectId) {
+            var val = $(selectId).val();
+            if (val && val !== '0') {
+                allSelectedIds.push(val);
+            }
+        });
 
-          
-            studentSelectIds.forEach(function(selectId) {
-                var val = $(selectId).val();
-                if (val && val !== '0') {
-                    allSelectedIds.push(val);
+        studentSelectIds.forEach(function(selectId) {
+            var currentSelectedValue = $(selectId).val();
+            var $select = $(selectId);
+
+            $select.find('option').each(function() {
+                var optionValue = $(this).val();
+                if (optionValue !== '0') {
+                    var shouldBeDisabled = allSelectedIds.includes(optionValue) && optionValue !== currentSelectedValue;
+                    $(this).prop('disabled', shouldBeDisabled);
                 }
             });
 
 
-            studentSelectIds.forEach(function(selectId) {
-                var currentSelectedValue = $(selectId).val();
-                var $select = $(selectId);
-
-                $select.find('option').each(function() {
-                    var optionValue = $(this).val();
-
-                    if (optionValue !== '0') {
-                        var shouldBeDisabled = allSelectedIds.includes(optionValue) && optionValue !== currentSelectedValue;
-
-             
-                        $(this).prop('disabled', shouldBeDisabled);
-                    }
-                });
-
-
-
-                $select.trigger('change');
             });
+        }
+
+        function handleStudentSelect(e) {
+            var $select = $(e.currentTarget);
+            var data = e.params.data;
+
+
+            if (data.id === "0") {
+                $select.val(null).trigger('change');
+            }
+
+
+            setTimeout(function() {
+                synchronizeStudentSelections();
+                $select.select2('close');
+            }, 1);
         }
 
         $(document).ready(function() {
@@ -192,15 +195,20 @@
                 placeholder: 'Gõ tên hoặc mã để tìm kiếm',
                 allowClear: true,
                 minimumResultsForSearch: 1,
-                matcher: customMatcher 
+                matcher: customMatcher
             });
 
-            $('.select-searchable').on('select2:select', function (e) {
+   
+            $('#GiangVienId').on('select2:select', function (e) {
                 var data = e.params.data;
                 if (data.id === "0") {
                     $(this).val(null).trigger('change');
                 }
+
             });
+
+        
+            $('#LopTruongId, #LopPhoId, #BiThuId').on('select2:select', handleStudentSelect);
 
 
             $('#LopTruongId, #LopPhoId, #BiThuId').on('change', function() {
