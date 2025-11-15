@@ -1,4 +1,6 @@
 ﻿@model BlueSchoolSystem.Models.ViewModel.AttendanceSessionDetailViewModel
+@using BlueSchoolSystem.Models.ViewModel
+
 
 @{
     var isExpired = Model.ExpireAt <= DateTime.Now;
@@ -45,7 +47,7 @@
         </div>
     </div>
     <div class="col-md-8">
-        <h5>Danh sách sinh viên đã điểm danh</h5>
+        <h5>DANH SÁCH SINH VIÊN</h5>
         <div class="table-responsive">
             <table class="table table-bordered table-hover align-middle mb-0">
                 <thead>
@@ -66,7 +68,7 @@
                         int stt = 1;
                         @foreach (var sv in Model.SinhViens)
                         {
-                            <tr>
+                            <tr data-mssv="@sv.MSSV" data-sinhvien-id="@sv.Id">
                                 <td>@stt</td>
                                 <td>@sv.MSSV</td>
                                 <td>@sv.HoVaTenDem @sv.Ten</td>
@@ -87,6 +89,7 @@
                             </tr>
                             stt++;
                         }
+
                     }
                     else
                     {
@@ -121,7 +124,7 @@
             <!-- Bên phải: danh sách tên -->
             <div class="qr-fullscreen-right w-100">
                 <h5 class="text-white mb-2">
-                    Danh sách sinh viên đã điểm danh (chỉ hiển thị tên)
+                    DANH SÁCH SINH VIÊN
                 </h5>
                 <div class="qr-fullscreen-list mt-2">
                     <ul id="qr-fullscreen-names" class="list-group list-group-flush bg-transparent">
@@ -170,6 +173,23 @@
             border-color: rgba(255, 255, 255, 0.15);
             padding-block: 4px;
         }
+
+    .row-present {
+        background-color: #d4edda !important; /* xanh nhạt */
+    }
+
+    .row-absent {
+        background-color: #f8d7da !important; /* đỏ nhạt */
+    }
+
+    .row-late {
+        background-color: #fff3cd !important; /* vàng nhạt */
+    }
+
+    .row-permission {
+        background-color: #d1ecf1 !important; /* xanh dương nhạt */
+    }
+
 </style>
 
 
@@ -201,8 +221,18 @@
             return d.toLocaleString('vi-VN');
         }
 
-        // ===== 1) Data từ server (để map id -> text khi cần) =====
+        //1) Data từ server (để map id -> text khi cần) =====
         var trangThaiDict = @Html.Raw(Json.Serialize(ViewBag.TrangThaiDict ?? new Dictionary<int, string>()));
+
+        // Map MSSV -> SinhVienId để dùng khi re-render từ Firebase
+            var sinhVienIdMap = @Html.Raw(
+                Json.Serialize(
+                        (Model.SinhViens ?? new List<BlueSchoolSystem.Models.ViewModel.StudentDetailViewModel>())
+                                .ToDictionary(s => s.MSSV, s => s.Id)
+                )
+            );
+
+
 
         // ===== 2) Firebase init =====
         var firebaseConfig = {
@@ -275,8 +305,46 @@
 
         attachCanonicalListener();
 
+        // Build <option> cho dropdown trạng thái
+        function buildStatusOptions(currentStatusId, currentStatusText) {
+            let html = "";
+            const used = new Set();
+
+            Object.keys(trangThaiDict || {}).forEach(key => {
+                const text = trangThaiDict[key];
+                if (!text || used.has(text)) return;
+                used.add(text);
+
+                const isSelected =
+                    (currentStatusId != null && Number(key) === Number(currentStatusId)) ||
+                    (!currentStatusId && text === currentStatusText);
+
+                html += `<option value="${key}" ${isSelected ? "selected" : ""}>${text}</option>`;
+            });
+
+            return html;
+        }
+
+        function colorRowByStatus(tr) {
+            if (!tr) return;
+
+            const select = tr.querySelector("select.js-att-status-select");
+            if (!select) return;
+
+            const text = select.options[select.selectedIndex].text.trim();
+
+            // reset màu
+            tr.classList.remove("row-present", "row-absent", "row-late", "row-permission");
+
+            if (text === "Có mặt") tr.classList.add("row-present");
+            else if (text === "Vắng mặt" || text === "Không phép") tr.classList.add("row-absent");
+            else if (text === "Đi trễ" || text === "Về sớm") tr.classList.add("row-late");
+            else if (text === "Có phép" || text === "Vắng có phép") tr.classList.add("row-permission");
+        }
+
+
         // ===== 4) Render bảng =====
-        function renderStudentsDict(dict) {
+                function renderStudentsDict(dict) {
             const tbody = document.getElementById("attendance-table-body");
             let rows = [];
 
@@ -291,11 +359,12 @@
                     mssv,
                     name,
                     statusText,
-                    timeStr
+                    statusId: sv.statusId,   // 👈 lưu luôn id
+                    timeStr,
+                    sinhVienId: sinhVienIdMap[mssv] || null
                 });
             });
 
-            // Ưu tiên "Có mặt" & "Đi trễ" lên trước, rồi sort theo tên cuối
             const presentSet = new Set(["Có mặt", "Đi trễ"]);
             rows.sort((a, b) => {
                 const ap = presentSet.has(a.statusText) ? 0 : 1;
@@ -307,32 +376,98 @@
             });
 
             if (rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6">Chưa có sinh viên điểm danh.</td></tr>`;
+                // giờ chỉ còn 5 cột => colspan 5
+                tbody.innerHTML = `<tr><td colspan="5">Chưa có sinh viên điểm danh.</td></tr>`;
                 return;
             }
 
             let stt = 1, html = "";
-            rows.forEach(sv => {
-                html += `
-                    <tr>
-                        <td>${stt++}</td>
-                        <td>${sv.mssv}</td>
-                        <td>${sv.name}</td>
-                        <td>${sv.timeStr || ""}</td>
-                        <td>${badgeByText(sv.statusText)}</td>
-                    </tr>
-                `;
-            });
+                    rows.forEach(sv => {
+            html += `
+                <tr data-mssv="${sv.mssv}" data-sinhvien-id="${sv.sinhVienId || ""}">
+                    <td>${stt++}</td>
+                    <td>${sv.mssv}</td>
+                    <td>${sv.name}</td>
+                    <td>${sv.timeStr || ""}</td>
+                    <td>
+                        <select class="form-select form-select-sm js-att-status-select">
+                            ${buildStatusOptions(sv.statusId, sv.statusText)}
+                        </select>
+                    </td>
+                </tr>
+            `;
+        });
+
             tbody.innerHTML = html;
 
-        // Nếu đang ở chế độ zoom QR thì auto cập nhật lại danh sách "Có mặt"
-        const overlay = document.getElementById("qr-fullscreen-overlay");
-        if (overlay && !overlay.classList.contains("d-none")) {
-            if (typeof buildNameListForFullscreen === "function") {
-                buildNameListForFullscreen();
+            // Nếu đang ở chế độ zoom QR thì auto cập nhật lại danh sách "Có mặt"
+            const overlay = document.getElementById("qr-fullscreen-overlay");
+            if (overlay && !overlay.classList.contains("d-none")) {
+                if (typeof buildNameListForFullscreen === "function") {
+                    buildNameListForFullscreen();
+                }
             }
+
+                    // tô màu từng dòng
+        document.querySelectorAll("#attendance-table-body tr").forEach(tr => {
+            colorRowByStatus(tr);
+        });
         }
+
+                // Lắng nghe đổi trạng thái ở dropdown trong bảng
+        document.getElementById("attendance-table-body")
+            .addEventListener("change", function (e) {
+                if (!e.target.classList.contains("js-att-status-select")) return;
+
+                const select = e.target;
+                const tr = select.closest("tr");
+                const mssv = tr?.dataset.mssv;
+                const newStatusId = Number(select.value);
+                const newStatusText = trangThaiDict[newStatusId] || "Không rõ";
+                 colorRowByStatus(tr);
+
+                // 🔄 Update lên Firebase canonical
+                if (mssv) {
+                    canonicalRef.child(mssv).update({
+                        statusId: newStatusId,
+                        status: newStatusText
+                    }).catch(err => console.error("Update status error:", err));
+                }
+
+                // Nếu đang mở overlay zoom thì build lại danh sách "Có mặt"
+                const overlay = document.getElementById("qr-fullscreen-overlay");
+                if (overlay && !overlay.classList.contains("d-none")) {
+                    if (typeof buildNameListForFullscreen === "function") {
+                        buildNameListForFullscreen();
+                    }
+                }
+
+                        const sinhVienId = parseInt(tr?.dataset.sinhvienId || "0", 10);
+        const diemDanhId = @Model.Id; // Id buổi điểm danh, chính là DiemDanhId bên API
+
+        if (sinhVienId > 0) {
+            fetch("https://localhost:5001/api/buoidiemdanh/capnhat-trangthai", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    diemDanhId: diemDanhId,
+                    sinhVienId: sinhVienId,
+                    trangThaiId: newStatusId
+                })
+            }).then(res => {
+                if (!res.ok) {
+                    console.error("API update status failed", res.status);
+                }
+                return res.text();
+            }).catch(err => {
+                console.error("Error call API update status:", err);
+            });
         }
+
+            });
+
 
         // ===== 5) Countdown giữ nguyên =====
         var expireAt = "@Model.ExpireAt.ToString("yyyy-MM-ddTHH:mm:ss")";
@@ -373,12 +508,21 @@
                 // cần đủ 5 cột: #, MSSV, Họ tên, Thời gian, Trạng thái
                 if (tds.length >= 5) {
                     const name = tds[2].textContent.trim();   // cột Họ tên
-                    const statusText = tds[4].textContent.trim(); // cột Trạng thái (text trong badge)
 
-                    // chỉ lấy những dòng có trạng thái "Có mặt"
+                    // cột Trạng thái giờ là <select>, lấy option đang chọn
+                    const select = tds[4].querySelector("select.js-att-status-select");
+                    if (!select) return;
+
+                    const selectedOption = select.options[select.selectedIndex];
+                    const selectedText = (selectedOption?.text || "").trim();
+
+                    // chỉ lấy những dòng có trạng thái "Có mặt" (hoặc thêm "Đi trễ" nếu muốn)
+                    const presentSet = new Set(["Có mặt"]);
+                    // nếu muốn cả Đi trễ thì: new Set(["Có mặt", "Đi trễ"]);
+
                     if (name &&
                         name !== "Chưa có sinh viên điểm danh." &&
-                        statusText.indexOf("Có mặt") !== -1) {
+                        presentSet.has(selectedText)) {
 
                         const li = document.createElement("li");
                         li.className = "list-group-item";
@@ -397,7 +541,8 @@
         }
 
 
-        if (btnOpenQr) {
+
+                if (btnOpenQr) {
             btnOpenQr.addEventListener("click", function () {
                 // sync QR + code
                 const qrImg = document.getElementById("qr-img");
@@ -430,6 +575,12 @@
                 }
             });
         }
+
+
+            
     </script>
+
+        
+
 }
 
