@@ -1001,9 +1001,9 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Chi tiết lớp học
-        public async Task<IActionResult> ClassDetails(int? id)
+        public async Task<IActionResult> ClassDetails(string maLop)
         {
-            if (id == null) return NotFound();
+            if (maLop == null) return NotFound();
 
             var lopHoc = await _context.LopHocs
             .Include(lh => lh.Nganh)
@@ -1021,13 +1021,11 @@ namespace BlueSchoolSystem.Controllers
                 .ThenInclude(ct => ct.BiThu)
                     .ThenInclude(sv => sv.User)
 
-            .FirstOrDefaultAsync(lh => lh.Id == id);
+            .FirstOrDefaultAsync(lh => lh.MaLop == maLop);
 
 
             if (lopHoc == null) return NotFound();
             
-
-
             return View(lopHoc);
         }
 
