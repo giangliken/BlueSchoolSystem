@@ -583,7 +583,7 @@ namespace BlueSchoolSystem.APIControllers
             }
 
             var trangThaiBuoiDiemDanhId = _context.TrangThais
-            .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+            .Where(t => t.LoaiTrangThai == "DiemDanh#" && t.TenTrangThai == "Đang diễn ra")
             .Select(t => t.Id)
             .FirstOrDefault();
 

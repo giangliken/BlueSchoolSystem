@@ -948,7 +948,7 @@ namespace BlueSchoolSystem.APIControllers
 
             // Buổi còn hạn (nên check thêm 'Đang diễn ra' cho đồng nhất)
             var trangThaiBuoiDiemDanhId = await _context.TrangThais
-                .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+                .Where(t => t.LoaiTrangThai == "DiemDanh#" && t.TenTrangThai == "Đang diễn ra")
                 .Select(t => t.Id)
                 .FirstOrDefaultAsync();
 
