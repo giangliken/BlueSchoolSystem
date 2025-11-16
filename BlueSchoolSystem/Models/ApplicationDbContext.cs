@@ -36,13 +36,14 @@ namespace BlueSchoolSystem.Models
         public DbSet<DangKyHocPhan> DangKyHocPhans { get; set; } // Bảng đăng ký học phần
         public DbSet<HocKy> HocKys { get; set; } // Bảng học kỳ
         public DbSet<ThongBao> ThongBaos { get; set; }
-
-
         public DbSet<UserFaceTemplate> UserFaceTemplates { get; set; }
         public DbSet<FaceVerifyLog> FaceVerifyLogs { get; set; }
-
-        //Table lưu trạng thái của hệ thống
         public DbSet<TrangThai> TrangThais { get; set; } // Bảng trạng thái của hệ thống
+        public DbSet<KhoaHoc> KhoaHocs { get; set; } // Bảng khóa học
+        public DbSet<ChuongTrinhDaoTao> ChuongTrinhDaoTaos { get; set; } // Bảng chương trình đào tạo
+        public DbSet<ChiTietChuongTrinhDaoTao> ChiTietChuongTrinhDaoTaos { get; set; } // Bảng chi tiết chương trình đào tạo
+
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
