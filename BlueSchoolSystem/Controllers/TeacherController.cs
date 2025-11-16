@@ -285,7 +285,7 @@ namespace BlueSchoolSystem.Controllers
 
             // Lấy trạng thái "Đã đóng"
             var trangThaiDong = await _context.TrangThais
-                .FirstOrDefaultAsync(t => t.TenTrangThai == "Đã đóng" && t.LoaiTrangThai == "DiemDanh");
+                .FirstOrDefaultAsync(t => t.TenTrangThai == "Đã đóng" && t.LoaiTrangThai == "DiemDanh#");
             if (trangThaiDong != null)
             {
                 buoi.TrangThaiId = trangThaiDong.Id;
@@ -336,8 +336,20 @@ namespace BlueSchoolSystem.Controllers
             // Gọi API tạo lại mã code mới, ví dụ POST hoặc PUT (tuỳ API bạn)
             var response = await client.PostAsync($"https://localhost:5001/api/buoidiemdanh/{id}/regeneratecode", null);
 
+
+            var buoi = await _context.DiemDanhs
+                            .Include(d => d.TrangThai)
+                            .FirstOrDefaultAsync(d => d.Id == id);
+            //Lấy Id của trạng thái đang diễn ra
+            var trangThaiDienRa = await _context.TrangThais.FirstOrDefaultAsync(t => t.TenTrangThai == "Đang diễn ra" && t.LoaiTrangThai == "DiemDanh#");
+            if (buoi != null && trangThaiDienRa != null)
+            {
+                buoi.TrangThaiId = trangThaiDienRa.Id;
+                await _context.SaveChangesAsync();
+            }
             if (response.IsSuccessStatusCode)
             {
+                
                 TempData["Success"] = "Đã tạo lại mã điểm danh mới!";
             }
             else
