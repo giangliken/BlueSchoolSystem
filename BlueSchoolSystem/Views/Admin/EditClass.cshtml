@@ -1,0 +1,258 @@
+﻿@model BlueSchoolSystem.Models.LopHoc
+
+@{
+    ViewData["Title"] = "Chỉnh Sửa Lớp Học";
+    var nganhList = ViewBag.NganhList as SelectList;
+    var giangVienList = ViewBag.GiangVienList as SelectList;
+
+    var lopTruongList = ViewBag.LopTruongList as SelectList;
+    var lopPhoList = ViewBag.LopPhoList as SelectList;
+    var biThuList = ViewBag.BiThuList as SelectList;
+    var currentGiangVienId = ViewBag.CurrentGiangVienId;
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4 text-gray-800">Thêm / cập nhật ban cán sự</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-10">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Thông tin lớp</h6>
+                </div>
+                <div class="card-body">
+                    <form asp-action="EditClass">
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                        <input type="hidden" asp-for="Id" />
+
+                        @if (TempData["Error"] != null)
+                        {
+                            <div class="alert alert-danger">@TempData["Error"]</div>
+                        }
+
+                        <div class="row">
+                            @* Thêm div.row để tạo hàng ngang *@
+                            <div class="col-md-4">
+                                @* Chia cột cho Mã Lớp *@
+                                <div class="form-group">
+                                    <label asp-for="MaLop" class="control-label">Mã Lớp</label>
+                                    <input asp-for="MaLop" class="form-control" readonly />
+                                    <span asp-validation-for="MaLop" class="text-danger"></span>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                @* Chia cột cho Tên Lớp *@
+                                <div class="form-group">
+                                    <label asp-for="TenLop" class="control-label">Tên Lớp</label>
+                                    <input asp-for="TenLop" class="form-control" readonly />
+                                    <span asp-validation-for="TenLop" class="text-danger"></span>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                @* Chia cột cho Ngành Học *@
+                                <div class="form-group">
+                                    <label asp-for="NganhId" class="control-label">Ngành Học</label>
+                                    @{
+                                        var selectedNganhText = nganhList.FirstOrDefault(i => i.Value == Model.NganhId.ToString())?.Text ?? "Chưa có ngành";
+                                    }
+                                    <input value="@selectedNganhText" class="form-control" readonly />
+                                    <input type="hidden" asp-for="NganhId" />
+                                </div>
+                            </div>
+                        </div> @* Kết thúc div.row *@
+
+                        <hr />
+
+                        <h6 class="font-weight-bold text-info mt-4 mb-3">Thông tin Cán sự & Giảng viên</h6>
+
+                        @* Giữ nguyên phần thông tin cán sự và nút bấm *@
+                        <div class="form-group">
+                            <label for="GiangVienId" class="control-label">Giảng viên chủ nhiệm</label>
+                            <select name="GiangVienId" id="GiangVienId" class="form-control select-searchable" asp-items="giangVienList">
+                                <option value="0">- Chưa chọn -</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="LopTruongId" class="control-label">Lớp trưởng</label>
+                            <select name="LopTruongId" id="LopTruongId" class="form-control select-searchable" asp-items="lopTruongList">
+                                <option value="0">- Chưa chọn -</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="LopPhoId" class="control-label">Lớp phó</label>
+                            <select name="LopPhoId" id="LopPhoId" class="form-control select-searchable" asp-items="lopPhoList">
+                                <option value="0">- Chưa chọn -</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="BiThuId" class="control-label">Bí thư</label>
+                            <select name="BiThuId" id="BiThuId" class="form-control select-searchable" asp-items="biThuList">
+                                <option value="0">- Chưa chọn -</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Lưu Thay Đổi
+                            </button>
+                            <a asp-action="ClassDetails" asp-route-maLop="@Model.MaLop" class="btn btn-secondary ml-2">
+                                <i class="fas fa-arrow-left"></i> Hủy
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+
+    <link href="https://raw.githack.com/ttskch/select2-bootstrap4-theme/master/dist/select2-bootstrap4.css" rel="stylesheet">
+
+
+    <style>
+        /* 1. CHỈNH CHIỀU CAO VÀ ĐỆM CHO VÙNG CHỌN CHUNG (CONTAINER) */
+        .select2-container--bootstrap4 .select2-selection {
+                    height: calc(1.5em + .75rem + 2px) !important;
+            /* Bỏ padding top/bottom ở đây để tránh xung đột */
+            /* padding-top: .375rem;
+                padding-bottom: .375rem; */
+        }
+
+        /* 2. CĂN CHỈNH TEXT HIỂN THỊ (QUAN TRỌNG NHẤT) */
+        .select2-container--bootstrap4 .select2-selection__rendered {
+                    padding-left: .5rem;
+            /* Căn chỉnh dọc: Thêm padding trên và dưới để đẩy text xuống giữa */
+            padding-top: 0.2rem;
+            padding-bottom: 0.75rem;
+            line-height: calc(1em + .2rem); /* Đặt line-height tương ứng để đảm bảo căn chỉnh đúng */
+
+        }
+
+        /* 3. ẨN NÚT XÓA (đã làm ở bước trước) */
+            .select2-container--bootstrap4 .select2-selection__clear {
+                    display: none !important;
+
+        }
+
+        /* 4. ẨN MŨI TÊN (đã làm ở bước trước) */
+            .select2-container--bootstrap4 .select2-selection__arrow {
+                    display: none !important;
+
+        }
+
+        /* 5. ĐIỀU CHỈNH VÙNG CHỌN ĐƠN (SINGLE SELECT) */
+            .select2-container--bootstrap4 .select2-selection--single {
+                    padding-right: .75rem !important;
+
+        }
+    </style>
+    <script>
+        var studentSelectIds = ['#LopTruongId', '#LopPhoId', '#LopPhoId'];
+
+
+        function customMatcher(params, data) {
+            if ($(data.element).prop('disabled')) {
+                return null;
+            }
+            if ($.trim(params.term) === '') {
+                return data;
+            }
+            if (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) {
+                return data;
+            }
+            return null;
+        }
+
+
+            function synchronizeStudentSelections() {
+        var allSelectedIds = [];
+        studentSelectIds.forEach(function(selectId) {
+            var val = $(selectId).val();
+            if (val && val !== '0') {
+                allSelectedIds.push(val);
+            }
+        });
+
+        studentSelectIds.forEach(function(selectId) {
+            var currentSelectedValue = $(selectId).val();
+            var $select = $(selectId);
+
+            $select.find('option').each(function() {
+                var optionValue = $(this).val();
+                if (optionValue !== '0') {
+                    var shouldBeDisabled = allSelectedIds.includes(optionValue) && optionValue !== currentSelectedValue;
+                    $(this).prop('disabled', shouldBeDisabled);
+                }
+            });
+
+
+            });
+        }
+
+        function handleStudentSelect(e) {
+            var $select = $(e.currentTarget);
+            var data = e.params.data;
+
+
+            if (data.id === "0") {
+                $select.val(null).trigger('change');
+            }
+
+
+            setTimeout(function() {
+                synchronizeStudentSelections();
+                $select.select2('close');
+            }, 1);
+        }
+
+        $(document).ready(function() {
+
+            $('.select-searchable').select2({
+                theme: 'bootstrap4',
+                placeholder: 'Gõ tên hoặc mã để tìm kiếm',
+                allowClear: false,
+                minimumResultsForSearch: 1,
+                matcher: customMatcher
+            });
+
+
+            $('#GiangVienId').on('select2:select', function (e) {
+                var data = e.params.data;
+                if (data.id === "0") {
+                    $(this).val(null).trigger('change');
+                }
+
+            });
+
+
+            $('#LopTruongId, #LopPhoId, #BiThuId').on('select2:select', handleStudentSelect);
+
+
+            $('#LopTruongId, #LopPhoId, #BiThuId').on('change', function() {
+                synchronizeStudentSelections();
+            });
+
+
+            setTimeout(synchronizeStudentSelections, 50);
+        });
+    </script>
+}

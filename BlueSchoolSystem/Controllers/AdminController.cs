@@ -1001,9 +1001,9 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Chi tiết lớp học
-        public async Task<IActionResult> ClassDetails(int? id)
+        public async Task<IActionResult> ClassDetails(string maLop) 
         {
-            if (id == null) return NotFound();
+            if (string.IsNullOrEmpty(maLop)) return NotFound();
 
             var lopHoc = await _context.LopHocs
             .Include(lh => lh.Nganh)
@@ -1020,18 +1020,184 @@ namespace BlueSchoolSystem.Controllers
             .Include(lh => lh.ChiTietLopHocs)
                 .ThenInclude(ct => ct.BiThu)
                     .ThenInclude(sv => sv.User)
-
-            .FirstOrDefaultAsync(lh => lh.Id == id);
-
+            .FirstOrDefaultAsync(lh => lh.MaLop == maLop); 
 
             if (lopHoc == null) return NotFound();
-            
-
 
             return View(lopHoc);
         }
 
+        // Phương thức private helper để tạo tất cả SelectLists cần thiết
+        private async Task<(SelectList nganhList, SelectList giangVienList, SelectList lopTruongList, SelectList lopPhoList, SelectList biThuList)>
+            CreateClassSelectLists(int classId, int? currentLopTruongId, int? currentLopPhoId, int? currentBiThuId)
+        {
+            var lopHocForFilters = await _context.LopHocs
+                .Include(lh => lh.ChiTietLopHocs)
+                .FirstOrDefaultAsync(lh => lh.Id == classId);
 
+
+            var chiTiet = lopHocForFilters?.ChiTietLopHocs.FirstOrDefault();
+            int? initialGiangVienId = chiTiet?.GiangVienId;
+
+
+            int? selectedLopTruongId = currentLopTruongId ?? chiTiet?.LopTruongId;
+            int? selectedLopPhoId = currentLopPhoId ?? chiTiet?.LopPhoId;
+            int? selectedBiThuId = currentBiThuId ?? chiTiet?.BiThuId;
+
+
+            var nganhList = new SelectList(
+                await _context.NganhHocs.ToListAsync(),
+                "Id", "TenNganh", lopHocForFilters?.NganhId
+            );
+
+
+            var sinhViens = await _context.SinhViens
+                .Where(sv => sv.LopId == classId)
+                .Select(sv => new { Id = sv.Id, HoTen = sv.HoVaTenDem + " " + sv.Ten + " (" + sv.MSSV + ")" })
+                .OrderBy(sv => sv.HoTen)
+                .ToListAsync();
+
+
+            var giangViens = await _context.GiangViens
+                .GroupJoin(_context.ChiTietLopHocs, gv => gv.Id, ct => ct.GiangVienId, (gv, ctGroup) => new
+                {
+                    GiangVien = gv,
+                    SoLopDamNhan = ctGroup.Count()
+                })
+                .Select(result => new
+                {
+                    Id = result.GiangVien.Id,
+                    HoTen = result.GiangVien.HoVaTenDem + " " + result.GiangVien.Ten + " (" + result.GiangVien.MaGiangVien + ")",
+                    SoLopDamNhan = result.SoLopDamNhan
+                })
+                .Where(gv => gv.SoLopDamNhan < 5 || gv.Id == initialGiangVienId) // Luôn cho phép GV hiện tại
+                .OrderBy(gv => gv.HoTen)
+                .ToListAsync();
+
+
+            var giangVienList = new SelectList(giangViens, "Id", "HoTen", initialGiangVienId);
+            var lopTruongList = new SelectList(sinhViens, "Id", "HoTen", selectedLopTruongId);
+            var lopPhoList = new SelectList(sinhViens, "Id", "HoTen", selectedLopPhoId);
+            var biThuList = new SelectList(sinhViens, "Id", "HoTen", selectedBiThuId);
+
+            return (nganhList, giangVienList, lopTruongList, lopPhoList, biThuList);
+        }
+        // 1. GET: Hiển thị form sửa lớp học
+        public async Task<IActionResult> EditClass(string maLop)
+        {
+            if (string.IsNullOrEmpty(maLop))
+            {
+                TempData["Error"] = "Không tìm thấy mã lớp học!";
+                return RedirectToAction("ClassManager");
+            }
+
+            var lopHoc = await _context.LopHocs
+                .Include(lh => lh.Nganh)
+                .Include(lh => lh.ChiTietLopHocs)
+                .FirstOrDefaultAsync(lh => lh.MaLop == maLop);
+
+            if (lopHoc == null)
+            {
+                TempData["Error"] = "Không tìm thấy lớp học cần chỉnh sửa!";
+                return RedirectToAction("ClassManager");
+            }
+
+
+            var lists = await CreateClassSelectLists(lopHoc.Id, null, null, null);
+
+            ViewBag.NganhList = lists.nganhList;
+            ViewBag.GiangVienList = lists.giangVienList;
+            ViewBag.LopTruongList = lists.lopTruongList;
+            ViewBag.LopPhoList = lists.lopPhoList;
+            ViewBag.BiThuList = lists.biThuList;
+
+            return View(lopHoc);
+        }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditClass(LopHoc model, int? LopTruongId, int? LopPhoId, int? BiThuId, int? GiangVienId)
+        {
+            var selectedStudentIds = new List<int>();
+            if (LopTruongId.HasValue && LopTruongId.Value > 0)
+                selectedStudentIds.Add(LopTruongId.Value);
+            if (LopPhoId.HasValue && LopPhoId.Value > 0)
+                selectedStudentIds.Add(LopPhoId.Value);
+            if (BiThuId.HasValue && BiThuId.Value > 0)
+                selectedStudentIds.Add(BiThuId.Value);
+
+
+            if (!ModelState.IsValid || selectedStudentIds.Count() != selectedStudentIds.Distinct().Count())
+            {
+                if (selectedStudentIds.Count() != selectedStudentIds.Distinct().Count())
+                {
+                    ModelState.AddModelError("", "Lỗi: Một sinh viên không thể giữ nhiều hơn một chức vụ cán sự (Lớp trưởng, Lớp phó, Bí thư). Vui lòng chọn lại.");
+                    TempData["Error"] = "Lỗi: Một sinh viên không thể giữ nhiều hơn một chức vụ cán sự.";
+                }
+
+   
+                var lists = await CreateClassSelectLists(model.Id, LopTruongId, LopPhoId, BiThuId);
+
+                ViewBag.NganhList = lists.nganhList;
+                ViewBag.GiangVienList = lists.giangVienList;
+                ViewBag.LopTruongList = lists.lopTruongList;
+                ViewBag.LopPhoList = lists.lopPhoList;
+                ViewBag.BiThuList = lists.biThuList;
+
+                return View(model);
+            }
+
+
+            try
+            {
+                var existingLopHoc = await _context.LopHocs
+                    .Include(lh => lh.ChiTietLopHocs)
+                    .FirstOrDefaultAsync(lh => lh.Id == model.Id);
+
+                if (existingLopHoc == null)
+                {
+                    TempData["Error"] = "Không tìm thấy lớp học trong cơ sở dữ liệu.";
+                    return RedirectToAction("ClassManager");
+                }
+
+
+                existingLopHoc.MaLop = model.MaLop;
+                existingLopHoc.TenLop = model.TenLop;
+                existingLopHoc.NganhId = model.NganhId;
+
+                var chiTiet = existingLopHoc.ChiTietLopHocs.FirstOrDefault();
+                if (chiTiet == null)
+                {
+                    chiTiet = new ChiTietLopHoc { LopHocId = existingLopHoc.Id };
+                    _context.ChiTietLopHocs.Add(chiTiet);
+                }
+
+                chiTiet.LopTruongId = LopTruongId > 0 ? LopTruongId : null;
+                chiTiet.LopPhoId = LopPhoId > 0 ? LopPhoId : null;
+                chiTiet.BiThuId = BiThuId > 0 ? BiThuId : null;
+                chiTiet.GiangVienId = GiangVienId > 0 ? GiangVienId : null;
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = "Cập nhật lớp học thành công!";
+                return RedirectToAction("ClassDetails", new { maLop = model.MaLop });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật lớp học ID {Id}", model.Id);
+                ModelState.AddModelError("", $"Lỗi không xác định: {ex.Message}");
+
+
+                var lists = await CreateClassSelectLists(model.Id, LopTruongId, LopPhoId, BiThuId);
+                ViewBag.NganhList = lists.nganhList;
+                ViewBag.GiangVienList = lists.giangVienList;
+                ViewBag.LopTruongList = lists.lopTruongList;
+                ViewBag.LopPhoList = lists.lopPhoList;
+                ViewBag.BiThuList = lists.biThuList;
+
+                return View(model);
+            }
+        }
+       
         public async Task<IActionResult> ActivityLogs()
         {
             var logs = await GetLogsFromApi();
