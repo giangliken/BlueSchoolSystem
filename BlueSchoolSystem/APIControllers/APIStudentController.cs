@@ -885,7 +885,7 @@ namespace BlueSchoolSystem.APIControllers
                 .FirstOrDefaultAsync();
 
             var trangThaiBuoiDiemDanhId = await _context.TrangThais
-                .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+                .Where(t => t.LoaiTrangThai == "DiemDanh#" && t.TenTrangThai == "Đang diễn ra")
                 .Select(t => t.Id)
                 .FirstOrDefaultAsync();
 
