@@ -7,8 +7,8 @@ namespace BlueSchoolSystem.Models
         public int Id { get; set; }
         public int ChuongTrinhDaoTaoId { get; set; }
         public ChuongTrinhDaoTao? ChuongTrinhDaoTao { get; set; }
-        public int MonHocId { get; set; }
-        public MonHoc? MonHoc { get; set; }
+        public string MaMonHoc { get; set; }   
+        public string? MaMonHocTienQuyet { get; set; }  
         public int HocKy { get; set; }
 
         public bool BatBuoc { get; set; }
