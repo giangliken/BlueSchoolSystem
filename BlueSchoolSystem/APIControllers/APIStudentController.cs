@@ -1007,6 +1007,9 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
+        //Hàm lấy tọa độ gốc của buổi điểm danh
+ 
+
 
         private async Task PushAttendanceToFirebase(
         int diemDanhId,
@@ -1028,7 +1031,7 @@ namespace BlueSchoolSystem.APIControllers
                 studentName = $"{(sv.HoVaTenDem ?? "").Trim()} {(sv.Ten ?? "").Trim()}".Trim(),
                 status = statusText,
                 statusId = trangThaiId,
-                timecheckedin = new[] { "Có mặt", "Đi trễ" }.Contains(statusText) ? thoiGian.ToString("HH:mm") : null,
+                timecheckedin = new[] { "Có mặt", "Đi trễ" }.Contains(statusText) ? thoiGian.ToString("HH:mm:ss"): null,
                 bluetoothID = request.DeviceId,
                 latitude = request.Latitude,
                 longitude = request.Longitude
