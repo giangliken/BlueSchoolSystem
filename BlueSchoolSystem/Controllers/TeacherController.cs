@@ -1,5 +1,6 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using Firebase.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -129,6 +130,47 @@ namespace BlueSchoolSystem.Controllers
             return View();
         }
 
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteAttendanceSession(int id, string maLopHocPhan)
+        {
+            try
+            {
+                var diemDanh = await _context.DiemDanhs
+                    .Include(dd => dd.ChiTietDiemDanhs)
+                    .FirstOrDefaultAsync(dd => dd.Id == id);
+
+                if (diemDanh == null)
+                {
+                    TempData["Error"] = "Không tìm thấy buổi điểm danh.";
+                    return RedirectToAction("LopHocPhanDetails", new { maLopHocPhan });
+                }
+
+                // Xoá chi tiết điểm danh trước
+                _context.ChiTietDiemDanhs.RemoveRange(diemDanh.ChiTietDiemDanhs);
+
+                // Xoá buổi điểm danh
+                _context.DiemDanhs.Remove(diemDanh);
+
+                await _context.SaveChangesAsync();
+
+                // 3. Xoá Firebase Realtime Database
+                var firebaseClient = new FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com/");
+                var path = $"attendancesessions/{id}";
+
+                await firebaseClient.Child(path).DeleteAsync();
+
+
+                TempData["Success"] = "Đã xoá buổi điểm danh thành công!";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Lỗi khi xoá: {ex.Message}";
+            }
+
+            return RedirectToAction("LopHocPhanDetails", new { maLopHocPhan });
+        }
 
 
 
