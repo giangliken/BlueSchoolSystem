@@ -543,6 +543,18 @@ namespace BlueSchoolSystem.APIControllers
                 return StatusCode(403, new { result = false, message = "Không có quyền truy cập lớp học phần này" });
 
 
+            // Kiểm tra lịch học đã khai báo cho ngày tạo buổi
+            var coLichDay = await _context.LichHocs
+                .AnyAsync(lh =>
+                    lh.LopHocPhanId == lopHocPhanId
+                    && lh.Ngay.Date == model.Ngay.Date
+                );
+
+            if (!coLichDay)
+            {
+                return BadRequest(new { result = false, message = "Bạn chỉ có thể tạo được buổi điểm danh vào ngày có lịch giảng dạy của môn này." });
+            }
+
             var danhSachSinhVien = await _context.ChiTietLopHocPhans
                 .Where(ct => ct.LopHocPhanId == lopHocPhanId)
                 .Select(ct => new
@@ -560,6 +572,7 @@ namespace BlueSchoolSystem.APIControllers
 
             if (!danhSachSinhVien.Any())
                 return BadRequest(new { result = false, message = "Lớp chưa có danh sách sinh viên, không thể tạo buổi điểm danh." });
+
 
 
             // Sinh mã code ngắn gọn
@@ -593,7 +606,7 @@ namespace BlueSchoolSystem.APIControllers
             .FirstOrDefaultAsync();
 
             if (trangThaiBuoiDiemDanhId == 0 || trangThaiChuaDiemDanhId == 0)
-                return BadRequest(new { result = false, message = "Thiếu cấu hình trạng thái điểm danh (Đang diễn ra/Chưa điểm danh)." });
+                return BadRequest(new { result = false, message = "Thiếu cấu hình trạng thái điểm danh" });
 
 
             var buoi = new DiemDanh
