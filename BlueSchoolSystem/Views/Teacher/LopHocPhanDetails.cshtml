@@ -24,13 +24,15 @@
 }
 
 <!-- Nút bấm mở modal tạo thông báo -->
-<button type="button" class="btn btn-warning fw-semibold ms-2" data-bs-toggle="modal" data-bs-target="#modalTaoThongBao">
-    <i class="fa-solid fa-bell me-1"></i> Tạo thông báo cho lớp này
-</button>
+<div class="d-flex justify-content-start gap-2 my-3 flex-wrap">
+    <button type="button" class="btn btn-warning fw-semibold" data-bs-toggle="modal" data-bs-target="#modalTaoThongBao">
+        <i class="fa-solid fa-bell me-1"></i> Thông báo
+    </button>
+    <button class="btn btn-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#modalGroupChat">
+        <i class="fa-solid fa-comments me-2"></i> Chat nhóm
+    </button>
+</div>
 
-<button class="btn btn-dark fw-semibold mb-2" data-bs-toggle="modal" data-bs-target="#modalGroupChat">
-    <i class="fa-solid fa-comments me-2"></i> Nhóm chat lớp học phần
-</button>
 
 <div class="modal fade" id="modalGroupChat" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -167,7 +169,17 @@ else
                                                    class="btn btn-outline-primary btn-sm" title="Xem chi tiết">
                                                     <i class="fa-solid fa-eye"></i>
                                                 </a>
+                                                <form asp-action="DeleteAttendanceSession" asp-controller="Teacher" method="post"
+                                                      onsubmit="return confirm('Bạn chắc chắn muốn xoá buổi điểm danh này?')"
+                                                      class="d-inline">
+                                                    <input type="hidden" name="id" value="@att.Id" />
+                                                    <input type="hidden" name="maLopHocPhan" value="@lhp?.MaLopHocPhan" />
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Xoá">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </form>
                                             </td>
+
                                         </tr>
                                         lan++;
                                         rowIndex++;
