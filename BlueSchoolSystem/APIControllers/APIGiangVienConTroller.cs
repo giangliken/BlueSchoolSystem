@@ -1137,12 +1137,47 @@ namespace BlueSchoolSystem.APIControllers
                 return NotFound("Không tìm thấy bản ghi điểm danh");
 
             chitiet.TrangThaiId = req.TrangThaiId;
-            chitiet.ThoiGian = DateTime.Now; // cập nhật lại thời gian chỉnh sửa
-
+            chitiet.ThoiGian = DateTime.Now;
+            chitiet.GhiChu = "Giảng viên điểm danh";
             await _context.SaveChangesAsync();
 
             return Ok(new { success = true });
         }
+
+        [AllowAnonymous]
+        [HttpPost("buoidiemdanh/{id}/capnhattrangthaihetthoigian")]
+        public async Task<IActionResult> CapNhatTrangThaiKhiHetThoiGian(int id)
+        {
+            var buoi = await _context.DiemDanhs
+                .Include(b => b.LopHocPhan)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (buoi == null)
+                return NotFound(new { result = false, message = "Không tìm thấy buổi điểm danh" });
+
+            // Cập nhật trạng thái thành "Đã kết thúc"
+            var trangThaiDaKetThucId = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "DiemDanh#" && t.TenTrangThai == "Đã đóng")
+                .Select(t => t.Id)
+                .FirstOrDefaultAsync();
+
+            if (trangThaiDaKetThucId == 0)
+                return BadRequest(new { result = false, message = "Thiếu cấu hình trạng thái 'Đã kết thúc'" });
+
+            buoi.TrangThaiId = trangThaiDaKetThucId;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                result = true,
+                message = "Đã cập nhật trạng thái buổi điểm danh thành 'Đã đóng' "
+            });
+        }
+
+
     }
+
+
+
 
 }
