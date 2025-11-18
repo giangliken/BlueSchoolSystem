@@ -16,11 +16,11 @@
 }
 @if (TempData["Success"] != null)
 {
-    <div class="alert alert-success my-2">@TempData["Success"]</div>
+    <div class="alert alert-success my-2" id="temp-alert-success">@TempData["Success"]</div>
 }
 @if (TempData["Error"] != null)
 {
-    <div class="alert alert-danger my-2">@TempData["Error"]</div>
+    <div class="alert alert-danger my-2" id="temp-alert-error">@TempData["Error"]</div>
 }
 
 <!-- Nút bấm mở modal tạo thông báo -->
@@ -128,6 +128,7 @@ else
                           class="d-inline"
                           asp-antiforgery="true">
                         <input type="hidden" name="LopHocPhanId" value="@lhp.Id" />
+                        <input type="hidden" name="maLopHocPhan" value="@lhp.MaLopHocPhan" />
                         <button type="submit" class="btn btn-primary fw-semibold d-flex align-items-center">
                             <i class="fa-solid fa-plus me-2"></i>Điểm danh mới
                         </button>
@@ -373,6 +374,15 @@ else
             console.warn('Không có maLopHocPhan để join phòng chat.');
           }
         });
+
+    //Sau 5 giây ẩn cửa sổ thông báo
+    $(document).ready(function() {
+        setTimeout(function() {
+            $('#temp-alert-success').fadeOut();
+            $('#temp-alert-error').fadeOut();
+        }, 5000);
+    });
+
     </script>
 }
 

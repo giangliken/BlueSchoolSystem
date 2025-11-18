@@ -162,7 +162,7 @@ namespace BlueSchoolSystem.Controllers
                 await firebaseClient.Child(path).DeleteAsync();
 
 
-                TempData["Success"] = "Đã xoá buổi điểm danh thành công!";
+                TempData["Success"] = "Xóa buổi điểm danh thành công!";
             }
             catch (Exception ex)
             {
@@ -201,7 +201,7 @@ namespace BlueSchoolSystem.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateAttendanceSession(int LopHocPhanId)
+        public async Task<IActionResult> CreateAttendanceSession(int LopHocPhanId, string maLopHocPhan)
         {
             var client = _httpClientFactory.CreateClient();
             var token = HttpContext.Session.GetString("access_token");
@@ -226,24 +226,32 @@ namespace BlueSchoolSystem.Controllers
             // Trong controller, khi POST tạo mới xong:
             if (response.IsSuccessStatusCode)
             {
-                // Parse id của buổi điểm danh vừa tạo từ response
                 dynamic result = JsonConvert.DeserializeObject(body);
-                int newSessionId = result.data.id; // nhớ đúng key (id hoặc Id)
+                int newSessionId = result.data.id; 
 
-                TempData["Success"] = "Tạo buổi điểm danh thành công!";
+                //TempData["Success"] = "Tạo buổi điểm danh thành công!";
                 return RedirectToAction("AttendanceDetails", new { id = newSessionId });
             }
             else
             {
-                TempData["Error"] = $"Tạo buổi điểm danh thất bại! (HTTP {(int)response.StatusCode} - {response.StatusCode})";
-                TempData["ErrorDetail"] = body; // ông có thể show ra View để coi
-                TempData["Error"] = "Tạo buổi điểm danh thất bại!";
-                return RedirectToAction("AttendanceSessions", new { id = LopHocPhanId });
+                // Lấy message chi tiết từ API trả về (body)
+                string apiMessage = "";
+                try
+                {
+                    var jobject = Newtonsoft.Json.Linq.JObject.Parse(body);
+                    apiMessage = jobject?["message"]?.ToString() ?? "";
+                }
+                catch
+                {
+                    apiMessage = body; 
+                }
+
+                TempData["Error"] = $"{apiMessage}";
+                TempData["ErrorDetail"] = body; // Lưu toàn bộ body nếu cần log hoặc show chi tiết
+                return RedirectToAction("LopHocPhanDetails", new { maLopHocPhan });
             }
 
         }
-
-
 
 
         public static string GenerateQrBase64(string text)
