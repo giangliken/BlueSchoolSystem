@@ -314,9 +314,16 @@ namespace BlueSchoolSystem.APIControllers
 
             // Ghi log
             var logMessage = $"Tạo đợt đăng ký '{dto.TenDot}' ({dto.LoaiThaoTac}) cho HK {hocky.TenHocKy}. Áp dụng cho {dto.DoiTuongApDungs.Count} đối tượng.";
+            var userId = User.FindFirst("userId")?.Value;
+            var userName = User.FindFirst("username")?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new { result = false, message = "Không xác định được người dùng từ token." });
+            }
             await _activityLogService.LogAsync(
-                userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                userName: User.FindFirstValue(ClaimTypes.Name)!,
+                userId: userId,
+                userName: userName ?? "Unknown",
                 device: Request.Headers["User-Agent"].ToString(),
                 ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
                 actionType: "CREATE",
@@ -325,17 +332,17 @@ namespace BlueSchoolSystem.APIControllers
                 description: logMessage
             );
 
-            // Công bố thông báo
-            var thongBaoDotDK = new ThongBao
-            {
-                Title = $"THÔNG BÁO ĐỢT ĐĂNG KÝ HỌC PHẦN: {dto.TenDot}",
-                Content = $"Đợt đăng ký {dto.TenDot} ({dto.LoaiThaoTac}) bắt đầu từ {dto.NgayBatDau:dd/MM/yyyy} đến {dto.NgayKetThuc:dd/MM/yyyy} cho các đối tượng: {string.Join(", ", dto.DoiTuongApDungs.Select(d => d.GiaTri))}.",
-                Time = DateTime.Now,
-                ReceiverUserId = "ALL",
-                SenderUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                Type = "REG_ANNOUNCEMENT"
-            };
-            _context.ThongBaos.Add(thongBaoDotDK);
+            //// Công bố thông báo
+            //var thongBaoDotDK = new ThongBao
+            //{
+            //    Title = $"THÔNG BÁO ĐỢT ĐĂNG KÝ HỌC PHẦN: {dto.TenDot}",
+            //    Content = $"Đợt đăng ký {dto.TenDot} ({dto.LoaiThaoTac}) bắt đầu từ {dto.NgayBatDau:dd/MM/yyyy} đến {dto.NgayKetThuc:dd/MM/yyyy} cho các đối tượng: {string.Join(", ", dto.DoiTuongApDungs.Select(d => d.GiaTri))}.",
+            //    Time = DateTime.Now,
+            //    ReceiverUserId = "ALL",
+            //    SenderUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+            //    Type = "REG_ANNOUNCEMENT"
+            //};
+            //_context.ThongBaos.Add(thongBaoDotDK);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetDotDangKysByHocKy), new { hocKyId = dto.HocKyId }, new
@@ -360,7 +367,7 @@ namespace BlueSchoolSystem.APIControllers
             var hocky = await _context.HocKys.FindAsync(dto.HocKyId);
             var monHoc = await _context.MonHocs.FindAsync(dto.MonHocId);
             var giangVien = await _context.GiangViens.FindAsync(dto.GiangVienId);
-            var trangThaiMoiTao = await _context.TrangThais.FirstOrDefaultAsync(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "DangMo"); // Trạng thái mặc định
+            var trangThaiMoiTao = await _context.TrangThais.FirstOrDefaultAsync(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Đang mở"); // Trạng thái mặc định
 
             if (hocky == null || monHoc == null || giangVien == null || trangThaiMoiTao == null)
             {
