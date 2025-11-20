@@ -423,7 +423,7 @@ namespace BlueSchoolSystem.APIControllers
 
 
         [HttpPost("lophocphan/lichhoc")]
-        public async Task<IActionResult> CreateLichHoc([FromBody] LichHocCreateDTO dto)
+        public async Task<IActionResult> CreateLichHoc([FromBody] LichHocDTO dto)
         {
             var lhp = await _context.LopHocPhans
                                     .AsNoTracking()
@@ -548,7 +548,7 @@ namespace BlueSchoolSystem.APIControllers
                     MonHoc = l.MonHoc.TenMonHoc,
                     GiangVien = l.GiangVien.HoVaTenDem + " " + l.GiangVien.Ten,
                     SiSoToiDa = l.SiSo,
-                    SiSoThucTe = _context.DangKyHocPhans.Count(dk => dk.HocPhanId == l.Id), // Tính Sĩ số
+                    SiSoThucTe = _context.DangKyHocPhans.Count(dk => dk.LopHocPhanId == l.Id), // Tính Sĩ số
                     TrangThai = l.TrangThai.TenTrangThai, // Tình trạng lớp: đủ mở / không đủ
                     LichHoc = _context.LichHocs.Where(lh => lh.LopHocPhanId == l.Id).Select(lh => new
                     {
@@ -611,58 +611,51 @@ namespace BlueSchoolSystem.APIControllers
         [HttpPost("auto-dangky-batbuoc/{hocKyId}")]
         public async Task<IActionResult> RunAutoDangKyBatBuoc(int hocKyId)
         {
-            var hocky = await _context.HocKys.FindAsync(hocKyId);
-            if (hocky == null)
-            {
+            // 1. Lấy thông tin học kỳ từ admin truyền vào
+            var hocKy = await _context.HocKys.FindAsync(hocKyId);
+            if (hocKy == null)
                 return NotFound(new { result = false, message = "Không tìm thấy Học kỳ." });
-            }
 
             int successCount = 0;
             int errorCount = 0;
 
-            // 1. Lấy danh sách Sinh viên (Giả định lấy tất cả SV đang hoạt động)
+            // 2. Lấy danh sách tất cả sinh viên đang học
             var sinhViens = await _context.SinhViens
                 .Include(sv => sv.Lop)
-                .Where(sv => sv.TrangThai.TenTrangThai == "DangHoc")
+                .Where(sv => sv.TrangThai.TenTrangThai == "Đang học")
                 .ToListAsync();
 
-            // 2. Lấy danh sách các Học phần Bắt buộc của Học kỳ này (cần join qua ChuongTrinhDaoTao)
+            // 3. Lấy danh sách các học phần bắt buộc cho học kỳ này
             var ctDaoTaoBatBuoc = await _context.ChiTietChuongTrinhDaoTaos
-                .Where(ct => ct.BatBuoc)
+                .Where(ct => ct.BatBuoc && ct.HocKy == hocKyId) // dùng hocKyId do admin chọn
                 .ToListAsync();
 
             foreach (var sv in sinhViens)
             {
-                // Tạm thời, ta chỉ lọc các môn Bắt buộc theo số Học Kỳ được gán trong ChiTietCTDT (Ví dụ: Học kỳ 2)
-                var monBatBuocCanDangKy = ctDaoTaoBatBuoc
-                    .Where(ct => ct.HocKy == hocky.SoHocKy)  // hoặc ct.HocKyId == hocKyId
-                    .ToList();
-
-                foreach (var monCt in monBatBuocCanDangKy)
+                foreach (var monCt in ctDaoTaoBatBuoc)
                 {
-                    // 3. Tìm Lớp Học Phần tương ứng (Chỉ chọn 1 LHP còn chỗ)
+                    // 4. Tìm lớp học phần còn chỗ cho môn này
                     var lhpTuongUng = await _context.LopHocPhans
                         .Where(l => l.MonHoc.MaMonHoc == monCt.MaMonHoc &&
                                     l.HocKyId == hocKyId &&
-                                    l.TrangThai.TenTrangThai == "DangMo" &&
-                                    l.SiSo > _context.DangKyHocPhans.Count(dk => dk.HocPhanId == l.Id))
+                                    l.TrangThai.TenTrangThai == "Đang mở" &&
+                                    l.SiSo > _context.DangKyHocPhans.Count(dk => dk.LopHocPhanId == l.Id))
                         .FirstOrDefaultAsync();
 
                     if (lhpTuongUng != null)
                     {
-                        // 4. Kiểm tra SV đã đăng ký môn này chưa (để tránh trùng lặp)
+                        // 5. Kiểm tra sinh viên đã đăng ký chưa
                         var isRegistered = await _context.DangKyHocPhans
-                            .AnyAsync(dk => dk.SinhVienId == sv.Id && dk.HocPhanId == lhpTuongUng.Id);
+                            .AnyAsync(dk => dk.SinhVienId == sv.Id && dk.LopHocPhanId == lhpTuongUng.Id);
 
                         if (!isRegistered)
                         {
-                            // 4. Tạo bản ghi Đăng ký
                             var dangKy = new DangKyHocPhan
                             {
                                 SinhVienId = sv.Id,
-                                HocPhanId = lhpTuongUng.Id,
+                                LopHocPhanId = lhpTuongUng.Id,
                                 NgayDangKy = DateTime.Now,
-                                LoaiDangKy = "BatBuocAuto" // Đánh dấu: LoaiDangKy = BatBuocAuto
+                                LoaiDangKy = "BatBuocAuto"
                             };
                             _context.DangKyHocPhans.Add(dangKy);
                             successCount++;
@@ -671,415 +664,159 @@ namespace BlueSchoolSystem.APIControllers
                     else
                     {
                         errorCount++;
-                        // Ghi log lỗi: Không tìm thấy LHP còn chỗ cho môn MonCt.MaMonHoc
                     }
                 }
             }
 
-            // 5. Cập nhật vào Database và tăng sĩ số lớp (Sĩ số thực tế đã được tính trong API 8)
+            // 6. Lưu thay đổi vào database
             await _context.SaveChangesAsync();
 
-            // Ghi log hoạt động
+            // 7. Ghi log hoạt động
+            var userId = User.FindFirst("userId")?.Value;
+            var userName = User.FindFirst("username")?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new { result = false, message = "Không xác định được người dùng từ token." });
+            }
             await _activityLogService.LogAsync(
-                userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                userName: User.FindFirstValue(ClaimTypes.Name)!,
+                userId: userId,
+                userName: userName ?? "Unknown",
                 device: Request.Headers["User-Agent"].ToString(),
                 ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
                 actionType: "JOB_RUN",
                 tableName: "DangKyHocPhans",
                 objectId: hocKyId.ToString(),
-                description: $"Chạy Job Auto Đăng ký HP Bắt buộc cho HK {hocky.TenHocKy}. Thành công: {successCount}, Lỗi: {errorCount}"
+                description: $"Chạy Job Auto Đăng ký HP Bắt buộc cho Học kỳ {hocKy.TenHocKy}. Thành công: {successCount}, Lỗi: {errorCount}"
             );
 
             return Ok(new
             {
                 result = true,
                 code = 200,
-                message = $"Job Auto Đăng ký HP Bắt buộc cho Học kỳ {hocky.TenHocKy} đã hoàn thành. Thành công: {successCount} đăng ký, Lỗi: {errorCount} môn không tìm thấy lớp."
+                message = $"Job Auto Đăng ký HP Bắt buộc cho Học kỳ {hocKy.TenHocKy} đã hoàn thành. Thành công: {successCount} đăng ký, Lỗi: {errorCount} môn không tìm thấy lớp."
             });
         }
 
-        // --- CHỨC NĂNG 5: QUẢN LÝ TÀI KHOẢN SINH VIÊN ---
+        //// --- CHỨC NĂNG 5: QUẢN LÝ TÀI KHOẢN SINH VIÊN ---
 
-        // API 10: Reset mật khẩu cho Sinh viên (khi SV không đăng nhập được)
-        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpPost("user/reset-password")]
-        public async Task<IActionResult> ResetStudentPassword([FromBody] PasswordResetDTO dto)
-        {
-            var user = await _userManager.FindByIdAsync(dto.UserId);
-            if (user == null)
-            {
-                return NotFound(new { result = false, message = "Không tìm thấy người dùng." });
-            }
-
-            // Xóa Token cũ và tạo Token mới để đặt lại mật khẩu
-            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-
-            // Thực hiện Reset mật khẩu
-            var result = await _userManager.ResetPasswordAsync(user, token, dto.NewPassword);
-
-            if (!result.Succeeded)
-            {
-                return BadRequest(new { result = false, message = "Không thể reset mật khẩu.", errors = result.Errors });
-            }
-
-            // Ghi log hoạt động
-            await _activityLogService.LogAsync(
-                userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                userName: User.FindFirstValue(ClaimTypes.Name)!,
-                device: Request.Headers["User-Agent"].ToString(),
-                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
-                actionType: "PASSWORD_RESET",
-                tableName: "ApplicationUsers",
-                objectId: user.Id,
-                description: $"Reset mật khẩu thành công cho người dùng: {user.UserName}"
-            );
-
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = $"Reset mật khẩu thành công cho sinh viên {user.UserName}."
-            });
-        }
-
-        // API 11: Khóa/Mở tài khoản SV
-        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpPost("user/lockout")]
-        public async Task<IActionResult> LockUnlockAccount([FromBody] AccountLockoutDTO dto)
-        {
-            var user = await _userManager.FindByIdAsync(dto.UserId);
-            if (user == null)
-            {
-                return NotFound(new { result = false, message = "Không tìm thấy người dùng." });
-            }
-
-            if (dto.IsLock)
-            {
-                // Khóa tài khoản
-                var lockoutEnd = DateTimeOffset.UtcNow.AddDays(dto.LockoutDays);
-                var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
-
-                if (!result.Succeeded)
-                {
-                    return BadRequest(new { result = false, message = "Không thể khóa tài khoản.", errors = result.Errors });
-                }
-
-                await _activityLogService.LogAsync(
-                    userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                    userName: User.FindFirstValue(ClaimTypes.Name)!,
-                    device: Request.Headers["User-Agent"].ToString(),
-                    ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
-                    actionType: "LOCK_ACCOUNT",
-                    tableName: "ApplicationUsers",
-                    objectId: user.Id,
-                    description: $"Khóa tài khoản {user.UserName}. Lý do: {dto.Reason}"
-                );
-
-                return Ok(new { result = true, code = 200, message = $"Khóa tài khoản {user.UserName} đến ngày {lockoutEnd:dd/MM/yyyy HH:mm:ss}." });
-            }
-            else
-            {
-                // Mở tài khoản
-                var result = await _userManager.SetLockoutEndDateAsync(user, null);
-
-                if (!result.Succeeded)
-                {
-                    return BadRequest(new { result = false, message = "Không thể mở tài khoản.", errors = result.Errors });
-                }
-
-                await _activityLogService.LogAsync(
-                    userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                    userName: User.FindFirstValue(ClaimTypes.Name)!,
-                    device: Request.Headers["User-Agent"].ToString(),
-                    ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
-                    actionType: "UNLOCK_ACCOUNT",
-                    tableName: "ApplicationUsers",
-                    objectId: user.Id,
-                    description: $"Mở tài khoản {user.UserName}."
-                );
-
-                return Ok(new { result = true, code = 200, message = $"Mở tài khoản {user.UserName} thành công." });
-            }
-        }
-
-        // API 12: Kiểm soát trạng thái đã đổi mật khẩu & đã khai báo email
-        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpGet("sinhvien/pending-onboarding")]
-        public async Task<IActionResult> GetPendingOnboardingStudents()
-        {
-            var pendingUsers = await _context.Users
-                .Where(u => u.EmailConfirmed == false || u.FaceRegistered == false)
-                .Select(u => new
-                {
-                    u.Id,
-                    u.UserName,
-                    u.Email,
-                    EmailConfirmed = u.EmailConfirmed,
-                    IsLocked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
-                    SinhVienId = u.SinhViens != null ? u.SinhViens.MSSV : "N/A"
-                })
-                .ToListAsync();
-
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = "Danh sách sinh viên cần hoàn thành Onboarding",
-                data = pendingUsers
-            });
-        }
-
-        // --- CHỨC NĂNG 6: XÁC NHẬN - PHÊ DUYỆT THAO TÁC CỦA SINH VIÊN ---
-
-        // API 13: Xử lý Hủy Đăng ký Học phần
-        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpPost("dangky/huy")]
-        public async Task<IActionResult> ApproveHuyDangKy([FromBody] XacNhanDangKyHocPhanDTO dto)
-        {
-            // 1. Kiểm tra thời gian hợp lệ: 15/12 -> 26/12 (Giả định đang trong năm hiện tại)
-            var now = DateTime.Now;
-            var ngayHuyBatDau = new DateTime(now.Year, 12, 15);
-            var ngayHuyKetThuc = new DateTime(now.Year, 12, 26);
-
-            if (now < ngayHuyBatDau || now > ngayHuyKetThuc)
-            {
-                return BadRequest(new { result = false, message = $"Thời gian hủy không hợp lệ. Chỉ cho phép từ {ngayHuyBatDau:dd/MM} đến {ngayHuyKetThuc:dd/MM}." });
-            }
-
-            // 2. Tìm bản ghi đăng ký
-            var dangKy = await _context.DangKyHocPhans
-                .FirstOrDefaultAsync(dk => dk.Id == dto.DangKyHocPhanId && dk.SinhVienId == dto.SinhVienId);
-
-            if (dangKy == null)
-            {
-                return NotFound(new { result = false, message = "Không tìm thấy bản ghi đăng ký học phần." });
-            }
-
-            // 3. Thực hiện Hủy: Xóa
-            _context.DangKyHocPhans.Remove(dangKy);
-            await _context.SaveChangesAsync();
-
-            // 4. Logic: Khi hủy, lớp này không thu học phí.
-
-            await _activityLogService.LogAsync(
-                userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                userName: User.FindFirstValue(ClaimTypes.Name)!,
-                device: Request.Headers["User-Agent"].ToString(),
-                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
-                actionType: "HUY_DKHP",
-                tableName: "DangKyHocPhans",
-                objectId: dangKy.Id.ToString(),
-                description: $"Xác nhận Hủy ĐKHP Id: {dangKy.Id} cho SV Id: {dto.SinhVienId}. Lý do: {dto.LyDo}"
-            );
-
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = "Hủy đăng ký học phần thành công. **Không thu học phí** cho môn này."
-            });
-        }
-
-        // API 14: Xử lý Rút Đăng ký Học phần
-        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpPost("dangky/rut")]
-        public async Task<IActionResult> ApproveRutDangKy([FromBody] XacNhanDangKyHocPhanDTO dto)
-        {
-            // 1. Kiểm tra thời gian: 19/01 -> 08/02 (Giả định trong năm tiếp theo)
-            var nextYear = DateTime.Now.Year + 1;
-            var now = DateTime.Now;
-            var ngayRutBatDau = new DateTime(nextYear, 01, 19);
-            var ngayRutKetThuc = new DateTime(nextYear, 02, 08);
-
-            // Trường hợp chạy job vào cuối năm trước
-            if (now.Month >= 11)
-            {
-                ngayRutBatDau = new DateTime(now.Year + 1, 01, 19);
-                ngayRutKetThuc = new DateTime(now.Year + 1, 02, 08);
-            }
-
-            if (now < ngayRutBatDau || now > ngayRutKetThuc)
-            {
-                return BadRequest(new { result = false, message = $"Thời gian rút không hợp lệ. Chỉ cho phép từ {ngayRutBatDau:dd/MM} đến {ngayRutKetThuc:dd/MM}." });
-            }
-
-            // 2. Tìm bản ghi đăng ký
-            var dangKy = await _context.DangKyHocPhans
-                .FirstOrDefaultAsync(dk => dk.Id == dto.DangKyHocPhanId && dk.SinhVienId == dto.SinhVienId);
-
-            if (dangKy == null)
-            {
-                return NotFound(new { result = false, message = "Không tìm thấy bản ghi đăng ký học phần." });
-            }
-
-            // 3. Thực hiện Rút: Đánh dấu là đã rút
-            // Không hoàn học phí
-            dangKy.LoaiDangKy = "RUT";
-
-            _context.DangKyHocPhans.Update(dangKy);
-            await _context.SaveChangesAsync();
-
-            await _activityLogService.LogAsync(
-                userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                userName: User.FindFirstValue(ClaimTypes.Name)!,
-                device: Request.Headers["User-Agent"].ToString(),
-                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
-                actionType: "RUT_DKHP",
-                tableName: "DangKyHocPhans",
-                objectId: dangKy.Id.ToString(),
-                description: $"Xác nhận Rút ĐKHP Id: {dangKy.Id} cho SV Id: {dto.SinhVienId}. Lý do: {dto.LyDo}"
-            );
-
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = "Rút đăng ký học phần thành công. **Không hoàn học phí**."
-            });
-        }
-
-        // API 15: Phê duyệt Đặc biệt (Bảo lưu, Miễn học, Chuyển điểm)
-        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpPost("pheduyet-dacbiet")]
-        public async Task<IActionResult> PheDuyetDacBiet([FromBody] PheDuyetDacBietDTO dto)
-        {
-            var sv = await _context.SinhViens.FindAsync(dto.SinhVienId);
-            if (sv == null)
-            {
-                return NotFound(new { result = false, message = "Không tìm thấy Sinh viên." });
-            }
-
-            string actionType = $"PHEDUYET_{dto.LoaiYeuCau.ToUpper()}";
-            string logDesc = $"{(dto.IsApproved ? "Phê duyệt" : "Từ chối")} yêu cầu {dto.LoaiYeuCau} cho SV {sv.MSSV}. Nội dung: {dto.NoiDungChiTiet}";
-
-            // Logic thực tế (Cần triển khai thêm logic cập nhật trạng thái SV/thêm bản ghi Miễn học/Chuyển điểm)
-
-            await _activityLogService.LogAsync(
-                userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                userName: User.FindFirstValue(ClaimTypes.Name)!,
-                device: Request.Headers["User-Agent"].ToString(),
-                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
-                actionType: actionType,
-                tableName: "SinhViens",
-                objectId: dto.SinhVienId.ToString(),
-                description: logDesc
-            );
-
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = logDesc.Replace("SV", $"Sinh viên {sv.MSSV}")
-            });
-        }
-
-        // --- CHỨC NĂNG 7: CÔNG BỐ THÔNG TIN CHO SINH VIÊN ---
-
-        // API 16: Lấy tất cả thông tin cần công bố cho sinh viên
-        [AllowAnonymous]
-        [HttpGet("thongtin-congbo/{hocKyId}")]
-        public async Task<IActionResult> GetThongTinCongBo(int hocKyId)
-        {
-            var hocky = await _context.HocKys.FindAsync(hocKyId);
-            if (hocky == null)
-            {
-                return NotFound(new { result = false, message = "Không tìm thấy Học kỳ." });
-            }
-
-            // 1. Lấy các Thông báo chung (Thông báo đợt đăng ký)
-            var thongBaoChung = await _context.ThongBaos
-                .Where(t => t.ReceiverUserId == "ALL" || t.Type == "REG_ANNOUNCEMENT" || t.Type == "TKB_ANNOUNCEMENT")
-                .OrderByDescending(t => t.Time)
-                .Take(10)
-                .ToListAsync();
-
-            // 2. Lấy Danh sách Lớp mở/hủy (09/12)
-            var danhSachLHP = await _context.LopHocPhans
-                .Where(l => l.HocKyId == hocKyId)
-                .Include(l => l.MonHoc)
-                .Include(l => l.GiangVien)
-                .Include(l => l.TrangThai)
-                .Select(l => new
-                {
-                    MaLopHocPhan = l.MaLopHocPhan,
-                    TenMonHoc = l.MonHoc!.TenMonHoc,
-                    GiangVien = l.GiangVien!.HoVaTenDem + " " + l.GiangVien.Ten,
-                    TrangThai = l.TrangThai!.TenTrangThai,
-                    GhiChuHuy = l.TrangThai.TenTrangThai.Equals("BiHuy") ? $"Lớp hủy được công bố ngày 09/12" : null
-                })
-                .ToListAsync();
-
-            // 3. Lấy Thời khóa biểu chính thức
-            var tkbChinhThuc = await _context.LichHocs
-                .Where(lh => lh.LopHocPhan.HocKyId == hocKyId)
-                .Include(lh => lh.LopHocPhan)
-                .Select(lh => new
-                {
-                    LopHP = lh.LopHocPhan.MaLopHocPhan,
-                    Ngay = lh.Ngay,
-                    GioBatDau = lh.GioBatDau,
-                    GioKetThuc = lh.GioKetThuc,
-                    Phong = lh.PhongHocId.ToString() // Cần join thêm PhongHoc
-                })
-                .ToListAsync();
-
-            // 4. Lấy Lịch thi
-            var lichThi = await _context.LichThis
-                .Where(lt => lt.LopHocPhan.HocKyId == hocKyId)
-                .Include(lt => lt.TrangThai)
-                .Select(lt => new
-                {
-                    LopHP = lt.LopHocPhan.MaLopHocPhan,
-                    NgayThi = lt.NgayThi,
-                    GioBatDau = lt.GioBatDau,
-                    PhongThi = lt.PhongHoc.MaPhongHoc, // Cần join thêm PhongHoc
-                    TrangThai = lt.TrangThai!.TenTrangThai
-                })
-                .ToListAsync();
-
-            var result = new
-            {
-                ThongBaoChung = thongBaoChung,
-                LopHocPhanCongBo = danhSachLHP,
-                ThoiKhoaBieu = tkbChinhThuc,
-                LichThi = lichThi
-            };
-
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = $"Công bố thông tin Học kỳ {hocky.TenHocKy} thành công.",
-                data = result
-            });
-        }
-
-
-        // --- CHỨC NĂNG 8: HỖ TRỢ SINH VIÊN TRONG THỜI GIAN ĐĂNG KÝ ---
-
-        //// API 17: Lấy danh sách các yêu cầu hỗ trợ từ sinh viên
-        //[Authorize(Roles = SD.Role_Admin + "," + SD.Role_Staff, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        //[HttpGet("hotro/yeucau")]
-        //public async Task<IActionResult> GetYeuCauHoTro()
+        //// API 10: Reset mật khẩu cho Sinh viên (khi SV không đăng nhập được)
+        //[Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[HttpPost("user/reset-password")]
+        //public async Task<IActionResult> ResetStudentPassword([FromBody] PasswordResetDTO dto)
         //{
-        //    var yeuCauHoTro = await _context.ActivityLogs
-        //        .Where(a => a.ActionType == "ERROR_REGISTER" || a.ActionType == "SUPPORT_REQUEST" || a.ActionType == "PASSWORD_RESET")
-        //        .OrderByDescending(a => a.Timestamp)
-        //        .Take(50)
-        //        .Select(a => new
+        //    var user = await _userManager.FindByIdAsync(dto.UserId);
+        //    if (user == null)
+        //    {
+        //        return NotFound(new { result = false, message = "Không tìm thấy người dùng." });
+        //    }
+
+        //    // Xóa Token cũ và tạo Token mới để đặt lại mật khẩu
+        //    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+        //    // Thực hiện Reset mật khẩu
+        //    var result = await _userManager.ResetPasswordAsync(user, token, dto.NewPassword);
+
+        //    if (!result.Succeeded)
+        //    {
+        //        return BadRequest(new { result = false, message = "Không thể reset mật khẩu.", errors = result.Errors });
+        //    }
+
+        //    // Ghi log hoạt động
+        //    await _activityLogService.LogAsync(
+        //        userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+        //        userName: User.FindFirstValue(ClaimTypes.Name)!,
+        //        device: Request.Headers["User-Agent"].ToString(),
+        //        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+        //        actionType: "PASSWORD_RESET",
+        //        tableName: "ApplicationUsers",
+        //        objectId: user.Id,
+        //        description: $"Reset mật khẩu thành công cho người dùng: {user.UserName}"
+        //    );
+
+        //    return Ok(new
+        //    {
+        //        result = true,
+        //        code = 200,
+        //        message = $"Reset mật khẩu thành công cho sinh viên {user.UserName}."
+        //    });
+        //}
+
+        //// API 11: Khóa/Mở tài khoản SV
+        //[Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[HttpPost("user/lockout")]
+        //public async Task<IActionResult> LockUnlockAccount([FromBody] AccountLockoutDTO dto)
+        //{
+        //    var user = await _userManager.FindByIdAsync(dto.UserId);
+        //    if (user == null)
+        //    {
+        //        return NotFound(new { result = false, message = "Không tìm thấy người dùng." });
+        //    }
+
+        //    if (dto.IsLock)
+        //    {
+        //        // Khóa tài khoản
+        //        var lockoutEnd = DateTimeOffset.UtcNow.AddDays(dto.LockoutDays);
+        //        var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
+
+        //        if (!result.Succeeded)
         //        {
-        //            a.Id,
-        //            ThoiGian = a.Timestamp,
-        //            NguoiDung = a.UserName,
-        //            HanhDong = a.ActionType,
-        //            MoTa = a.Description,
-        //            CanThiep = a.ActionType switch
-        //            {
-        //                "PASSWORD_RESET" => "Reset tài khoản",
-        //                "ERROR_REGISTER" => "Xử lý lỗi đăng ký/trùng lịch",
-        //                _ => "Can thiệp khi SV báo lỗi hệ thống"
-        //            }
+        //            return BadRequest(new { result = false, message = "Không thể khóa tài khoản.", errors = result.Errors });
+        //        }
+
+        //        await _activityLogService.LogAsync(
+        //            userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+        //            userName: User.FindFirstValue(ClaimTypes.Name)!,
+        //            device: Request.Headers["User-Agent"].ToString(),
+        //            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+        //            actionType: "LOCK_ACCOUNT",
+        //            tableName: "ApplicationUsers",
+        //            objectId: user.Id,
+        //            description: $"Khóa tài khoản {user.UserName}. Lý do: {dto.Reason}"
+        //        );
+
+        //        return Ok(new { result = true, code = 200, message = $"Khóa tài khoản {user.UserName} đến ngày {lockoutEnd:dd/MM/yyyy HH:mm:ss}." });
+        //    }
+        //    else
+        //    {
+        //        // Mở tài khoản
+        //        var result = await _userManager.SetLockoutEndDateAsync(user, null);
+
+        //        if (!result.Succeeded)
+        //        {
+        //            return BadRequest(new { result = false, message = "Không thể mở tài khoản.", errors = result.Errors });
+        //        }
+
+        //        await _activityLogService.LogAsync(
+        //            userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+        //            userName: User.FindFirstValue(ClaimTypes.Name)!,
+        //            device: Request.Headers["User-Agent"].ToString(),
+        //            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+        //            actionType: "UNLOCK_ACCOUNT",
+        //            tableName: "ApplicationUsers",
+        //            objectId: user.Id,
+        //            description: $"Mở tài khoản {user.UserName}."
+        //        );
+
+        //        return Ok(new { result = true, code = 200, message = $"Mở tài khoản {user.UserName} thành công." });
+        //    }
+        //}
+
+        //// API 12: Kiểm soát trạng thái đã đổi mật khẩu & đã khai báo email
+        //[Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[HttpGet("sinhvien/pending-onboarding")]
+        //public async Task<IActionResult> GetPendingOnboardingStudents()
+        //{
+        //    var pendingUsers = await _context.Users
+        //        .Where(u => u.EmailConfirmed == false || u.FaceRegistered == false)
+        //        .Select(u => new
+        //        {
+        //            u.Id,
+        //            u.UserName,
+        //            u.Email,
+        //            EmailConfirmed = u.EmailConfirmed,
+        //            IsLocked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
+        //            SinhVienId = u.SinhViens != null ? u.SinhViens.MSSV : "N/A"
         //        })
         //        .ToListAsync();
 
@@ -1087,136 +824,398 @@ namespace BlueSchoolSystem.APIControllers
         //    {
         //        result = true,
         //        code = 200,
-        //        message = "Danh sách yêu cầu hỗ trợ cần xử lý (Trực chat / hotline)",
-        //        data = yeuCauHoTro
+        //        message = "Danh sách sinh viên cần hoàn thành Onboarding",
+        //        data = pendingUsers
+        //    });
+        //}
+
+        //// --- CHỨC NĂNG 6: XÁC NHẬN - PHÊ DUYỆT THAO TÁC CỦA SINH VIÊN ---
+
+        //// API 13: Xử lý Hủy Đăng ký Học phần
+        //[Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[HttpPost("dangky/huy")]
+        //public async Task<IActionResult> ApproveHuyDangKy([FromBody] XacNhanDangKyHocPhanDTO dto)
+        //{
+        //    // 1. Kiểm tra thời gian hợp lệ: 15/12 -> 26/12 (Giả định đang trong năm hiện tại)
+        //    var now = DateTime.Now;
+        //    var ngayHuyBatDau = new DateTime(now.Year, 12, 15);
+        //    var ngayHuyKetThuc = new DateTime(now.Year, 12, 26);
+
+        //    if (now < ngayHuyBatDau || now > ngayHuyKetThuc)
+        //    {
+        //        return BadRequest(new { result = false, message = $"Thời gian hủy không hợp lệ. Chỉ cho phép từ {ngayHuyBatDau:dd/MM} đến {ngayHuyKetThuc:dd/MM}." });
+        //    }
+
+        //    // 2. Tìm bản ghi đăng ký
+        //    var dangKy = await _context.DangKyHocPhans
+        //        .FirstOrDefaultAsync(dk => dk.Id == dto.DangKyHocPhanId && dk.SinhVienId == dto.SinhVienId);
+
+        //    if (dangKy == null)
+        //    {
+        //        return NotFound(new { result = false, message = "Không tìm thấy bản ghi đăng ký học phần." });
+        //    }
+
+        //    // 3. Thực hiện Hủy: Xóa
+        //    _context.DangKyHocPhans.Remove(dangKy);
+        //    await _context.SaveChangesAsync();
+
+        //    // 4. Logic: Khi hủy, lớp này không thu học phí.
+
+        //    await _activityLogService.LogAsync(
+        //        userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+        //        userName: User.FindFirstValue(ClaimTypes.Name)!,
+        //        device: Request.Headers["User-Agent"].ToString(),
+        //        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+        //        actionType: "HUY_DKHP",
+        //        tableName: "DangKyHocPhans",
+        //        objectId: dangKy.Id.ToString(),
+        //        description: $"Xác nhận Hủy ĐKHP Id: {dangKy.Id} cho SV Id: {dto.SinhVienId}. Lý do: {dto.LyDo}"
+        //    );
+
+        //    return Ok(new
+        //    {
+        //        result = true,
+        //        code = 200,
+        //        message = "Hủy đăng ký học phần thành công. **Không thu học phí** cho môn này."
+        //    });
+        //}
+
+        //// API 14: Xử lý Rút Đăng ký Học phần
+        //[Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[HttpPost("dangky/rut")]
+        //public async Task<IActionResult> ApproveRutDangKy([FromBody] XacNhanDangKyHocPhanDTO dto)
+        //{
+        //    // 1. Kiểm tra thời gian: 19/01 -> 08/02 (Giả định trong năm tiếp theo)
+        //    var nextYear = DateTime.Now.Year + 1;
+        //    var now = DateTime.Now;
+        //    var ngayRutBatDau = new DateTime(nextYear, 01, 19);
+        //    var ngayRutKetThuc = new DateTime(nextYear, 02, 08);
+
+        //    // Trường hợp chạy job vào cuối năm trước
+        //    if (now.Month >= 11)
+        //    {
+        //        ngayRutBatDau = new DateTime(now.Year + 1, 01, 19);
+        //        ngayRutKetThuc = new DateTime(now.Year + 1, 02, 08);
+        //    }
+
+        //    if (now < ngayRutBatDau || now > ngayRutKetThuc)
+        //    {
+        //        return BadRequest(new { result = false, message = $"Thời gian rút không hợp lệ. Chỉ cho phép từ {ngayRutBatDau:dd/MM} đến {ngayRutKetThuc:dd/MM}." });
+        //    }
+
+        //    // 2. Tìm bản ghi đăng ký
+        //    var dangKy = await _context.DangKyHocPhans
+        //        .FirstOrDefaultAsync(dk => dk.Id == dto.DangKyHocPhanId && dk.SinhVienId == dto.SinhVienId);
+
+        //    if (dangKy == null)
+        //    {
+        //        return NotFound(new { result = false, message = "Không tìm thấy bản ghi đăng ký học phần." });
+        //    }
+
+        //    // 3. Thực hiện Rút: Đánh dấu là đã rút
+        //    // Không hoàn học phí
+        //    dangKy.LoaiDangKy = "RUT";
+
+        //    _context.DangKyHocPhans.Update(dangKy);
+        //    await _context.SaveChangesAsync();
+
+        //    await _activityLogService.LogAsync(
+        //        userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+        //        userName: User.FindFirstValue(ClaimTypes.Name)!,
+        //        device: Request.Headers["User-Agent"].ToString(),
+        //        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+        //        actionType: "RUT_DKHP",
+        //        tableName: "DangKyHocPhans",
+        //        objectId: dangKy.Id.ToString(),
+        //        description: $"Xác nhận Rút ĐKHP Id: {dangKy.Id} cho SV Id: {dto.SinhVienId}. Lý do: {dto.LyDo}"
+        //    );
+
+        //    return Ok(new
+        //    {
+        //        result = true,
+        //        code = 200,
+        //        message = "Rút đăng ký học phần thành công. **Không hoàn học phí**."
+        //    });
+        //}
+
+        //// API 15: Phê duyệt Đặc biệt (Bảo lưu, Miễn học, Chuyển điểm)
+        //[Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[HttpPost("pheduyet-dacbiet")]
+        //public async Task<IActionResult> PheDuyetDacBiet([FromBody] PheDuyetDacBietDTO dto)
+        //{
+        //    var sv = await _context.SinhViens.FindAsync(dto.SinhVienId);
+        //    if (sv == null)
+        //    {
+        //        return NotFound(new { result = false, message = "Không tìm thấy Sinh viên." });
+        //    }
+
+        //    string actionType = $"PHEDUYET_{dto.LoaiYeuCau.ToUpper()}";
+        //    string logDesc = $"{(dto.IsApproved ? "Phê duyệt" : "Từ chối")} yêu cầu {dto.LoaiYeuCau} cho SV {sv.MSSV}. Nội dung: {dto.NoiDungChiTiet}";
+
+        //    // Logic thực tế (Cần triển khai thêm logic cập nhật trạng thái SV/thêm bản ghi Miễn học/Chuyển điểm)
+
+        //    await _activityLogService.LogAsync(
+        //        userId: User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+        //        userName: User.FindFirstValue(ClaimTypes.Name)!,
+        //        device: Request.Headers["User-Agent"].ToString(),
+        //        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+        //        actionType: actionType,
+        //        tableName: "SinhViens",
+        //        objectId: dto.SinhVienId.ToString(),
+        //        description: logDesc
+        //    );
+
+        //    return Ok(new
+        //    {
+        //        result = true,
+        //        code = 200,
+        //        message = logDesc.Replace("SV", $"Sinh viên {sv.MSSV}")
+        //    });
+        //}
+
+        //// --- CHỨC NĂNG 7: CÔNG BỐ THÔNG TIN CHO SINH VIÊN ---
+
+        //// API 16: Lấy tất cả thông tin cần công bố cho sinh viên
+        //[AllowAnonymous]
+        //[HttpGet("thongtin-congbo/{hocKyId}")]
+        //public async Task<IActionResult> GetThongTinCongBo(int hocKyId)
+        //{
+        //    var hocky = await _context.HocKys.FindAsync(hocKyId);
+        //    if (hocky == null)
+        //    {
+        //        return NotFound(new { result = false, message = "Không tìm thấy Học kỳ." });
+        //    }
+
+        //    // 1. Lấy các Thông báo chung (Thông báo đợt đăng ký)
+        //    var thongBaoChung = await _context.ThongBaos
+        //        .Where(t => t.ReceiverUserId == "ALL" || t.Type == "REG_ANNOUNCEMENT" || t.Type == "TKB_ANNOUNCEMENT")
+        //        .OrderByDescending(t => t.Time)
+        //        .Take(10)
+        //        .ToListAsync();
+
+        //    // 2. Lấy Danh sách Lớp mở/hủy (09/12)
+        //    var danhSachLHP = await _context.LopHocPhans
+        //        .Where(l => l.HocKyId == hocKyId)
+        //        .Include(l => l.MonHoc)
+        //        .Include(l => l.GiangVien)
+        //        .Include(l => l.TrangThai)
+        //        .Select(l => new
+        //        {
+        //            MaLopHocPhan = l.MaLopHocPhan,
+        //            TenMonHoc = l.MonHoc!.TenMonHoc,
+        //            GiangVien = l.GiangVien!.HoVaTenDem + " " + l.GiangVien.Ten,
+        //            TrangThai = l.TrangThai!.TenTrangThai,
+        //            GhiChuHuy = l.TrangThai.TenTrangThai.Equals("BiHuy") ? $"Lớp hủy được công bố ngày 09/12" : null
+        //        })
+        //        .ToListAsync();
+
+        //    // 3. Lấy Thời khóa biểu chính thức
+        //    var tkbChinhThuc = await _context.LichHocs
+        //        .Where(lh => lh.LopHocPhan.HocKyId == hocKyId)
+        //        .Include(lh => lh.LopHocPhan)
+        //        .Select(lh => new
+        //        {
+        //            LopHP = lh.LopHocPhan.MaLopHocPhan,
+        //            Ngay = lh.Ngay,
+        //            GioBatDau = lh.GioBatDau,
+        //            GioKetThuc = lh.GioKetThuc,
+        //            Phong = lh.PhongHocId.ToString() // Cần join thêm PhongHoc
+        //        })
+        //        .ToListAsync();
+
+        //    // 4. Lấy Lịch thi
+        //    var lichThi = await _context.LichThis
+        //        .Where(lt => lt.LopHocPhan.HocKyId == hocKyId)
+        //        .Include(lt => lt.TrangThai)
+        //        .Select(lt => new
+        //        {
+        //            LopHP = lt.LopHocPhan.MaLopHocPhan,
+        //            NgayThi = lt.NgayThi,
+        //            GioBatDau = lt.GioBatDau,
+        //            PhongThi = lt.PhongHoc.MaPhongHoc, // Cần join thêm PhongHoc
+        //            TrangThai = lt.TrangThai!.TenTrangThai
+        //        })
+        //        .ToListAsync();
+
+        //    var result = new
+        //    {
+        //        ThongBaoChung = thongBaoChung,
+        //        LopHocPhanCongBo = danhSachLHP,
+        //        ThoiKhoaBieu = tkbChinhThuc,
+        //        LichThi = lichThi
+        //    };
+
+        //    return Ok(new
+        //    {
+        //        result = true,
+        //        code = 200,
+        //        message = $"Công bố thông tin Học kỳ {hocky.TenHocKy} thành công.",
+        //        data = result
         //    });
         //}
 
 
-        // --- CHỨC NĂNG 9: QUẢN LÝ BÁO CÁO & THỐNG KÊ ---
+        //// --- CHỨC NĂNG 8: HỖ TRỢ SINH VIÊN TRONG THỜI GIAN ĐĂNG KÝ ---
 
-        // API 18: Thống kê số lượng đăng ký theo Ngành/Khóa
-        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpGet("baocao/dangky-nganh-khoa")]
-        public async Task<IActionResult> GetReportDangKyByNganhKhoa()
-        {
-            var report = await _context.DangKyHocPhans
-                .Include(dk => dk.SinhVien)
-                    .ThenInclude(sv => sv!.Lop)
-                        .ThenInclude(l => l!.Nganh)
-                .GroupBy(dk => new { dk.SinhVien!.Lop!.Nganh!.TenNganh, KhoaHoc = dk.SinhVien.MSSV.Substring(0, 4) })
-                .Select(g => new
-                {
-                    TenNganh = g.Key.TenNganh,
-                    KhoaHoc = g.Key.KhoaHoc,
-                    TongSoSinhVienDangKy = g.Select(dk => dk.SinhVienId).Distinct().Count(),
-                    TongSoHocPhanDangKy = g.Count()
-                })
-                .OrderBy(r => r.KhoaHoc)
-                .ThenBy(r => r.TenNganh)
-                .ToListAsync();
+        ////// API 17: Lấy danh sách các yêu cầu hỗ trợ từ sinh viên
+        ////[Authorize(Roles = SD.Role_Admin + "," + SD.Role_Staff, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        ////[HttpGet("hotro/yeucau")]
+        ////public async Task<IActionResult> GetYeuCauHoTro()
+        ////{
+        ////    var yeuCauHoTro = await _context.ActivityLogs
+        ////        .Where(a => a.ActionType == "ERROR_REGISTER" || a.ActionType == "SUPPORT_REQUEST" || a.ActionType == "PASSWORD_RESET")
+        ////        .OrderByDescending(a => a.Timestamp)
+        ////        .Take(50)
+        ////        .Select(a => new
+        ////        {
+        ////            a.Id,
+        ////            ThoiGian = a.Timestamp,
+        ////            NguoiDung = a.UserName,
+        ////            HanhDong = a.ActionType,
+        ////            MoTa = a.Description,
+        ////            CanThiep = a.ActionType switch
+        ////            {
+        ////                "PASSWORD_RESET" => "Reset tài khoản",
+        ////                "ERROR_REGISTER" => "Xử lý lỗi đăng ký/trùng lịch",
+        ////                _ => "Can thiệp khi SV báo lỗi hệ thống"
+        ////            }
+        ////        })
+        ////        .ToListAsync();
 
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = "Báo cáo số sinh viên đăng ký theo ngành/khóa thành công.",
-                data = report
-            });
-        }
+        ////    return Ok(new
+        ////    {
+        ////        result = true,
+        ////        code = 200,
+        ////        message = "Danh sách yêu cầu hỗ trợ cần xử lý (Trực chat / hotline)",
+        ////        data = yeuCauHoTro
+        ////    });
+        ////}
 
-        // API 19: Thống kê Hủy / Rút Học phần
-        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpGet("baocao/huy-rut")]
-        public async Task<IActionResult> GetReportHuyRutHocPhan()
-        {
-            var huyRutStats = await _context.DangKyHocPhans
-                .Where(dk => dk.LoaiDangKy == "RUT" || dk.LoaiDangKy == "HUY")
-                .GroupBy(dk => dk.LoaiDangKy)
-                .Select(g => new
-                {
-                    LoaiThaoTac = g.Key,
-                    TongSoLanThucHien = g.Count()
-                })
-                .ToListAsync();
 
-            var tongHuy = huyRutStats.FirstOrDefault(s => s.LoaiThaoTac == "HUY")?.TongSoLanThucHien ?? 0;
-            var tongRut = huyRutStats.FirstOrDefault(s => s.LoaiThaoTac == "RUT")?.TongSoLanThucHien ?? 0;
+        //// --- CHỨC NĂNG 9: QUẢN LÝ BÁO CÁO & THỐNG KÊ ---
 
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = "Thống kê Hủy / Rút Học phần thành công.",
-                data = new
-                {
-                    TongHuy = tongHuy,
-                    TongRut = tongRut,
-                    ChiTiet = huyRutStats
-                }
-            });
-        }
+        //// API 18: Thống kê số lượng đăng ký theo Ngành/Khóa
+        //[Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[HttpGet("baocao/dangky-nganh-khoa")]
+        //public async Task<IActionResult> GetReportDangKyByNganhKhoa()
+        //{
+        //    var report = await _context.DangKyHocPhans
+        //        .Include(dk => dk.SinhVien)
+        //            .ThenInclude(sv => sv!.Lop)
+        //                .ThenInclude(l => l!.Nganh)
+        //        .GroupBy(dk => new { dk.SinhVien!.Lop!.Nganh!.TenNganh, KhoaHoc = dk.SinhVien.MSSV.Substring(0, 4) })
+        //        .Select(g => new
+        //        {
+        //            TenNganh = g.Key.TenNganh,
+        //            KhoaHoc = g.Key.KhoaHoc,
+        //            TongSoSinhVienDangKy = g.Select(dk => dk.SinhVienId).Distinct().Count(),
+        //            TongSoHocPhanDangKy = g.Count()
+        //        })
+        //        .OrderBy(r => r.KhoaHoc)
+        //        .ThenBy(r => r.TenNganh)
+        //        .ToListAsync();
 
-        // API 20: Báo cáo trùng lịch
-        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpGet("baocao/trung-lich/{hocKyId}")]
-        public async Task<IActionResult> GetReportTrungLich(int hocKyId)
-        {
-            var lichHocTrongKy = await _context.LichHocs
-                .Where(lh => lh.LopHocPhan.HocKyId == hocKyId)
-                .Include(lh => lh.LopHocPhan)
-                .ToListAsync();
+        //    return Ok(new
+        //    {
+        //        result = true,
+        //        code = 200,
+        //        message = "Báo cáo số sinh viên đăng ký theo ngành/khóa thành công.",
+        //        data = report
+        //    });
+        //}
 
-            var conflictReport = new List<object>();
+        //// API 19: Thống kê Hủy / Rút Học phần
+        //[Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[HttpGet("baocao/huy-rut")]
+        //public async Task<IActionResult> GetReportHuyRutHocPhan()
+        //{
+        //    var huyRutStats = await _context.DangKyHocPhans
+        //        .Where(dk => dk.LoaiDangKy == "RUT" || dk.LoaiDangKy == "HUY")
+        //        .GroupBy(dk => dk.LoaiDangKy)
+        //        .Select(g => new
+        //        {
+        //            LoaiThaoTac = g.Key,
+        //            TongSoLanThucHien = g.Count()
+        //        })
+        //        .ToListAsync();
 
-            // Nhóm theo Ngày và Thời gian
-            var conflictCandidates = lichHocTrongKy
-                .GroupBy(lh => new { DayOfWeek = (int)lh.Ngay.DayOfWeek, lh.GioBatDau, lh.GioKetThuc })
-                .ToList();
+        //    var tongHuy = huyRutStats.FirstOrDefault(s => s.LoaiThaoTac == "HUY")?.TongSoLanThucHien ?? 0;
+        //    var tongRut = huyRutStats.FirstOrDefault(s => s.LoaiThaoTac == "RUT")?.TongSoLanThucHien ?? 0;
 
-            foreach (var group in conflictCandidates)
-            {
-                // 1. Kiểm tra trùng Phòng
-                var roomConflicts = group.GroupBy(lh => lh.PhongHocId)
-                    .Where(g => g.Count() > 1)
-                    .Select(g => new
-                    {
-                        LoaiTrung = "Trùng Phòng",
-                        PhongId = g.Key,
-                        LopHocPhans = g.Select(lh => lh.LopHocPhan.MaLopHocPhan).ToList()
-                    })
-                    .ToList();
+        //    return Ok(new
+        //    {
+        //        result = true,
+        //        code = 200,
+        //        message = "Thống kê Hủy / Rút Học phần thành công.",
+        //        data = new
+        //        {
+        //            TongHuy = tongHuy,
+        //            TongRut = tongRut,
+        //            ChiTiet = huyRutStats
+        //        }
+        //    });
+        //}
 
-                // 2. Kiểm tra trùng Giảng viên
-                var gvConflicts = group.GroupBy(lh => lh.LopHocPhan.GiangVienId)
-                    .Where(g => g.Count() > 1 && g.Key.HasValue)
-                    .Select(g => new
-                    {
-                        LoaiTrung = "Trùng Giảng Viên",
-                        GiangVienId = g.Key,
-                        LopHocPhans = g.Select(lh => lh.LopHocPhan.MaLopHocPhan).ToList()
-                    })
-                    .ToList();
+        //// API 20: Báo cáo trùng lịch
+        //[Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[HttpGet("baocao/trung-lich/{hocKyId}")]
+        //public async Task<IActionResult> GetReportTrungLich(int hocKyId)
+        //{
+        //    var lichHocTrongKy = await _context.LichHocs
+        //        .Where(lh => lh.LopHocPhan.HocKyId == hocKyId)
+        //        .Include(lh => lh.LopHocPhan)
+        //        .ToListAsync();
 
-                if (roomConflicts.Any() || gvConflicts.Any())
-                {
-                    conflictReport.Add(new
-                    {
-                        NgayTrongTuan = group.Key.DayOfWeek,
-                        GioBatDau = group.Key.GioBatDau,
-                        GioKetThuc = group.Key.GioKetThuc,
-                        Conflicts = roomConflicts.Cast<object>().Concat(gvConflicts).ToList()
-                    });
-                }
-            }
+        //    var conflictReport = new List<object>();
 
-            return Ok(new
-            {
-                result = true,
-                code = 200,
-                message = "Báo cáo trùng lịch thành công.",
-                data = conflictReport
-            });
-        }
+        //    // Nhóm theo Ngày và Thời gian
+        //    var conflictCandidates = lichHocTrongKy
+        //        .GroupBy(lh => new { DayOfWeek = (int)lh.Ngay.DayOfWeek, lh.GioBatDau, lh.GioKetThuc })
+        //        .ToList();
+
+        //    foreach (var group in conflictCandidates)
+        //    {
+        //        // 1. Kiểm tra trùng Phòng
+        //        var roomConflicts = group.GroupBy(lh => lh.PhongHocId)
+        //            .Where(g => g.Count() > 1)
+        //            .Select(g => new
+        //            {
+        //                LoaiTrung = "Trùng Phòng",
+        //                PhongId = g.Key,
+        //                LopHocPhans = g.Select(lh => lh.LopHocPhan.MaLopHocPhan).ToList()
+        //            })
+        //            .ToList();
+
+        //        // 2. Kiểm tra trùng Giảng viên
+        //        var gvConflicts = group.GroupBy(lh => lh.LopHocPhan.GiangVienId)
+        //            .Where(g => g.Count() > 1 && g.Key.HasValue)
+        //            .Select(g => new
+        //            {
+        //                LoaiTrung = "Trùng Giảng Viên",
+        //                GiangVienId = g.Key,
+        //                LopHocPhans = g.Select(lh => lh.LopHocPhan.MaLopHocPhan).ToList()
+        //            })
+        //            .ToList();
+
+        //        if (roomConflicts.Any() || gvConflicts.Any())
+        //        {
+        //            conflictReport.Add(new
+        //            {
+        //                NgayTrongTuan = group.Key.DayOfWeek,
+        //                GioBatDau = group.Key.GioBatDau,
+        //                GioKetThuc = group.Key.GioKetThuc,
+        //                Conflicts = roomConflicts.Cast<object>().Concat(gvConflicts).ToList()
+        //            });
+        //        }
+        //    }
+
+        //    return Ok(new
+        //    {
+        //        result = true,
+        //        code = 200,
+        //        message = "Báo cáo trùng lịch thành công.",
+        //        data = conflictReport
+        //    });
+        //}
     }
 }
