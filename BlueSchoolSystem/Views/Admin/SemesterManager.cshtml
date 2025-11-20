@@ -1,0 +1,79 @@
+﻿@model IEnumerable<BlueSchoolSystem.Models.HocKy>
+
+@{
+    ViewData["Title"] = "Quản Lý Học Kỳ";
+    var trangThaiList = ViewBag.TrangThaiList as List<BlueSchoolSystem.Models.TrangThai>;
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<a asp-action="CreateSemester" class="btn btn-success mb-3">Tạo Học Kỳ Mới</a>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+<table class="table table-bordered table-hover">
+    <thead>
+        <tr>
+            <th>Tên Học Kỳ</th>
+            <th>Ngày Bắt Đầu</th>
+            <th>Ngày Kết Thúc</th>
+            <th>Trạng Thái</th>
+            <th>Hành Động</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var hk in Model)
+        {
+            <tr>
+                <td>@hk.TenHocKy</td>
+                <td>@hk.NgayBatDau.ToString("dd/MM/yyyy")</td>
+                <td>@hk.NgayKetThuc.ToString("dd/MM/yyyy")</td>
+                <td>
+    <select class="form-select semester-status" data-hocky-id="@hk.Id">
+        @foreach (var tt in trangThaiList)
+        {
+                            @if (hk.TrangThaiId == tt.Id)
+                            {
+                                <option value="@tt.Id" selected>@tt.TenTrangThai</option>
+                            }
+                            else
+                            {
+                                <option value="@tt.Id">@tt.TenTrangThai</option>
+                            }
+        }
+    </select>
+</td>
+                <td>
+                    <!-- Có thể thêm nút xem chi tiết hoặc xóa nếu muốn -->
+                    <button class="btn btn-primary btn-update-status" data-hocky-id="@hk.Id">Cập Nhật Trạng Thái</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('.btn-update-status').click(function () {
+                var hockyId = $(this).data('hocky-id');
+                var trangThaiId = $(this).closest('tr').find('.semester-status').val();
+
+                $.post('@Url.Action("UpdateSemesterStatus")', { hockyId: hockyId, trangThaiId: trangThaiId })
+                    .done(function (res) {
+                        if (res.success) {
+                            alert(res.message);
+                        } else {
+                            alert("Lỗi: " + res.message);
+                        }
+                    })
+                    .fail(function () {
+                        alert("Không thể kết nối tới server.");
+                    });
+            });
+        });
+    </script>
+}

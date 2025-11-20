@@ -1239,8 +1239,174 @@ namespace BlueSchoolSystem.Controllers
 
             return logs ?? new List<ActivityLog>();
         }
+        // lấy danh sách học kì
+        public async Task<IActionResult> SemesterManager()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
+            // Lấy token
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
 
+            // Lấy danh sách trạng thái để đổ vào dropdown filter
+            var trangThaiList = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "HocKy")
+                .ToListAsync();
+            ViewBag.TrangThaiList = trangThaiList;
+
+            HttpResponseMessage response;
+            try
+            {
+                // Gọi API lấy danh sách học kỳ
+                response = await client.GetAsync("api/hocky");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API lấy danh sách học kỳ.");
+                TempData["Error"] = "Không thể kết nối đến hệ thống API.";
+                return View(new List<HocKy>());
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Không thể lấy danh sách học kỳ từ hệ thống API.";
+                return View(new List<HocKy>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("data", out var dataElement))
+            {
+                TempData["Error"] = "Dữ liệu học kỳ không hợp lệ.";
+                return View(new List<HocKy>());
+            }
+
+            // Sử dụng JsonSerializer để deserialize danh sách Học Kỳ
+            var hockys = System.Text.Json.JsonSerializer.Deserialize<List<HocKy>>(dataElement.GetRawText(), new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            return View(hockys ?? new List<HocKy>());
+        }
+        // GET: /Admin/CreateSemester
+        public async Task<IActionResult> CreateSemester()
+        {
+            // Cần phải có DTO để chứa các field: TenHocKy, NgayBatDau, NgayKetThuc, NgayCongBoTKB
+            return View(new HocKyDTO { NgayBatDau = DateTime.Today.AddDays(1), NgayKetThuc = DateTime.Today.AddMonths(4), NgayCongBoTKB = DateTime.Today.AddMonths(1) });
+        }
+
+        // POST: /Admin/CreateSemester
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateSemester(HocKyDTO dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(dto);
+            }
+
+            // Logic kiểm tra ngày tháng
+            if (dto.NgayBatDau >= dto.NgayKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.NgayKetThuc), "Ngày kết thúc phải sau ngày bắt đầu.");
+                return View(dto);
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                // Chuẩn bị request body
+                var json = JsonConvert.SerializeObject(dto);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                // Gọi API tạo học kỳ
+                var response = await client.PostAsync("api/hocky", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    TempData["Success"] = $"Tạo Học kỳ **{dto.TenHocKy}** thành công.";
+                    return RedirectToAction(nameof(SemesterManager));
+                }
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    // Cố gắng parse lỗi từ API nếu có
+                    try
+                    {
+                        dynamic errObj = JsonConvert.DeserializeObject(apiError);
+                        ModelState.AddModelError("", errObj?.message ?? "Lỗi tạo học kỳ từ API.");
+                    }
+                    catch
+                    {
+                        ModelState.AddModelError("", "Lỗi không xác định khi tạo học kỳ.");
+                    }
+                    return View(dto);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối khi tạo học kỳ.");
+                ModelState.AddModelError("", $"Lỗi kết nối: {ex.Message}");
+                return View(dto);
+            }
+        }
+        // Phương thức này thường được gọi bằng Ajax/Fetch từ trang SemesterManager
+        [HttpPost]
+        public async Task<IActionResult> UpdateSemesterStatus(int hockyId, int trangThaiId)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            // Tạo DTO tương ứng với API yêu cầu
+            var dto = new UpdateTrangThaiDTO { HocKyId = hockyId, TrangThaiId = trangThaiId };
+            var json = JsonConvert.SerializeObject(dto);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            try
+            {
+                var response = await client.PutAsync("api/hocky/trangthai", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Parse response để lấy message thành công
+                    var body = await response.Content.ReadAsStringAsync();
+                    dynamic successObj = JsonConvert.DeserializeObject(body);
+                    return Json(new { success = true, message = successObj.message });
+                }
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    dynamic errObj = JsonConvert.DeserializeObject(apiError);
+                    return Json(new { success = false, message = errObj?.message ?? "Cập nhật trạng thái không thành công." });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối khi cập nhật trạng thái học kỳ.");
+                return Json(new { success = false, message = $"Lỗi kết nối: {ex.Message}" });
+            }
+        }
 
     }
 }
