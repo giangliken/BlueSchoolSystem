@@ -1,4 +1,6 @@
 ﻿@model BlueSchoolSystem.Models.ViewModel.AttendanceSessionDetailViewModel
+@using BlueSchoolSystem.Models.ViewModel
+
 
 @{
     var isExpired = Model.ExpireAt <= DateTime.Now;
@@ -10,7 +12,7 @@
     <input type="hidden" name="maLopHocPhan" value="@Model.MaLopHocPhan" />
     <button type="submit" class="btn btn-secondary mb-3 d-inline-flex align-items-center">
         <i class="fa-solid fa-arrow-left me-2"></i>
-        Quay lại lớp học phần
+        Quay lại
     </button>
 </form>
 <h4>
@@ -20,10 +22,22 @@
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card text-center p-3">
-            <img id="qr-img" src="data:image/png;base64,@Model.QrCodeBase64" style="width:200px;@(isExpired ? "opacity:0.3;" : "")" />
+            <div class="d-flex justify-content-center">
+                <img id="qr-img"
+                     src="data:image/png;base64,@Model.QrCodeBase64"
+                     style="width:200px;@(isExpired ? "opacity:0.3;" : "")" />
+            </div>
             <div class="mt-2 fw-semibold text-primary">
                 Mã điểm danh: <span id="ma-code">@(!isExpired ? Model.Code : "")</span>
             </div>
+
+            <button type="button"
+                    id="btn-open-qr-fullscreen"
+                    class="btn btn-outline-primary btn-sm mt-2">
+                <i class="fa-solid fa-maximize"></i> Phóng to mã QR
+            </button>
+
+
             <form asp-action="RegenerateAttendanceCode" asp-controller="Teacher" asp-route-id="@Model.Id" method="post" class="mt-2">
                 @Html.AntiForgeryToken()
                 <button type="submit" class="btn btn-warning btn-sm" @(isExpired ? "" : "disabled")>
@@ -33,7 +47,28 @@
         </div>
     </div>
     <div class="col-md-8">
-        <h5>Danh sách sinh viên đã điểm danh</h5>
+        <h5>DANH SÁCH SINH VIÊN</h5>
+        <div class="row mb-2">
+            <div class="col-md-6">
+                <input type="text" id="filterInput" class="form-control" placeholder="Tìm theo MSSV hoặc tên sinh viên..." />
+            </div>
+            <div class="col-md-4">
+                <select id="filterStatus" class="form-select">
+                    <option value="">-- Tất cả trạng thái --</option>
+                    @foreach (var kv in trangThaiDict)
+                    {
+                        <option value="@kv.Value">@kv.Value</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-secondary w-100" id="btnClearFilters">
+                    <i class="fa-solid fa-filter me-1"></i> Xoá lọc
+                </button>
+            </div>
+
+        </div>
+
         <div class="table-responsive">
             <table class="table table-bordered table-hover align-middle mb-0">
                 <thead>
@@ -48,43 +83,128 @@
                     </tr>
                 </thead>
                 <tbody id="attendance-table-body">
-                    @* Lần đầu load trang vẫn render dữ liệu Model.SinhViens *@
-                    @if (Model.SinhViens != null && Model.SinhViens.Any())
-                    {
-                        int stt = 1;
-                        @foreach (var sv in Model.SinhViens)
-                        {
-                            <tr>
-                                <td>@stt</td>
-                                <td>@sv.MSSV</td>
-                                <td>@sv.HoVaTenDem @sv.Ten</td>
-                                <td>@sv.ThoiGian?.ToString("HH:mm:ss dd/MM/yyyy")</td>
-                                <td>
-                                    @{
-                                        string trangThai = (trangThaiDict != null && trangThaiDict.ContainsKey(sv.TrangThai))
-                                        ? trangThaiDict[sv.TrangThai]
-                                        : "Không rõ";
-                                        string badge = "bg-secondary";
-                                        if (trangThai == "Có mặt") badge = "bg-success";
-                                        else if (trangThai == "Vắng mặt" || trangThai == "Không phép") badge = "bg-danger";
-                                        else if (trangThai == "Đi trễ" || trangThai == "Về sớm") badge = "bg-warning text-dark";
-                                        else if (trangThai == "Có phép") badge = "bg-info";
-                                    }
-                                    <span class="badge @badge">@trangThai</span>
-                                </td>
-                            </tr>
-                            stt++;
-                        }
-                    }
-                    else
-                    {
-                        <tr><td colspan="6">Chưa có sinh viên điểm danh.</td></tr>
-                    }
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+
+<div id="qr-fullscreen-overlay" class="qr-fullscreen-overlay d-none">
+    <div class="qr-fullscreen-inner">
+        <button type="button"
+                id="btn-close-qr-fullscreen"
+                class="btn btn-light btn-sm position-absolute top-0 end-0 m-3">
+            <i class="fa-solid fa-xmark"></i> Thu nhỏ
+        </button>
+
+        <div class="qr-fullscreen-content d-flex flex-column flex-md-row gap-4 align-items-start">
+            <!-- Bên trái: QR + mã -->
+            <div class="qr-fullscreen-left text-center flex-shrink-0">
+                <img id="qr-fullscreen-img"
+                     src=""
+                     class="qr-fullscreen-img" />
+
+                <div class="mt-3 fw-semibold text-white fs-5">
+                    Mã điểm danh: <span id="ma-code-full"></span>
+                </div>
+            </div>
+
+            <!-- Bên phải: danh sách tên -->
+            <div class="qr-fullscreen-right w-100">
+                <h5 class="text-white mb-2">
+                    DANH SÁCH SINH VIÊN
+                </h5>
+                <div class="qr-fullscreen-list mt-2">
+                    <ul id="qr-fullscreen-names" class="list-group list-group-flush bg-transparent">
+                        @* JS sẽ fill dữ liệu *@
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<style>
+    .qr-fullscreen-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .qr-fullscreen-inner {
+        position: relative;
+        max-width: 900px; /* cho rộng ra để chia 2 cột */
+        width: 100%;
+        padding: 1.5rem;
+        color: #fff;
+    }
+
+    .qr-fullscreen-img {
+        width: 340px;
+        max-width: 100%;
+    }
+
+    .qr-fullscreen-list {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    .qr-fullscreen-list .list-group-item {
+        background: transparent;
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.15);
+        padding-block: 4px;
+    }
+
+    .row-present {
+        background-color: #d4edda !important; /* xanh nhạt */
+    }
+
+    .row-absent {
+        background-color: #f8d7da !important; /* đỏ nhạt */
+    }
+
+    .row-late {
+        background-color: #fff3cd !important; /* vàng nhạt */
+    }
+
+    .row-permission {
+        background-color: #d1ecf1 !important; /* xanh dương nhạt */
+    }
+
+    .select-present {
+        background-color: #d4edda !important; /* xanh lá nhạt */
+        color: green !important;
+        border-color: #c3e6cb !important;
+    }
+
+    .select-absent {
+        background-color: #f8d7da !important; /* đỏ nhạt */
+        color: red !important;
+        border-color: #f5c6cb !important;
+    }
+
+    .select-late {
+        background-color: #fff3cd !important; /* vàng nhạt */
+        color: darkorange !important;
+        border-color: #ffeeba !important;
+    }
+
+    .select-permission {
+        background-color: #d1ecf1 !important; /* xanh dương nhạt */
+        color: cadetblue !important;
+        border-color: #bee5eb !important;
+    }
+
+</style>
+
+
 
 @section Scripts {
     <!-- Firebase SDK v8 -->
@@ -92,172 +212,475 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <script>
-        // ===== 0) Helpers =====
-        // Map text -> badge (UI)
-        function badgeByText(label) {
-            let badge = "bg-secondary";
-            if (label === "Có mặt") badge = "bg-success";
-            else if (label === "Vắng mặt" || label === "Không phép" || label === "Vắng") badge = "bg-danger";
-            else if (label === "Đi trễ" || label === "Về sớm") badge = "bg-warning text-dark";
-            else if (label === "Có phép" || label === "Vắng có phép") badge = "bg-info";
-            return `<span class="badge ${badge}">${label}</span>`;
-        }
+                    // ===== 0) Helpers =====
+                    // Map text -> badge (UI)
+                    function badgeByText(label) {
+                        let badge = "bg-secondary";
+                        if (label === "Có mặt") badge = "bg-success";
+                        else if (label === "Vắng mặt" || label === "Không phép" || label === "Vắng") badge = "bg-danger";
+                        else if (label === "Đi trễ" || label === "Về sớm") badge = "bg-warning text-dark";
+                        else if (label === "Có phép" || label === "Vắng có phép") badge = "bg-info";
+                        return `<span class="badge ${badge}">${label}</span>`;
+                    }
 
-        // Convert mọi kiểu time về string hiển thị
-        function fmtTime(v) {
-            if (!v) return "";
-            // nếu server đã format HH:mm thì giữ nguyên
-            if (/^\d{2}:\d{2}$/.test(v)) return v;
-            const d = new Date(v);
-            if (isNaN(d.getTime())) return v;
-            return d.toLocaleString('vi-VN');
-        }
+                    // Convert mọi kiểu time về string hiển thị
+                    function fmtTime(v) {
+                        if (!v) return "";
 
-        // ===== 1) Data từ server (để map id -> text khi cần) =====
-        var trangThaiDict = @Html.Raw(Json.Serialize(ViewBag.TrangThaiDict ?? new Dictionary<int, string>()));
+                        // Nếu đã là chuỗi "HH:mm:ss" thì giữ nguyên
+                        if (/^\d{2}:\d{2}(:\d{2})?$/.test(v)) return v;
 
-        // ===== 2) Firebase init =====
-        var firebaseConfig = {
-          apiKey: "AIzaSyD2Uh_6wINLjM99TZ64cIdR330cWPrJ3ws",
-          authDomain: "bluenet-e6525.firebaseapp.com",
-          databaseURL: "https://bluenet-e6525-default-rtdb.firebaseio.com",
-          projectId: "bluenet-e6525",
-          storageBucket: "bluenet-e6525.firebasestorage.app",
-          messagingSenderId: "682840647075",
-          appId: "1:682840647075:web:ed799955c38a40f2526616",
-          measurementId: "G-RXWF28P678"
-        };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                        const d = new Date(v);
+                        if (isNaN(d.getTime())) return v;
 
-        // ===== 3) Lắng nghe theo schema CHUẨN =====
-        var diemDanhId = "@Model.Id";
-        var db = firebase.database();
-
-        // Canonical path: attendancesessions/{id}/students/{MSSV}
-        var canonicalRef = db.ref("attendancesessions/" + diemDanhId + "/students");
-
-        // Legacy fallback: attendance_sessions/{id}/{SvId}
-        //var legacyRef = db.ref("attendance_sessions/" + diemDanhId);
-
-        var usingLegacy = false;
-
-        function attachCanonicalListener() {
-            canonicalRef.on("value", function (snapshot) {
-                const data = snapshot.val();
-                if (data && Object.keys(data).length > 0) {
-                    usingLegacy = false;
-                    renderStudentsDict(data); // data: { MSSV: {studentId, studentName, status/statusId, timecheckedin...} }
-                } else {
-                    // Nếu canonical trống, thử legacy (để không gãy khi rollout)
-                    attachLegacyOnce();
-                }
-            });
-        }
-
-        function attachLegacyOnce() {
-            if (usingLegacy) return;
-            legacyRef.once("value").then(function (snap) {
-                const val = snap.val();
-                if (val && Object.keys(val).length > 0) {
-                    usingLegacy = true;
-                    // Chuyển legacy -> shape students để UI xài chung
-                    // legacy item có: { id, mssv, hoVaTenDem, ten, trangThai (id), thoiGian ... }
-                    legacyRef.on("value", function (s) {
-                        const raw = s.val() || {};
-                        const students = {};
-                        Object.keys(raw).forEach(k => {
-                            const it = raw[k] || {};
-                            const name = `${(it.hoVaTenDem || "").trim()} ${(it.ten || "").trim()}`.trim();
-                            students[it.mssv || k] = {
-                                studentId: it.mssv || k,
-                                studentName: name,
-                                statusId: it.trangThai,
-                                timecheckedin: fmtTime(it.thoiGian),
-                                // bluetoothID/lat/lng có thể không có ở legacy
-                            };
+                        return d.toLocaleTimeString('vi-VN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
                         });
-                        renderStudentsDict(students);
-                    });
-                } else {
-                    // cả 2 đều trống -> show empty
-                    renderStudentsDict({});
+                    }
+
+
+                    //1) Data từ server (để map id -> text khi cần) =====
+                    var trangThaiDict = @Html.Raw(Json.Serialize(ViewBag.TrangThaiDict ?? new Dictionary<int, string>()));
+
+                    // Map MSSV -> SinhVienId để dùng khi re-render từ Firebase
+                        var sinhVienIdMap = @Html.Raw(
+                                                                                                                                                                                                                                                            Json.Serialize(
+                                                                                                                                                                                                                                                                                                                                                                                            (Model.SinhViens ?? new List<BlueSchoolSystem.Models.ViewModel.StudentDetailViewModel>())
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            .ToDictionary(s => s.MSSV, s => s.Id)
+                                                                                                                                                                                                                                                            )
+                                                                                                                                                                                            );
+
+
+
+    // ===== 2) Firebase init =====
+    var firebaseConfig = {
+      apiKey: "AIzaSyD2Uh_6wINLjM99TZ64cIdR330cWPrJ3ws",
+      authDomain: "bluenet-e6525.firebaseapp.com",
+      databaseURL: "https://bluenet-e6525-default-rtdb.firebaseio.com",
+      projectId: "bluenet-e6525",
+      storageBucket: "bluenet-e6525.firebasestorage.app",
+      messagingSenderId: "682840647075",
+      appId: "1:682840647075:web:ed799955c38a40f2526616",
+      measurementId: "G-RXWF28P678"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+                    // ===== 3) Lắng nghe theo schema CHUẨN =====
+                    var diemDanhId = "@Model.Id";
+                    var db = firebase.database();
+
+                    // Canonical path: attendancesessions/{id}/students/{MSSV}
+                    var canonicalRef = db.ref("attendancesessions/" + diemDanhId + "/students");
+
+                    // Legacy fallback: attendance_sessions/{id}/{SvId}
+                    //var legacyRef = db.ref("attendance_sessions/" + diemDanhId);
+
+                    var usingLegacy = false;
+
+                    function attachCanonicalListener() {
+                        canonicalRef.on("value", function (snapshot) {
+                            const data = snapshot.val();
+                            if (data && Object.keys(data).length > 0) {
+                                usingLegacy = false;
+                                renderStudentsDict(data); // data: { MSSV: {studentId, studentName, status/statusId, timecheckedin...} }
+                            } else {
+                                // Nếu canonical trống, thử legacy (để không gãy khi rollout)
+                                attachLegacyOnce();
+                            }
+                        });
+                    }
+
+                    function attachLegacyOnce() {
+                        if (usingLegacy) return;
+                        legacyRef.once("value").then(function (snap) {
+                            const val = snap.val();
+                            if (val && Object.keys(val).length > 0) {
+                                usingLegacy = true;
+                                // Chuyển legacy -> shape students để UI xài chung
+                                // legacy item có: { id, mssv, hoVaTenDem, ten, trangThai (id), thoiGian ... }
+                                legacyRef.on("value", function (s) {
+                                    const raw = s.val() || {};
+                                    const students = {};
+                                    Object.keys(raw).forEach(k => {
+                                        const it = raw[k] || {};
+                                        const name = `${(it.hoVaTenDem || "").trim()} ${(it.ten || "").trim()}`.trim();
+                                        students[it.mssv || k] = {
+                                            studentId: it.mssv || k,
+                                            studentName: name,
+                                            statusId: it.trangThai,
+                                            timecheckedin: fmtTime(it.thoiGian),
+                                            // bluetoothID/lat/lng có thể không có ở legacy
+                                        };
+                                    });
+                                    renderStudentsDict(students);
+                                });
+                            } else {
+                                // cả 2 đều trống -> show empty
+                                renderStudentsDict({});
+                            }
+                        });
+                    }
+
+                    attachCanonicalListener();
+
+                    // Build <option> cho dropdown trạng thái
+                    function buildStatusOptions(currentStatusId, currentStatusText) {
+                        let html = "";
+                        const used = new Set();
+
+                        Object.keys(trangThaiDict || {}).forEach(key => {
+                            const text = trangThaiDict[key];
+                            if (!text || used.has(text)) return;
+                            used.add(text);
+
+                            const isSelected =
+                                (currentStatusId != null && Number(key) === Number(currentStatusId)) ||
+                                (!currentStatusId && text === currentStatusText);
+
+                            html += `<option value="${key}" ${isSelected ? "selected" : ""}>${text}</option>`;
+                        });
+
+                        return html;
+                    }
+
+                            function colorRowByStatus(tr) {
+                    if (!tr) return;
+
+                    const select = tr.querySelector("select.js-att-status-select");
+                    if (!select) return;
+
+                    const text = select.options[select.selectedIndex].text.trim();
+
+                    // Reset màu cho row + select
+                    tr.classList.remove("row-present", "row-absent", "row-late", "row-permission");
+                    select.classList.remove("select-present", "select-absent", "select-late", "select-permission");
+
+                    if (text === "Có mặt") {
+                        tr.classList.add("row-present");
+                        select.classList.add("select-present");
+                    }
+                    else if (["Vắng mặt", "Không phép", "Vắng"].includes(text)) {
+                        tr.classList.add("row-absent");
+                        select.classList.add("select-absent");
+                    }
+                    else if (["Đi trễ", "Về sớm"].includes(text)) {
+                        tr.classList.add("row-late");
+                        select.classList.add("select-late");
+                    }
+                    else if (["Có phép", "Vắng có phép"].includes(text)) {
+                        tr.classList.add("row-permission");
+                        select.classList.add("select-permission");
+                    }
                 }
-            });
-        }
 
-        attachCanonicalListener();
 
-        // ===== 4) Render bảng =====
-        function renderStudentsDict(dict) {
-            const tbody = document.getElementById("attendance-table-body");
-            let rows = [];
 
-            // Transform dict -> array + sort: Có mặt/Đi trễ trước, xong alpha theo tên
-            Object.keys(dict || {}).forEach(mssv => {
-                const sv = dict[mssv] || {};
-                const name = sv.studentName || `${(sv.hoVaTenDem || "").trim()} ${(sv.ten || "").trim()}`.trim();
-                const statusText = sv.status || (sv.statusId != null ? (trangThaiDict[sv.statusId] || "Không rõ") : "Không rõ");
-                const timeStr = fmtTime(sv.timecheckedin || sv.thoiGian);
+                    // ===== 4) Render bảng =====
+                            function renderStudentsDict(dict) {
+                        const tbody = document.getElementById("attendance-table-body");
+                        let rows = [];
 
-                rows.push({
-                    mssv,
-                    name,
-                    statusText,
-                    timeStr
-                });
-            });
+                        // Transform dict -> array + sort: Có mặt/Đi trễ trước, xong alpha theo tên
+                        Object.keys(dict || {}).forEach(mssv => {
+                            const sv = dict[mssv] || {};
+                            const name = sv.studentName || `${(sv.hoVaTenDem || "").trim()} ${(sv.ten || "").trim()}`.trim();
+                            const statusText = sv.status || (sv.statusId != null ? (trangThaiDict[sv.statusId] || "Không rõ") : "Không rõ");
+                            const timeStr = fmtTime(sv.timecheckedin || sv.thoiGian);
 
-            // Ưu tiên "Có mặt" & "Đi trễ" lên trước, rồi sort theo tên cuối
-            const presentSet = new Set(["Có mặt", "Đi trễ"]);
-            rows.sort((a, b) => {
-                const ap = presentSet.has(a.statusText) ? 0 : 1;
-                const bp = presentSet.has(b.statusText) ? 0 : 1;
-                if (ap !== bp) return ap - bp;
-                const al = (a.name || "").toLowerCase().split(" ").pop();
-                const bl = (b.name || "").toLowerCase().split(" ").pop();
-                return (al || "").localeCompare(bl || "");
-            });
+                            rows.push({
+                                mssv,
+                                name,
+                                statusText,
+                                statusId: sv.statusId,   // 👈 lưu luôn id
+                                timeStr,
+                                sinhVienId: sinhVienIdMap[mssv] || null
+                            });
+                        });
 
-            if (rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6">Chưa có sinh viên điểm danh.</td></tr>`;
-                return;
-            }
+                        const presentSet = new Set(["Có mặt", "Đi trễ"]);
+                        rows.sort((a, b) => {
+                            const ap = presentSet.has(a.statusText) ? 0 : 1;
+                            const bp = presentSet.has(b.statusText) ? 0 : 1;
+                            if (ap !== bp) return ap - bp;
+                            const al = (a.name || "").toLowerCase().split(" ").pop();
+                            const bl = (b.name || "").toLowerCase().split(" ").pop();
+                            return (al || "").localeCompare(bl || "");
+                        });
 
-            let stt = 1, html = "";
-            rows.forEach(sv => {
-                html += `
-                    <tr>
-                        <td>${stt++}</td>
-                        <td>${sv.mssv}</td>
-                        <td>${sv.name}</td>
-                        <td>${sv.timeStr || ""}</td>
-                        <td>${badgeByText(sv.statusText)}</td>
-                    </tr>
-                `;
-            });
-            tbody.innerHTML = html;
-        }
+                        if (rows.length === 0) {
+                            // giờ chỉ còn 5 cột => colspan 5
+                            tbody.innerHTML = `<tr><td colspan="5">Chưa có sinh viên điểm danh.</td></tr>`;
+                            return;
+                        }
 
-        // ===== 5) Countdown giữ nguyên =====
-        var expireAt = "@Model.ExpireAt.ToString("yyyy-MM-ddTHH:mm:ss")";
-        var expireDate = new Date(expireAt);
-        var timerSpan = document.getElementById("timer");
-        function updateTimer() {
-            var now = new Date();
-            var diff = Math.max(0, Math.floor((expireDate - now) / 1000));
-            var mm = String(Math.floor(diff / 60)).padStart(2, '0');
-            var ss = String(diff % 60).padStart(2, '0');
-            timerSpan.textContent = mm + ":" + ss;
-            if (diff <= 0) {
-                timerSpan.classList.remove("bg-danger");
-                timerSpan.classList.add("bg-secondary");
-                document.getElementById("qr-img").style.opacity = 0.3;
-                document.getElementById("ma-code").textContent = "";
-            } else {
-                setTimeout(updateTimer, 500);
-            }
-        }
-        updateTimer();
+                        let stt = 1, html = "";
+                                rows.forEach(sv => {
+                        html += `
+                            <tr data-mssv="${sv.mssv}" data-sinhvien-id="${sv.sinhVienId || ""}">
+                                <td>${stt++}</td>
+                                <td>${sv.mssv}</td>
+                                <td>${sv.name}</td>
+                                <td>${sv.timeStr || ""}</td>
+                                <td>
+                                    <select class="form-select form-select-sm js-att-status-select">
+                                        ${buildStatusOptions(sv.statusId, sv.statusText)}
+                                    </select>
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                        tbody.innerHTML = html;
+
+                        // Nếu đang ở chế độ zoom QR thì auto cập nhật lại danh sách "Có mặt"
+                        const overlay = document.getElementById("qr-fullscreen-overlay");
+                        if (overlay && !overlay.classList.contains("d-none")) {
+                            if (typeof buildNameListForFullscreen === "function") {
+                                buildNameListForFullscreen();
+                            }
+                        }
+
+                                // tô màu từng dòng
+                    document.querySelectorAll("#attendance-table-body tr").forEach(tr => {
+                        colorRowByStatus(tr);
+                    });
+                    }
+
+                            // Lắng nghe đổi trạng thái ở dropdown trong bảng
+                    document.getElementById("attendance-table-body")
+                        .addEventListener("change", function (e) {
+                            if (!e.target.classList.contains("js-att-status-select")) return;
+
+                            const select = e.target;
+                            const tr = select.closest("tr");
+                            const mssv = tr?.dataset.mssv;
+                            const newStatusId = Number(select.value);
+                            const newStatusText = trangThaiDict[newStatusId] || "Không rõ";
+                             colorRowByStatus(tr);
+
+                            // 🔄 Update lên Firebase canonical
+                            if (mssv) {
+                                canonicalRef.child(mssv).update({
+                                    statusId: newStatusId,
+                                    status: newStatusText,
+                                    timecheckedin: new Date().toLocaleTimeString('vi-VN', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit'
+                                    })
+
+                                }).catch(err => console.error("Update status error:", err));
+                            }
+
+                            // Nếu đang mở overlay zoom thì build lại danh sách "Có mặt"
+                            const overlay = document.getElementById("qr-fullscreen-overlay");
+                            if (overlay && !overlay.classList.contains("d-none")) {
+                                if (typeof buildNameListForFullscreen === "function") {
+                                    buildNameListForFullscreen();
+                                }
+                            }
+
+                                    const sinhVienId = parseInt(tr?.dataset.sinhvienId || "0", 10);
+                    const diemDanhId = @Model.Id; // Id buổi điểm danh, chính là DiemDanhId bên API
+
+                    if (sinhVienId > 0) {
+                        fetch("https://localhost:5001/api/buoidiemdanh/capnhat-trangthai", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                diemDanhId: diemDanhId,
+                                sinhVienId: sinhVienId,
+                                trangThaiId: newStatusId
+                            })
+                        }).then(res => {
+                            if (!res.ok) {
+                                console.error("API update status failed", res.status);
+                            }
+                            return res.text();
+                        }).catch(err => {
+                            console.error("Error call API update status:", err);
+                        });
+                    }
+
+                        });
+
+
+                    // ===== 5) Countdown giữ nguyên =====
+                    var expireAt = "@Model.ExpireAt.ToString("yyyy-MM-ddTHH:mm:ss")";
+                    var expireDate = new Date(expireAt);
+                    var timerSpan = document.getElementById("timer");
+
+                    var hasUpdatedStatus = false; // chặn gọi API nhiều lần
+                    var diemDanhId = @Model.Id;
+
+                    function updateTimer() {
+                        var now = new Date();
+                        var diff = Math.max(0, Math.floor((expireDate - now) / 1000));
+                        var mm = String(Math.floor(diff / 60)).padStart(2, '0');
+                        var ss = String(diff % 60).padStart(2, '0');
+                        timerSpan.textContent = mm + ":" + ss;
+                        if (diff <= 0) {
+                            timerSpan.classList.remove("bg-danger");
+                            timerSpan.classList.add("bg-secondary");
+                            document.getElementById("qr-img").style.opacity = 0.3;
+                            document.getElementById("ma-code").textContent = "";
+                        if (!hasUpdatedStatus) {
+                            hasUpdatedStatus = true;
+
+                                fetch(`/api/buoidiemdanh/${diemDanhId}/capnhattrangthaihetthoigian`, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json"
+                                    // Authorization nếu dùng token JWT
+                                }
+                            })
+                            .then(res => res.json())
+                            .then(data => {
+                                console.log("Cập nhật trạng thái thành công:", data);
+                                // Nếu muốn show Toast hay đổi UI gì thì làm ở đây
+                            })
+                            .catch(err => {
+                                console.error("Lỗi khi gọi API cập nhật trạng thái:", err);
+                            });
+                        }
+                        } else {
+                            setTimeout(updateTimer, 500);
+                        }
+                    }
+                    updateTimer();
+
+                     // ===== 6) Fullscreen QR + danh sách chỉ tên =====
+                    const btnOpenQr = document.getElementById("btn-open-qr-fullscreen");
+                    const btnCloseQr = document.getElementById("btn-close-qr-fullscreen");
+                    const overlayQr = document.getElementById("qr-fullscreen-overlay");
+                    const imgQrFull = document.getElementById("qr-fullscreen-img");
+                    const spanCodeFull = document.getElementById("ma-code-full");
+                    const ulNames = document.getElementById("qr-fullscreen-names");
+
+                    // Build danh sách chỉ tên từ bảng hiện tại
+                            function buildNameListForFullscreen() {
+                        ulNames.innerHTML = "";
+
+                        const rows = document.querySelectorAll("#attendance-table-body tr");
+                        rows.forEach(tr => {
+                            const tds = tr.querySelectorAll("td");
+                            // cần đủ 5 cột: #, MSSV, Họ tên, Thời gian, Trạng thái
+                            if (tds.length >= 5) {
+                                const name = tds[2].textContent.trim();   // cột Họ tên
+
+                                // cột Trạng thái giờ là <select>, lấy option đang chọn
+                                const select = tds[4].querySelector("select.js-att-status-select");
+                                if (!select) return;
+
+                                const selectedOption = select.options[select.selectedIndex];
+                                const selectedText = (selectedOption?.text || "").trim();
+
+                                // chỉ lấy những dòng có trạng thái "Có mặt" (hoặc thêm "Đi trễ" nếu muốn)
+                                const presentSet = new Set(["Có mặt"]);
+                                // nếu muốn cả Đi trễ thì: new Set(["Có mặt", "Đi trễ"]);
+
+                                if (name &&
+                                    name !== "Chưa có sinh viên điểm danh." &&
+                                    presentSet.has(selectedText)) {
+
+                                    const li = document.createElement("li");
+                                    li.className = "list-group-item";
+                                    li.textContent = name;
+                                    ulNames.appendChild(li);
+                                }
+                            }
+                        });
+
+                        if (!ulNames.children.length) {
+                            const li = document.createElement("li");
+                            li.className = "list-group-item";
+                            li.textContent = "Chưa có sinh viên có mặt.";
+                            ulNames.appendChild(li);
+                        }
+                    }
+
+
+
+                            if (btnOpenQr) {
+                        btnOpenQr.addEventListener("click", function () {
+                            // sync QR + code
+                            const qrImg = document.getElementById("qr-img");
+                            const codeSpan = document.getElementById("ma-code");
+
+                            imgQrFull.src = qrImg ? qrImg.src : "";
+                            spanCodeFull.textContent = codeSpan ? codeSpan.textContent : "";
+
+                            // build list tên
+                            buildNameListForFullscreen();
+
+                            overlayQr.classList.remove("d-none");
+                            document.body.style.overflow = "hidden"; // khóa scroll nền
+                        });
+                    }
+
+                    if (btnCloseQr) {
+                        btnCloseQr.addEventListener("click", function () {
+                            overlayQr.classList.add("d-none");
+                            document.body.style.overflow = "";
+                        });
+                    }
+
+                    // click nền đen để đóng
+                    if (overlayQr) {
+                        overlayQr.addEventListener("click", function (e) {
+                            if (e.target === overlayQr) {
+                                overlayQr.classList.add("d-none");
+                                document.body.style.overflow = "";
+                            }
+                        });
+                    }
+
+
+                            document.addEventListener("DOMContentLoaded", function () {
+                        const filterInput = document.getElementById("filterInput");
+                        const filterStatus = document.getElementById("filterStatus");
+                        const clearBtn = document.getElementById("btnClearFilters");
+
+                        function normalize(str) {
+                            return (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        }
+
+                        function filterTable() {
+                            const keyword = normalize(filterInput.value.trim());
+                            const selectedStatus = normalize(filterStatus.value.trim());
+
+                            const rows = document.querySelectorAll("#attendance-table-body tr");
+
+                            rows.forEach(row => {
+                                const mssv = normalize(row.cells[1]?.textContent || "");
+                                const name = normalize(row.cells[2]?.textContent || "");
+                                const statusText = normalize(row.querySelector("select.js-att-status-select option:checked")?.text || "");
+
+                                const matchKeyword = keyword === "" || mssv.includes(keyword) || name.includes(keyword);
+                                const matchStatus = selectedStatus === "" || statusText === selectedStatus;
+
+                                row.style.display = (matchKeyword && matchStatus) ? "" : "none";
+                            });
+                        }
+
+                        if (filterInput) filterInput.addEventListener("input", filterTable);
+                        if (filterStatus) filterStatus.addEventListener("change", filterTable);
+                        if (clearBtn) clearBtn.addEventListener("click", function () {
+                            filterInput.value = "";
+                            filterStatus.value = "";
+                            filterTable();
+                        });
+                    });
+
+
+
     </script>
+
+
+
 }
 
