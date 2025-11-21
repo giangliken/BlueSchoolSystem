@@ -4,7 +4,67 @@
     ViewData["Title"] = "ClassManager";
 }
 
-<h1>Quản lý lớp học</h1>
+<form method="get" asp-action="ClassManager" class="row mb-4">
+    <!-- Từ khóa -->
+    <div class="col-md-3">
+        <input type="text" name="keyword" class="form-control"
+               value="@ViewBag.Keyword" placeholder="Tìm theo tên lớp hoặc mã lớp..." />
+    </div>
+
+    <!-- Lọc theo Khoa -->
+   <div class="col-md-3">
+    <select name="maKhoa" class="form-select" onchange="this.form.submit()">
+        <option value="">-- Tất cả các khoa --</option>
+        @foreach (var khoa in ViewBag.KhoaList)
+        {
+            var selected = (ViewBag.MaKhoa == khoa.MaKhoa) ? "selected" : "";
+            @:<option value="@khoa.MaKhoa" @selected>@khoa.TenKhoa</option>
+        }
+    </select>
+    </div>
+
+
+    <!-- Lọc theo Ngành -->
+    <div class="col-md-3">
+    <select name="maNganh" class="form-select">
+        <option value="">-- Tất cả các ngành --</option>
+        @foreach (var nganh in ViewBag.NganhList)
+        {
+            var selected = (ViewBag.MaNganh == nganh.MaNganh) ? "selected" : "";
+            @:<option value="@nganh.MaNganh" @selected>@nganh.TenNganh</option>
+        }
+    </select>
+    </div>
+
+
+    <!-- Lọc theo Khóa học -->
+    <div class="col-md-3">
+        <select name="khoaHoc" class="form-select">
+            <option value="">-- Tất cả các khóa --</option>
+            @foreach (var kh in ViewBag.KhoaHocList as List<string>)
+            {
+                var selected = (ViewBag.KhoaHoc == kh) ? "selected" : "";
+                @:<option value="@kh" @selected>@kh</option>
+            }
+        </select>
+    </div>
+
+    <div class="row">
+    <div class="col-12 d-flex justify-content-end mt-2">
+        <button type="submit" class="btn btn-info me-2">
+            <i class="fa-solid fa-magnifying-glass me-1"></i> Lọc
+        </button>
+        <a asp-action="ClassManager" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate-left me-1"></i> Xóa lọc
+        </a>
+    </div>
+    </div>
+
+   
+
+</form>
+
+
 
 <div class="mb-3"><b>Tổng số:</b> @Model.Count() bản ghi</div>
 <table class="table table-hover table-striped table-bordered">
@@ -21,20 +81,24 @@
     </thead>
     <tbody>
         @{
+            var index = 1;
             foreach (var item in Model)
             {
                 <tr style="cursor:pointer"
                     onclick="window.location='@Url.Action("ClassDetails", "Admin", new { maLop = item.MaLop })'">
-                    <td style="width: 60px;" class="text-center">@item.Id</td>
-                    <td style="width: 60px;" class="text-start">@item.MaLop</td>
-                    <td style="width: 150x;" class="text-start">@item.TenLop</td>
-                    <td style="width: 150x;" class="text-start">@item.Nganh</td>
-                    <td style="width: 150x;" class="text-start">@item.Khoa</td>
-                    <td style="width: 150px;" class="text-center">@item.SiSo</td>
+                    <td class="text-center">@index</td>
+                    <td>@item.MaLop</td>
+                    <td>@item.TenLop</td>
+                    <td>@item.Nganh</td>
+                    <td>@item.Khoa</td>
+                    <td class="text-center">@item.SiSo</td>
                 </tr>
+
+                index++;
             }
         }
     </tbody>
+
 </table>
 <p style="color:black"><i>*Nếu thông tin lớp học có sai sót thì liên hệ quản trị viên hệ thống</i></p>
 @section Scripts {

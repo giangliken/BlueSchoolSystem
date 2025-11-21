@@ -961,7 +961,7 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Trang quản lí lớp học
-        public async Task<IActionResult> ClassManager()
+        public async Task<IActionResult> ClassManager(string? maKhoa, string? maNganh, string? keyword, string? khoaHoc)
         {
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
@@ -972,8 +972,14 @@ namespace BlueSchoolSystem.Controllers
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            HttpResponseMessage response;
-            response = await client.GetAsync("api/laydanhsachlophoc");
+            var url = "api/laydanhsachlophoctheodieukien?";
+            if (!string.IsNullOrEmpty(maKhoa)) url += $"maKhoa={maKhoa}&";
+            if (!string.IsNullOrEmpty(maNganh)) url += $"maNganh={maNganh}&";
+            if (!string.IsNullOrEmpty(keyword)) url += $"keyword={keyword}&";
+            if (!string.IsNullOrEmpty(khoaHoc)) url += $"khoaHoc={khoaHoc}&";
+            url = url.TrimEnd('&', '?');
+
+            var response = await client.GetAsync(string.IsNullOrEmpty(url) ? "api/laydanhsachlophoctheodieukien" : url);
             if (!response.IsSuccessStatusCode)
             {
                 ViewBag.Error = "Không thể lấy danh sách lớp học.";
@@ -990,15 +996,41 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<LopHocViewModel>());
             }
 
-            var lophocs = JsonSerializer.Deserialize<List<LopHocViewModel>>(dataElement.ToString(), new JsonSerializerOptions
+            var classes = JsonSerializer.Deserialize<List<LopHocViewModel>>(dataElement.ToString(), new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
 
+            // Dropdown filters
+            ViewBag.KhoaList = await _context.Khoas.ToListAsync();
+            if (!string.IsNullOrEmpty(maKhoa))
+            {
+                ViewBag.NganhList = await _context.NganhHocs
+                    .Where(n => n.Khoa.MaKhoa == maKhoa)
+                    .ToListAsync();
+            }
+            else
+            {
+                ViewBag.NganhList = await _context.NganhHocs.ToListAsync();
+            }
+            ViewBag.KhoaHocList = (await _context.LopHocs
+                .Select(l => l.MaLop.Substring(0, 2))
+                .Distinct()
+                .ToListAsync())
+                .Select(x => "20" + x) // "22" → "2022"
+                .OrderByDescending(x => x)
+                .ToList();
 
 
-            return View(lophocs ?? new List<LopHocViewModel>());
+            // Gửi lại filters cho View giữ trạng thái
+            ViewBag.MaKhoa = maKhoa;
+            ViewBag.MaNganh = maNganh;
+            ViewBag.Keyword = keyword;
+            ViewBag.KhoaHoc = khoaHoc;
+
+            return View(classes ?? new List<LopHocViewModel>());
         }
+
 
         //Chi tiết lớp học
         public async Task<IActionResult> ClassDetails(string maLop) 

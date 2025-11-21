@@ -56,6 +56,61 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+
+        [HttpGet("laydanhsachlophoctheodieukien")]
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public IActionResult GetClasses(string? maKhoa, string? maNganh, string? keyword, string? khoaHoc)
+        {
+            var query = _context.LopHocs
+                .Include(lh => lh.Nganh)
+                    .ThenInclude(n => n.Khoa)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(maKhoa))
+            {
+                query = query.Where(lh => lh.Nganh.Khoa.MaKhoa.ToLower() == maKhoa.ToLower());
+            }
+
+            if (!string.IsNullOrEmpty(maNganh))
+            {
+                query = query.Where(lh => lh.Nganh.MaNganh.ToLower() == maNganh.ToLower());
+            }
+
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                query = query.Where(lh => lh.MaLop.Contains(keyword) || lh.TenLop.Contains(keyword));
+            }
+
+            if (!string.IsNullOrEmpty(khoaHoc))
+            {
+                var prefix = khoaHoc.Substring(2, 2); // "2022" => "22"
+                query = query.Where(l => l.MaLop.StartsWith(prefix));
+            }
+
+
+            var classes = query
+                .Select(lh => new
+                {
+                    lh.Id,
+                    lh.MaLop,
+                    lh.TenLop,
+                    lh.NganhId,
+                    Nganh = lh.Nganh.TenNganh,
+                    Khoa = lh.Nganh.Khoa.TenKhoa,
+                    SiSo = _context.SinhViens.Count(sv => sv.LopId == lh.Id)
+                })
+                .ToList();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                soluonglop = classes.Count,
+                data = classes
+            });
+        }
+
+
         //Lấy danh sách lớp học theo mã ngành
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("laydanhsachlophoctheonganh")]
