@@ -107,6 +107,23 @@ namespace BlueSchoolSystem.Models
                    .HasForeignKey(l => l.TrangThaiId)
                    .OnDelete(DeleteBehavior.Restrict);
 
+            builder.Entity<LopHocPhan>()
+                .HasOne(l => l.TrangThai)
+                .WithMany()
+                .HasForeignKey(l => l.TrangThaiId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DangKyHocPhan>()
+                .HasOne(dk => dk.SinhVien)
+                .WithMany() 
+                .HasForeignKey(dk => dk.SinhVienId)
+                .OnDelete(DeleteBehavior.Restrict); 
+
+            builder.Entity<DangKyHocPhan>()
+                .HasOne(dk => dk.LopHocPhan)
+                .WithMany() 
+                .HasForeignKey(dk => dk.LopHocPhanId)
+                .OnDelete(DeleteBehavior.Restrict); 
 
             builder.Entity<UserFaceTemplate>(e =>
             {
