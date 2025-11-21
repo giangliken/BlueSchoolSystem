@@ -1,0 +1,41 @@
+﻿@model IEnumerable<BlueSchoolSystem.Models.DotDangKy>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Học Kỳ</th>
+            <th>Tên Đợt</th>
+            <th>Thời Gian</th>
+            <th>Đối Tượng</th>
+            <th>Loại Thao Tác</th>
+            <th>Trạng Thái</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var d in Model)
+        {
+            <tr>
+                <td>@d.HocKy?.TenHocKy</td>
+                <td>@d.TenDot</td>
+                <td>
+                    @d.NgayBatDau.ToString("dd/MM/yyyy HH:mm")<br />
+                    → @d.NgayKetThuc.ToString("dd/MM/yyyy HH:mm")
+                </td>
+                <td>@d.LoaiDoiTuong: <b>@d.GiaTriDoiTuong</b></td>
+                <td>@d.LoaiThaoTac</td>
+                <td>@(d.IsActive ? "Hoạt động" : "Ngưng")</td>
+                <td style="white-space:nowrap">
+                    <a asp-action="EditRegistrationPeriod" asp-route-id="@d.Id" class="btn btn-primary btn-sm">Sửa</a>
+                    <form asp-action="DeleteRegistrationPeriod" method="post" style="display:inline;">
+                        <input type="hidden" name="id" value="@d.Id" />
+                        <button type="submit" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Bạn chắc chắn muốn xóa?')">
+                            Xóa
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

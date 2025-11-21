@@ -12,6 +12,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
+using System.Security.Claims;
 
 namespace BlueSchoolSystem.Controllers
 {
@@ -25,8 +26,9 @@ namespace BlueSchoolSystem.Controllers
         private readonly string? _apiBaseUrl;
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IActivityLogService _activityLogService;
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration)
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
@@ -35,6 +37,7 @@ namespace BlueSchoolSystem.Controllers
             this.configuration = configuration;
 
             _apiBaseUrl = configuration["ApiSettings:BaseUrl"];
+            _activityLogService = activityLogService;
 
         }
 
@@ -1239,6 +1242,7 @@ namespace BlueSchoolSystem.Controllers
 
             return logs ?? new List<ActivityLog>();
         }
+        //quản lý học kì
         // lấy danh sách học kì
         public async Task<IActionResult> SemesterManager()
         {
@@ -1406,6 +1410,405 @@ namespace BlueSchoolSystem.Controllers
                 _logger.LogError(ex, "Lỗi kết nối khi cập nhật trạng thái học kỳ.");
                 return Json(new { success = false, message = $"Lỗi kết nối: {ex.Message}" });
             }
+        }
+        //Quản lý đợt đăng ký
+        public async Task<IActionResult> RegistrationPeriods()
+        {
+            // Lấy danh sách Học kỳ từ API (để dropdown chọn)
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl ?? "https://localhost:5001/");
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                    client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+                var resp = await client.GetAsync("api/hocky");
+                if (!resp.IsSuccessStatusCode)
+                {
+                    TempData["Error"] = "Không thể lấy danh sách học kỳ từ API.";
+                    ViewBag.HocKyList = new SelectList(new List<HocKy>(), "Id", "TenHocKy");
+                    return View();
+                }
+
+                var body = await resp.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("data", out var dataEl))
+                {
+                    var hockys = System.Text.Json.JsonSerializer.Deserialize<List<HocKy>>(dataEl.GetRawText(),
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<HocKy>();
+
+                    // Lọc theo trạng thái
+                    var filteredHockys = hockys
+                        .Where(h => h.TrangThai != null &&
+                                    (h.TrangThai.TenTrangThai == "Hoạt động" || h.TrangThai.TenTrangThai == "Mới tạo"))
+                        .ToList();
+
+                    filteredHockys.Insert(0, new HocKy { Id = 0, TenHocKy = "Tất cả" });
+                    ViewBag.HocKyList = new SelectList(filteredHockys, "Id", "TenHocKy");
+                }
+                else
+                {
+                    ViewBag.HocKyList = new SelectList(new List<HocKy>(), "Id", "TenHocKy");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API lấy Học kỳ");
+                TempData["Error"] = "Không thể kết nối đến hệ thống API.";
+                ViewBag.HocKyList = new SelectList(new List<HocKy>(), "Id", "TenHocKy");
+            }
+
+
+            // Load tất cả đợt đăng ký **kèm HocKy**
+            var periods = await _context.DotDangKys
+                .Include(d => d.HocKy)  // <- Thêm Include này
+                .ToListAsync();
+
+            return View(periods ?? new List<DotDangKy>());
+        }
+
+        // --------------------------
+        // Partial table (AJAX)
+        // --------------------------
+        // GET: /Admin/GetRegistrationPeriodsTable?hocKyId=1
+        public async Task<IActionResult> GetRegistrationPeriodsTable(int hocKyId)
+        {
+            List<DotDangKy> list;
+            if (hocKyId == 0)
+            {
+                list = await _context.DotDangKys
+                    .Include(d => d.HocKy)
+                    .OrderBy(d => d.NgayBatDau)
+                    .ToListAsync();
+            }
+            else
+            {
+                list = await _context.DotDangKys
+                    .Where(d => d.HocKyId == hocKyId)
+                    .Include(d => d.HocKy)
+                    .OrderBy(d => d.NgayBatDau)
+                    .ToListAsync();
+            }
+
+            ViewBag.HocKyId = hocKyId;
+            return PartialView("_RegistrationPeriodsTable", list);
+        }
+
+        // --------------------------
+        // Create
+        // --------------------------
+        // GET: /Admin/CreateRegistrationPeriod?hocKyId=X
+        public async Task<IActionResult> CreateRegistrationPeriod(int? hocKyId)
+        {
+            if (!hocKyId.HasValue || hocKyId.Value == 0)
+            {
+                TempData["Error"] = "Vui lòng chọn Học kỳ trước khi tạo Đợt Đăng ký.";
+                return RedirectToAction(nameof(RegistrationPeriods));
+            }
+
+            var hocky = await _context.HocKys.FindAsync(hocKyId.Value);
+            if (hocky == null)
+            {
+                TempData["Error"] = "Học kỳ không tồn tại.";
+                return RedirectToAction(nameof(RegistrationPeriods));
+            }
+
+            await LoadViewBags(hocKyId.Value);
+
+            var defaultDto = new DotDangKyDTO
+            {
+                HocKyId = hocKyId.Value,
+                NgayBatDau = DateTime.Today.AddDays(1),
+                NgayKetThuc = DateTime.Today.AddDays(7),
+                LoaiThaoTac = "Đăng ký mới"
+            };
+
+            return View(defaultDto);
+        }
+
+        // POST: /Admin/CreateRegistrationPeriod
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateRegistrationPeriod(DotDangKyDTO dto)
+        {
+            await LoadViewBags(dto.HocKyId);
+
+            if (dto == null)
+            {
+                ModelState.AddModelError("", "Dữ liệu không hợp lệ.");
+                return View(dto);
+            }
+
+            if (dto.NgayBatDau >= dto.NgayKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.NgayKetThuc), "Ngày kết thúc phải sau ngày bắt đầu.");
+            }
+
+            if (dto.DoiTuongApDungs == null || !dto.DoiTuongApDungs.Any())
+            {
+                ModelState.AddModelError("", "Phải chọn ít nhất một đối tượng áp dụng.");
+            }
+            if (dto.HocKyId == 0 || !await _context.HocKys.AnyAsync(h => h.Id == dto.HocKyId))
+            {
+                ModelState.AddModelError(nameof(dto.HocKyId), "Học kỳ không hợp lệ.");
+                await LoadViewBags(dto.HocKyId);
+                return View(dto);
+            }
+            if (!ModelState.IsValid) return View(dto);
+
+            var newDots = new List<DotDangKy>();
+            foreach (var obj in dto.DoiTuongApDungs)
+            {
+                var entity = new DotDangKy
+                {
+                    HocKyId = dto.HocKyId,
+                    TenDot = dto.TenDot,
+                    NgayBatDau = dto.NgayBatDau,
+                    NgayKetThuc = dto.NgayKetThuc,
+                    LoaiThaoTac = dto.LoaiThaoTac,
+                    LoaiDoiTuong = obj.Loai,
+                    GiaTriDoiTuong = obj.GiaTri,
+                    IsActive = true
+                };
+                newDots.Add(entity);
+            }
+
+            await _context.DotDangKys.AddRangeAsync(newDots);
+            await _context.SaveChangesAsync();
+
+            // Log
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("userId")?.Value;
+                var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    await _activityLogService.LogAsync(
+                        userId: userId,
+                        userName: userName ?? "Unknown",
+                        device: Request.Headers["User-Agent"].ToString(),
+                        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                        actionType: "CREATE",
+                        tableName: "DotDangKys",
+                        objectId: newDots.FirstOrDefault()?.Id.ToString() ?? "0",
+                        description: $"Tạo đợt đăng ký '{dto.TenDot}' cho HK {dto.HocKyId}. Số đối tượng: {dto.DoiTuongApDungs.Count}"
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Ghi log thất bại sau khi tạo DotDangKy");
+            }
+
+            return RedirectToAction("RegistrationPeriods", new { hocKyId = dto.HocKyId });
+        }
+
+        // --------------------------
+        // Edit (group edit: sửa toàn bộ đợt dựa theo TenDot + LoaiThaoTac + HocKyId)
+        // --------------------------
+        // GET: /Admin/EditRegistrationPeriod/{id}
+        public async Task<IActionResult> EditRegistrationPeriod(int id)
+        {
+            var first = await _context.DotDangKys.FindAsync(id);
+            if (first == null)
+            {
+                TempData["Error"] = "Không tìm thấy đợt đăng ký.";
+                return RedirectToAction(nameof(RegistrationPeriods));
+            }
+
+            var group = await _context.DotDangKys
+                .Where(d => d.HocKyId == first.HocKyId &&
+                            d.TenDot == first.TenDot &&
+                            d.LoaiThaoTac == first.LoaiThaoTac)
+                .ToListAsync();
+
+            var dto = new DotDangKyDTO
+            {
+                HocKyId = first.HocKyId,
+                TenDot = first.TenDot,
+                NgayBatDau = first.NgayBatDau,
+                NgayKetThuc = first.NgayKetThuc,
+                LoaiThaoTac = first.LoaiThaoTac,
+                DoiTuongApDungs = group
+                    .Select(g => new DoiTuongApDungDTO
+                    {
+                        Loai = g.LoaiDoiTuong,
+                        GiaTri = g.GiaTriDoiTuong
+                    }).ToList()
+            };
+
+            // Nếu không có thì thêm 1 đối tượng mặc định
+            if (!dto.DoiTuongApDungs.Any())
+            {
+                dto.DoiTuongApDungs.Add(new DoiTuongApDungDTO
+                {
+                    Loai = "NIEN_KHOA",
+                    GiaTri = ""
+                });
+            }
+
+            await LoadViewBags(first.HocKyId);
+            return View(dto);
+        }
+
+        // POST: /Admin/EditRegistrationPeriod/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditRegistrationPeriod(int id, DotDangKyDTO dto)
+        {
+            if (dto == null)
+            {
+                ModelState.AddModelError("", "Dữ liệu không hợp lệ.");
+                await LoadViewBags(dto?.HocKyId ?? 0);
+                return View(dto);
+            }
+
+            if (dto.NgayBatDau >= dto.NgayKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.NgayKetThuc), "Ngày kết thúc phải sau ngày bắt đầu.");
+            }
+
+            if (dto.DoiTuongApDungs == null || !dto.DoiTuongApDungs.Any())
+            {
+                ModelState.AddModelError("", "Phải có ít nhất một đối tượng áp dụng.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                await LoadViewBags(dto.HocKyId);
+                return View(dto);
+            }
+
+            var existing = await _context.DotDangKys.FindAsync(id);
+            if (existing == null)
+            {
+                ModelState.AddModelError("", "Không tìm thấy đợt để cập nhật.");
+                await LoadViewBags(dto.HocKyId);
+                return View(dto);
+            }
+
+            // Xóa toàn bộ nhóm cũ
+            var groupToRemove = await _context.DotDangKys
+                .Where(d => d.HocKyId == existing.HocKyId &&
+                            d.TenDot == existing.TenDot &&
+                            d.LoaiThaoTac == existing.LoaiThaoTac)
+                .ToListAsync();
+
+            _context.DotDangKys.RemoveRange(groupToRemove);
+
+            // Tạo nhóm mới
+            var newDots = dto.DoiTuongApDungs.Select(obj => new DotDangKy
+            {
+                HocKyId = dto.HocKyId,
+                TenDot = dto.TenDot,
+                NgayBatDau = dto.NgayBatDau,
+                NgayKetThuc = dto.NgayKetThuc,
+                LoaiThaoTac = dto.LoaiThaoTac,
+                LoaiDoiTuong = obj.Loai,
+                GiaTriDoiTuong = obj.GiaTri,
+                IsActive = true
+            }).ToList();
+
+            await _context.DotDangKys.AddRangeAsync(newDots);
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction("RegistrationPeriods", new { hocKyId = dto.HocKyId });
+        }
+
+
+        // --------------------------
+        // Delete (xóa toàn bộ nhóm cùng TenDot + LoaiThaoTac + HocKyId)
+        // --------------------------
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteRegistrationPeriod(int id)
+        {
+            var first = await _context.DotDangKys.FindAsync(id);
+            if (first == null)
+            {
+                TempData["Error"] = "Không tìm thấy đợt đăng ký.";
+                return RedirectToAction(nameof(RegistrationPeriods));
+            }
+
+            var group = await _context.DotDangKys
+                .Where(d => d.HocKyId == first.HocKyId && d.TenDot == first.TenDot && d.LoaiThaoTac == first.LoaiThaoTac)
+                .ToListAsync();
+
+            _context.DotDangKys.RemoveRange(group);
+            await _context.SaveChangesAsync();
+
+            // Log
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("userId")?.Value;
+                var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    await _activityLogService.LogAsync(
+                        userId: userId,
+                        userName: userName ?? "Unknown",
+                        device: Request.Headers["User-Agent"].ToString(),
+                        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                        actionType: "DELETE",
+                        tableName: "DotDangKys",
+                        objectId: $"{first.HocKyId}_{first.TenDot}_{first.LoaiThaoTac}",
+                        description: $"Xóa đợt đăng ký '{first.TenDot}' cho HK {first.HocKyId}. Xóa {group.Count} bản ghi."
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Ghi log thất bại sau khi xóa DotDangKy");
+            }
+
+            return RedirectToAction("RegistrationPeriods", new { hocKyId = first.HocKyId });
+        }
+
+        // --------------------------
+        // Helpers
+        // --------------------------
+        private async Task LoadViewBags(int hocKyId)
+        {
+            // Lấy học kỳ hiện tại
+            ViewBag.HocKy = await _context.HocKys.FindAsync(hocKyId);
+
+            // Bổ sung danh sách tất cả học kỳ cho dropdown
+            var hockys = await _context.HocKys
+                .Include(h => h.TrangThai)
+                .Where(h => h.TrangThai.TenTrangThai == "Hoạt động" || h.TrangThai.TenTrangThai == "Mới tạo")
+                .OrderByDescending(h => h.NgayBatDau)
+                .ToListAsync();
+            ViewBag.HocKyList = new SelectList(hockys, "Id", "TenHocKy", hocKyId);
+
+
+            // Các ViewBag khác
+            ViewBag.NienKhoaList = await _context.SinhViens
+                .Select(s => s.NgayNhapHoc.Year.ToString())
+                .Distinct()
+                .OrderByDescending(x => x)
+                .ToListAsync();
+
+            ViewBag.KhoaList = await _context.Khoas.ToListAsync();
+
+            ViewBag.ThaoTacList = new List<string>
+    {
+        "DANGKY",
+        "HUY",
+        "RUT",
+        "DIEUCHINH",
+        "DANGKY_SOM"
+    };
+
+            ViewBag.LoaiDoiTuongList = new List<string>
+    {
+        "NIEN_KHOA",
+        "KHOA",
+        "NGANH",
+        "LOAIHINH"
+    };
         }
 
     }
