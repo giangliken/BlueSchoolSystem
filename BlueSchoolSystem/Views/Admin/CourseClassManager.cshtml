@@ -93,6 +93,13 @@
                                         data-bs-target="#statusModal">
                                     <i class="fa fa-edit"></i> Sửa TT
                                 </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-delete-lhp mb-1"
+                                        data-lhp-id="@item.id"
+                                        data-lhp-ma="@item.maLopHocPhan"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#deleteModal">
+                                    <i class="fa fa-trash"></i> Xóa
+                                </button>
                             </td>
                         </tr>
                     }
@@ -127,6 +134,25 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
                         <button type="button" class="btn btn-primary" id="btnSaveStatus">Lưu Thay Đổi</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Xóa Lớp Học Phần: <span id="deleteLhpMa"></span></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="deleteLhpId" />
+                        <p>Bạn có chắc chắn muốn xóa lớp học phần này? Hành động này không thể hoàn tác.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="button" class="btn btn-danger" id="btnConfirmDelete">Xóa</button>
                     </div>
                 </div>
             </div>
@@ -202,6 +228,45 @@
                     });
                 }
             });
+        });
+
+                // Xử lý nút Xóa
+        $(document).on('click', '.btn-delete-lhp', function() {
+            var lhpId = $(this).data('lhp-id');
+            var lhpMa = $(this).data('lhp-ma');
+            $('#deleteLhpId').val(lhpId);
+            $('#deleteLhpMa').text(lhpMa);
+        });
+
+        // Xác nhận xóa
+        $('#btnConfirmDelete').click(function() {
+            var lhpId = $('#deleteLhpId').val();
+
+            if (!lhpId) {
+                alert('Lỗi: Không xác định được lớp học phần.');
+                return;
+            }
+
+            if (confirm('Bạn có chắc chắn muốn xóa lớp học phần này?')) {
+                $.ajax({
+                    url: '@Url.Action("DeleteCourseClass", "Admin")', // Phải tạo action DeleteCourseClass
+                    type: 'POST',
+                    data: { lopHocPhanId: lhpId },
+                    success: function(response) {
+                        if (response.success) {
+                            var modal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+                            modal.hide();
+                            alert(response.message);
+                            window.location.reload();
+                        } else {
+                            alert('Lỗi: ' + response.message);
+                        }
+                    },
+                    error: function() {
+                        alert('Lỗi kết nối server.');
+                    }
+                });
+            }
         });
     </script>
 }

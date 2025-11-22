@@ -2130,5 +2130,26 @@ namespace BlueSchoolSystem.Controllers
                 return Json(new { success = false, message = $"Lỗi kết nối: {ex.Message}" });
             }
         }
+        [HttpPost]
+        public IActionResult DeleteCourseClass(int lopHocPhanId)
+        {
+            try
+            {
+                var lhp = _context.LopHocPhans.Find(lopHocPhanId);
+                if (lhp == null)
+                {
+                    return Json(new { success = false, message = "Không tìm thấy lớp học phần." });
+                }
+
+                _context.LopHocPhans.Remove(lhp);
+                _context.SaveChanges();
+
+                return Json(new { success = true, message = "Xóa lớp học phần thành công." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
     }
 }
