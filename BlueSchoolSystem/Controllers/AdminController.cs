@@ -1,5 +1,6 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using Humanizer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -9,10 +10,10 @@ using Newtonsoft.Json;
 using OfficeOpenXml;
 using System.Diagnostics;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
-using System.Security.Claims;
 
 namespace BlueSchoolSystem.Controllers
 {
@@ -1811,5 +1812,323 @@ namespace BlueSchoolSystem.Controllers
     };
         }
 
+        // Quản lý lớp học phần
+
+        // GET: /Admin/CourseClassManager
+        public async Task<IActionResult> CourseClassManager()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            HttpResponseMessage response;
+            try
+            {
+                // Gọi API lấy danh sách LHP
+                response = await client.GetAsync("api/lophocphans");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API lấy danh sách Lớp Học Phần.");
+                TempData["Error"] = "Không thể kết nối đến hệ thống API.";
+                return View(new List<object>()); // Trả về list rỗng nếu lỗi
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Không thể lấy danh sách Lớp Học Phần từ hệ thống API.";
+                return View(new List<object>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            var dataElement = root.GetProperty("data");
+
+            // Dùng dynamic hoặc ViewModel nếu bạn có định nghĩa
+            // Trong ví dụ này, tôi dùng dynamic để đơn giản hóa việc parse object phức tạp
+            var lhpList = JsonConvert.DeserializeObject<List<dynamic>>(dataElement.GetRawText());
+
+            // Lấy danh sách trạng thái để đổ vào modal cập nhật
+            ViewBag.TrangThaiLHPList = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "LopHocPhan")
+                .ToListAsync();
+
+            return View(lhpList);
+        }
+
+        // GET: /Admin/CreateCourseClass
+        public async Task<IActionResult> CreateCourseClass()
+        {
+            // Chuẩn bị SelectList cho form tạo LHP
+            ViewBag.HocKyList = new SelectList(await _context.HocKys.ToListAsync(), "Id", "TenHocKy");
+            ViewBag.MonHocList = new SelectList(await _context.MonHocs.ToListAsync(), "Id", "TenMonHoc");
+            ViewBag.GiangVienList = new SelectList(
+                await _context.GiangViens.Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten }).ToListAsync(),
+                "Id", "HoTen");
+
+            var defaultDto = new LopHocPhanCreateDTO
+            {
+                NgayBatDauLHP = DateTime.Today,
+                NgayKetThucLHP = DateTime.Today.AddMonths(3),
+            };
+
+            return View(defaultDto);
+        }
+
+        // POST: /Admin/CreateCourseClass
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateCourseClass(LopHocPhanCreateDTO dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                // Re-populate ViewBags
+                ViewBag.HocKyList = new SelectList(await _context.HocKys.ToListAsync(), "Id", "TenHocKy", dto.HocKyId);
+                ViewBag.MonHocList = new SelectList(await _context.MonHocs.ToListAsync(), "Id", "TenMonHoc", dto.MonHocId);
+                ViewBag.GiangVienList = new SelectList(
+                    await _context.GiangViens.Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten }).ToListAsync(),
+                    "Id", "HoTen", dto.GiangVienId);
+                return View(dto);
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var json = JsonConvert.SerializeObject(dto);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                // Gọi API tạo LHP
+                var response = await client.PostAsync("api/lophocphan", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResult = await response.Content.ReadAsStringAsync();
+                    dynamic resultObj = JsonConvert.DeserializeObject(apiResult);
+                    int newLhpId = resultObj.lopHocPhanId;
+
+                    TempData["Success"] = $"Tạo Lớp Học Phần **{dto.MaLopHocPhan}** thành công! Vui lòng thêm lịch học.";
+                    // Redirect đến trang thêm lịch học (tạm thời redirect về Manager)
+                    // Tốt hơn nên redirect đến: /Admin/AddSchedule?lhpId={newLhpId}
+                    return RedirectToAction(nameof(CourseClassManager));
+                }
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    dynamic errObj = JsonConvert.DeserializeObject(apiError);
+                    ModelState.AddModelError("", errObj?.message ?? "Lỗi tạo Lớp Học Phần từ API.");
+
+                    // Re-populate ViewBags
+                    ViewBag.HocKyList = new SelectList(await _context.HocKys.ToListAsync(), "Id", "TenHocKy", dto.HocKyId);
+                    ViewBag.MonHocList = new SelectList(await _context.MonHocs.ToListAsync(), "Id", "TenMonHoc", dto.MonHocId);
+                    ViewBag.GiangVienList = new SelectList(
+                        await _context.GiangViens.Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten }).ToListAsync(),
+                        "Id", "HoTen", dto.GiangVienId);
+                    return View(dto);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối khi tạo Lớp Học Phần.");
+                ModelState.AddModelError("", $"Lỗi kết nối: {ex.Message}");
+                // Re-populate ViewBags
+                ViewBag.HocKyList = new SelectList(await _context.HocKys.ToListAsync(), "Id", "TenHocKy", dto.HocKyId);
+                ViewBag.MonHocList = new SelectList(await _context.MonHocs.ToListAsync(), "Id", "TenMonHoc", dto.MonHocId);
+                ViewBag.GiangVienList = new SelectList(
+                    await _context.GiangViens.Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten }).ToListAsync(),
+                    "Id", "HoTen", dto.GiangVienId);
+                return View(dto);
+            }
+        }
+
+        // GET: /Admin/AddSchedule?lhpId=X (Thêm lịch học cho LHP đã tạo)
+        public async Task<IActionResult> AddSchedule(int lhpId)
+        {
+            var lhp = await _context.LopHocPhans
+                .Include(l => l.MonHoc)
+                .Include(l => l.GiangVien)
+                .FirstOrDefaultAsync(l => l.Id == lhpId);
+
+            if (lhp == null)
+            {
+                TempData["Error"] = "Không tìm thấy Lớp Học Phần.";
+                return RedirectToAction(nameof(CourseClassManager));
+            }
+
+            ViewBag.LHP = lhp;
+            ViewBag.PhongHocList = new SelectList(
+                _context.PhongHocs.ToList(),
+                "Id", "MaPhongHoc"
+            );
+
+            var model = new LichHocDTO
+            {
+                LopHocPhanId = lhp.Id,
+                Ngay = DateTime.Today,
+                GioBatDau = TimeSpan.FromHours(8),
+                GioKetThuc = TimeSpan.FromHours(10)
+            };
+
+            return View(model); // ✅ luôn trả về model không null
+        }
+
+
+
+
+        // POST: /Admin/AddSchedule
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddSchedule(LichHocDTO dto)
+        {
+            // Lấy LHP và các thuộc tính liên quan
+            var lhp = await _context.LopHocPhans
+                .Include(l => l.GiangVien)
+                .Include(l => l.MonHoc)
+                .FirstOrDefaultAsync(l => l.Id == dto.LopHocPhanId);
+
+            // Logic chung để nạp lại ViewBag trong trường hợp lỗi (được đặt trước return View)
+            Func<IActionResult> RePopulateViewAndReturn = () =>
+            {
+                ViewBag.LHP = lhp;
+                // Luôn đảm bảo PhongHocList được nạp
+                ViewBag.PhongHocList = new SelectList(
+                    _context.PhongHocs.ToList(),
+                    "Id", "MaPhong",
+                    dto.PhongHocId
+                );
+
+                // Kiểm tra an toàn cho GiangVien
+                if (lhp != null && lhp.GiangVien != null)
+                {
+                    ViewBag.GiangVien = $"{lhp.GiangVien.HoVaTenDem} {lhp.GiangVien.Ten} (Mã: {lhp.GiangVien.MaGiangVien})";
+                }
+                else
+                {
+                    ViewBag.GiangVien = "Không rõ (Lỗi dữ liệu giảng viên)";
+                }
+
+                // Nếu LHP bị mất sau khi POST, ta không thể tiếp tục
+                if (lhp == null)
+                {
+                    TempData["Error"] = "Lỗi nghiêm trọng: Không tìm thấy Lớp Học Phần khi xử lý lịch học.";
+                    return RedirectToAction(nameof(CourseClassManager));
+                }
+
+                return View(dto);
+            };
+
+            if (!ModelState.IsValid)
+            {
+                return RePopulateViewAndReturn();
+            }
+
+            // Kiểm tra lhp có null không trước khi tiếp tục (trường hợp LHP bị xóa giữa chừng)
+            if (lhp == null)
+            {
+                TempData["Error"] = "Lỗi: Không tìm thấy Lớp Học Phần để thêm lịch học.";
+                return RedirectToAction(nameof(CourseClassManager));
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var json = JsonConvert.SerializeObject(dto);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                // Gọi API tạo Lịch Học
+                var response = await client.PostAsync("api/lophocphan/lichhoc", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    TempData["Success"] = $"Thêm lịch học thành công cho LHP ID {dto.LopHocPhanId}!";
+                    return RedirectToAction(nameof(CourseClassManager));
+                }
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    dynamic errObj = JsonConvert.DeserializeObject(apiError);
+                    ModelState.AddModelError("", errObj?.message ?? "Lỗi thêm lịch học từ API.");
+
+                    // Re-populate ViewBags
+                    return RePopulateViewAndReturn();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối khi thêm lịch học.");
+                ModelState.AddModelError("", $"Lỗi kết nối: {ex.Message}");
+
+                // Re-populate ViewBags
+                return RePopulateViewAndReturn();
+            }
+        }
+
+
+        // POST: /Admin/UpdateCourseClassStatus
+        // Thường gọi qua Ajax từ trang CourseClassManager
+        [HttpPost]
+        public async Task<IActionResult> UpdateCourseClassStatus(int lopHocPhanId, int trangThaiId, string lyDo = null)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var dto = new UpdateLopHocPhanStatusDTO { LopHocPhanId = lopHocPhanId, TrangThaiId = trangThaiId, LyDo = lyDo };
+            var json = JsonConvert.SerializeObject(dto);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            try
+            {
+                var response = await client.PutAsync("api/lophocphan/trangthai", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    dynamic successObj = JsonConvert.DeserializeObject(body);
+                    return Json(new { success = true, message = successObj.message });
+                }
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+
+
+                    _logger.LogWarning("API UpdateStatus failed. StatusCode: {StatusCode}. Error: {Error}", response.StatusCode, apiError);
+
+                    dynamic errObj = JsonConvert.DeserializeObject(apiError);
+                    return Json(new { success = false, message = errObj?.message ?? "Cập nhật trạng thái không thành công." });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối khi cập nhật trạng thái LHP.");
+                return Json(new { success = false, message = $"Lỗi kết nối: {ex.Message}" });
+            }
+        }
     }
 }

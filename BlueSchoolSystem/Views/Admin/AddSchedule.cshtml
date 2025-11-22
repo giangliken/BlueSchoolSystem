@@ -1,0 +1,124 @@
+﻿@model BlueSchoolSystem.Models.ViewModel.LichHocDTO
+
+@{
+    var lhp = ViewBag.LHP as BlueSchoolSystem.Models.LopHocPhan;
+
+    if (lhp == null)
+    {
+        ViewData["Title"] = "Lỗi Lớp Học Phần";
+    }
+    else
+    {
+        ViewData["Title"] = $"Thêm Lịch Học - {lhp.MaLopHocPhan}";
+    }
+}
+@if (ViewData.ModelState != null && !ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 offset-lg-1">
+
+            @* Kiểm tra LHP tồn tại *@
+            @if (lhp == null)
+            {
+                <div class="alert alert-danger">
+                    Không tìm thấy thông tin Lớp Học Phần. Vui lòng quay lại danh sách quản lý.
+                    <a asp-action="CourseClassManager" class="btn btn-sm btn-danger">Quay lại</a>
+                </div>
+            }
+            else
+            {
+                <h2>📅 Thêm Lịch Học Cho Lớp: @lhp.MaLopHocPhan</h2>
+                <hr />
+
+                @* Thông tin Lớp Học Phần *@
+                <div class="card bg-light mb-4">
+                    <div class="card-header">Thông tin Lớp Học Phần</div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3">Môn Học:</dt>
+                            <dd class="col-sm-9">
+                                <strong>@(lhp.MonHoc?.TenMonHoc ?? "Không rõ")</strong>
+                            </dd>
+
+                            <dt class="col-sm-3">Giảng Viên:</dt>
+                            <dd class="col-sm-9">@((ViewBag.GiangVien ?? lhp.GiangVien?.HoVaTenDem + " " + lhp.GiangVien?.Ten) ?? "Không rõ")</dd>
+
+                            <dt class="col-sm-3">Thời gian LHP:</dt>
+                            <dd class="col-sm-9">
+                                @{
+                                    var ngayBatDau = lhp.NgayBatDau != default(DateTime) ? lhp.NgayBatDau.ToString("dd/MM/yyyy") : "...";
+                                    var ngayKetThuc = lhp.NgayKetThuc != default(DateTime) ? lhp.NgayKetThuc.ToString("dd/MM/yyyy") : "...";
+                                }
+                                @ngayBatDau - @ngayKetThuc
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                @* Hiển thị thông báo lỗi ModelState *@
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+                @if (TempData["Error"] != null)
+                {
+                    <div class="alert alert-danger">@TempData["Error"]</div>
+                }
+
+                @* Form thêm lịch học *@
+                <form asp-action="AddSchedule" method="post">
+                    <input type="hidden" asp-for="LopHocPhanId" value="@lhp.Id" />
+
+                    <div class="form-group mb-3">
+                        <label asp-for="Ngay" class="control-label">Ngày Học</label>
+                        <input asp-for="Ngay" type="date" class="form-control" value="@Model?.Ngay.ToString("yyyy-MM-dd")" />
+                        <span asp-validation-for="Ngay" class="text-danger"></span>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="GioBatDau" class="control-label">Giờ Bắt Đầu</label>
+                                <input asp-for="GioBatDau" type="time" class="form-control" value="@Model?.GioBatDau.ToString(@"hh\:mm")" />
+                                <span asp-validation-for="GioBatDau" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="GioKetThuc" class="control-label">Giờ Kết Thúc</label>
+                                <input asp-for="GioKetThuc" type="time" class="form-control" value="@Model?.GioKetThuc.ToString(@"hh\:mm")" />
+                                <span asp-validation-for="GioKetThuc" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <label asp-for="PhongHocId" class="control-label">Phòng Học</label>
+                        <select asp-for="PhongHocId" class="form-control" asp-items="ViewBag.PhongHocList">
+                            <option value="">-- Chọn Phòng --</option>
+                        </select>
+                        <span asp-validation-for="PhongHocId" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-success me-2">
+                            <i class="fa fa-plus-circle"></i> Thêm Lịch
+                        </button>
+                        <a asp-action="CourseClassManager" class="btn btn-secondary">
+                            <i class="fa fa-arrow-left"></i> Quay lại Danh sách
+                        </a>
+                    </div>
+                </form>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @Html.Partial("_ValidationScriptsPartial")
+}

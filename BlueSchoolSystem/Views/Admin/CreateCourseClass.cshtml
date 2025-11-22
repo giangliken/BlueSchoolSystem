@@ -1,0 +1,101 @@
+﻿@* File: Views/Admin/CreateCourseClass.cshtml *@
+@model BlueSchoolSystem.Models.ViewModel.LopHocPhanCreateDTO
+@{
+    ViewData["Title"] = "Tạo Lớp Học Phần Mới";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <h2>➕ Tạo Lớp Học Phần Mới</h2>
+            <hr />
+
+            <form asp-action="CreateCourseClass" method="post">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">Thông Tin Cơ Bản</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label asp-for="MaLopHocPhan">Mã Lớp Học Phần (*)</label>
+                                <input asp-for="MaLopHocPhan" class="form-control" placeholder="Ví dụ: CSE101_01" />
+                                <span asp-validation-for="MaLopHocPhan" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label asp-for="TenLopHocPhan">Tên Lớp Học Phần</label>
+                                <input asp-for="TenLopHocPhan" class="form-control" />
+                                <span asp-validation-for="TenLopHocPhan" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label asp-for="HocKyId">Học Kỳ (*)</label>
+                                <select asp-for="HocKyId" asp-items="ViewBag.HocKyList" class="form-control">
+                                    <option value="">-- Chọn Học kỳ --</option>
+                                </select>
+                                <span asp-validation-for="HocKyId" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label asp-for="MonHocId">Môn Học (*)</label>
+                                <select asp-for="MonHocId" asp-items="ViewBag.MonHocList" class="form-control">
+                                    <option value="">-- Chọn Môn học --</option>
+                                </select>
+                                <span asp-validation-for="MonHocId" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8 form-group">
+                                <label asp-for="GiangVienId">Giảng Viên (*)</label>
+                                <select asp-for="GiangVienId" asp-items="ViewBag.GiangVienList" class="form-control">
+                                    <option value="">-- Chọn Giảng viên --</option>
+                                </select>
+                                <span asp-validation-for="GiangVienId" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-4 form-group">
+                                <label asp-for="SiSoToiDa">Sĩ Số Tối Đa (*)</label>
+                                <input asp-for="SiSoToiDa" type="number" min="1" class="form-control" />
+                                <span asp-validation-for="SiSoToiDa" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header bg-secondary text-white">Thời Gian Học Phần</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label asp-for="NgayBatDauLHP">Ngày Bắt Đầu LHP (*)</label>
+                                <input asp-for="NgayBatDauLHP" type="date" class="form-control" />
+                                <span asp-validation-for="NgayBatDauLHP" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label asp-for="NgayKetThucLHP">Ngày Kết Thúc LHP (*)</label>
+                                <input asp-for="NgayKetThucLHP" type="date" class="form-control" />
+                                <span asp-validation-for="NgayKetThucLHP" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group mt-4 text-right">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="fa fa-save"></i> Tạo Lớp Học Phần
+                    </button>
+                    <a asp-action="CourseClassManager" class="btn btn-secondary ml-2">
+                        <i class="fa fa-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
