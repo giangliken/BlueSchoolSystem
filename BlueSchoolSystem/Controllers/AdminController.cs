@@ -1858,7 +1858,15 @@ namespace BlueSchoolSystem.Controllers
             ViewBag.TrangThaiLHPList = await _context.TrangThais
                 .Where(t => t.LoaiTrangThai == "LopHocPhan")
                 .ToListAsync();
+            // Lấy danh sách trạng thái
+            ViewBag.TrangThaiLHPList = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "LopHocPhan")
+                .ToListAsync();
 
+            // 🔹 Nạp danh sách học kỳ cho modal Auto đăng ký
+            var hocKyList = await _context.HocKys.ToListAsync();
+            ViewBag.HocKyList = hocKyList;
+            ViewBag.HocKyId = hocKyList.FirstOrDefault()?.Id ?? 0;
             return View(lhpList);
         }
 
@@ -2151,5 +2159,43 @@ namespace BlueSchoolSystem.Controllers
                 return Json(new { success = false, message = ex.Message });
             }
         }
+        //chức năng tự động đăng kí lhp
+        [HttpPost]
+        public async Task<IActionResult> RunAutoDangKyBatBuocFromAdmin(int hocKyId, int thuTuHocKy)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            try
+            {
+                var response = await client.PostAsync(
+                    $"api/auto-dangky-batbuoc/{hocKyId}?thuTuHocKy={thuTuHocKy}",
+                    null
+                );
+
+                var body = await response.Content.ReadAsStringAsync();
+                dynamic resultObj = JsonConvert.DeserializeObject(body);
+
+                if (response.IsSuccessStatusCode && resultObj.result == true)
+                {
+                    TempData["Success"] = resultObj.message.ToString();
+                }
+                else
+                {
+                    TempData["Error"] = resultObj?.message ?? "Chạy Auto đăng ký thất bại.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Lỗi kết nối API: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(CourseClassManager));
+        }
+
     }
 }

@@ -606,12 +606,12 @@ namespace BlueSchoolSystem.APIControllers
 
         // --- CHỨC NĂNG 4: AUTO ĐĂNG KÝ HỌC PHẦN BẮT BUỘC ---
 
-        // API 9: Kích hoạt Job tự động đăng ký HP bắt buộc
+        // API: Kích hoạt Job tự động đăng ký HP bắt buộc
         [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPost("auto-dangky-batbuoc/{hocKyId}")]
-        public async Task<IActionResult> RunAutoDangKyBatBuoc(int hocKyId)
+        public async Task<IActionResult> RunAutoDangKyBatBuoc(int hocKyId, [FromQuery] int thuTuHocKy)
         {
-            // 1. Lấy thông tin học kỳ từ admin truyền vào
+            // 1. Lấy thông tin học kỳ thực tế
             var hocKy = await _context.HocKys.FindAsync(hocKyId);
             if (hocKy == null)
                 return NotFound(new { result = false, message = "Không tìm thấy Học kỳ." });
@@ -619,22 +619,27 @@ namespace BlueSchoolSystem.APIControllers
             int successCount = 0;
             int errorCount = 0;
 
-            // 2. Lấy danh sách tất cả sinh viên đang học
+            // 2. Lấy danh sách sinh viên đang học
             var sinhViens = await _context.SinhViens
                 .Include(sv => sv.Lop)
                 .Where(sv => sv.TrangThai.TenTrangThai == "Đang học")
                 .ToListAsync();
 
-            // 3. Lấy danh sách các học phần bắt buộc cho học kỳ này
-            var ctDaoTaoBatBuoc = await _context.ChiTietChuongTrinhDaoTaos
-                .Where(ct => ct.BatBuoc && ct.HocKy == hocKyId) // dùng hocKyId do admin chọn
-                .ToListAsync();
-
             foreach (var sv in sinhViens)
             {
-                foreach (var monCt in ctDaoTaoBatBuoc)
+                if (sv.Lop?.NganhId == null)
+                    continue; // bỏ qua sinh viên chưa có ngành
+
+                // 3. Lấy danh sách môn bắt buộc theo thứ tự học kỳ và ngành
+                var ctBatBuoc = await _context.ChiTietChuongTrinhDaoTaos
+                    .Where(ct => ct.BatBuoc &&
+                                 ct.HocKy == thuTuHocKy &&
+                                 ct.ChuongTrinhDaoTao.NganhHocId == sv.Lop.NganhId)
+                    .ToListAsync();
+
+                foreach (var monCt in ctBatBuoc)
                 {
-                    // 4. Tìm lớp học phần còn chỗ cho môn này
+                    // 4. Tìm lớp học phần còn chỗ
                     var lhpTuongUng = await _context.LopHocPhans
                         .Where(l => l.MonHoc.MaMonHoc == monCt.MaMonHoc &&
                                     l.HocKyId == hocKyId &&
@@ -650,14 +655,13 @@ namespace BlueSchoolSystem.APIControllers
 
                         if (!isRegistered)
                         {
-                            var dangKy = new DangKyHocPhan
+                            _context.DangKyHocPhans.Add(new DangKyHocPhan
                             {
                                 SinhVienId = sv.Id,
                                 LopHocPhanId = lhpTuongUng.Id,
                                 NgayDangKy = DateTime.Now,
                                 LoaiDangKy = "BatBuocAuto"
-                            };
-                            _context.DangKyHocPhans.Add(dangKy);
+                            });
                             successCount++;
                         }
                     }
@@ -668,35 +672,38 @@ namespace BlueSchoolSystem.APIControllers
                 }
             }
 
-            // 6. Lưu thay đổi vào database
+            // 6. Lưu thay đổi
             await _context.SaveChangesAsync();
 
             // 7. Ghi log hoạt động
             var userId = User.FindFirst("userId")?.Value;
-            var userName = User.FindFirst("username")?.Value;
+            var userName = User.FindFirst("username")?.Value ?? "Unknown";
 
             if (string.IsNullOrEmpty(userId))
-            {
                 return Unauthorized(new { result = false, message = "Không xác định được người dùng từ token." });
-            }
+
             await _activityLogService.LogAsync(
                 userId: userId,
-                userName: userName ?? "Unknown",
+                userName: userName,
                 device: Request.Headers["User-Agent"].ToString(),
                 ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
                 actionType: "JOB_RUN",
                 tableName: "DangKyHocPhans",
                 objectId: hocKyId.ToString(),
-                description: $"Chạy Job Auto Đăng ký HP Bắt buộc cho Học kỳ {hocKy.TenHocKy}. Thành công: {successCount}, Lỗi: {errorCount}"
+                description: $"Chạy Job Auto Đăng ký HP Bắt buộc cho Học kỳ {hocKy.TenHocKy} " +
+                             $"(ThuTuHocKy={thuTuHocKy}). Thành công: {successCount}, Lỗi: {errorCount}"
             );
 
+            // 8. Trả kết quả
             return Ok(new
             {
                 result = true,
                 code = 200,
-                message = $"Job Auto Đăng ký HP Bắt buộc cho Học kỳ {hocKy.TenHocKy} đã hoàn thành. Thành công: {successCount} đăng ký, Lỗi: {errorCount} môn không tìm thấy lớp."
+                message = $"Job Auto Đăng ký HP Bắt buộc cho Học kỳ {hocKy.TenHocKy} (ThuTuHocKy={thuTuHocKy}) đã hoàn thành. " +
+                          $"Thành công: {successCount} đăng ký, Lỗi: {errorCount} môn không tìm thấy lớp."
             });
         }
+
 
         //// --- CHỨC NĂNG 5: QUẢN LÝ TÀI KHOẢN SINH VIÊN ---
 
