@@ -920,46 +920,81 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Trang quản lí khoa viện
-        public async Task<IActionResult> FacultyManager()
+
+        public async Task<IActionResult> FacultyManager(string maKhoa, string searchString)
         {
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
 
             var token = HttpContext.Session.GetString("access_token");
+            ViewBag.AccessToken = token;
+
             if (!string.IsNullOrEmpty(token))
             {
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            HttpResponseMessage response;
-            response = await client.GetAsync("api/laydanhsachkhoa");
-            if (!response.IsSuccessStatusCode)
+            try {
+            
+                HttpResponseMessage response = await client.GetAsync("api/laydanhsachkhoa");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    ViewBag.Error = "Không thể lấy danh sách khoa viện (API Error).";
+                    return View(new List<Khoa>());
+                }
+
+                var body = await response.Content.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(body);
+                var root = document.RootElement;
+
+                List<Khoa> listKhoaFull = new List<Khoa>();
+
+                // Xử lý lấy dữ liệu từ JSON 
+                if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var dataElement))
+                {
+                    listKhoaFull = JsonSerializer.Deserialize<List<Khoa>>(dataElement.ToString(), new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                else
+                {
+                    try
+                    {
+                        listKhoaFull = JsonSerializer.Deserialize<List<Khoa>>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    }
+                    catch { }
+                }
+
+                if (listKhoaFull == null) listKhoaFull = new List<Khoa>();
+
+                ViewBag.ListKhoa = new SelectList(listKhoaFull, "MaKhoa", "TenKhoa", maKhoa);
+
+                // 2. Bắt đầu lọc dữ liệu (Filter)
+                var query = listKhoaFull.AsQueryable();
+
+                if (!string.IsNullOrEmpty(maKhoa))
+                {
+                    query = query.Where(k => k.MaKhoa == maKhoa);
+                }
+
+                if (!string.IsNullOrEmpty(searchString))
+                {
+                    searchString = searchString.Trim().ToLower();
+                    query = query.Where(k => k.MaKhoa.ToLower().Contains(searchString)
+                                          || k.TenKhoa.ToLower().Contains(searchString));
+                    ViewData["CurrentFilter"] = searchString;
+                }
+                return View(query.ToList());
+            }
+            catch (Exception ex)
             {
-                ViewBag.Error = "Không thể lấy danh sách khoa viện.";
+                ViewBag.Error = "Lỗi kết nối: " + ex.Message;
                 return View(new List<Khoa>());
             }
-
-            var body = await response.Content.ReadAsStringAsync();
-            using var document = JsonDocument.Parse(body);
-            var root = document.RootElement;
-
-            if (!root.TryGetProperty("data", out var dataElement))
-            {
-                ViewBag.Error = "Không tìm thấy dữ liệu khoa viện.";
-                return View(new List<Khoa>());
-            }
-
-            var khoas = JsonSerializer.Deserialize<List<Khoa>>(dataElement.ToString(), new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-           
-
-            return View(khoas ?? new List<Khoa>());
-
         }
-
+        
         //Trang quản lí lớp học
         public async Task<IActionResult> ClassManager()
         {
