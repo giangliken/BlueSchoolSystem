@@ -1,46 +1,97 @@
 ﻿@model BlueSchoolSystem.Models.ViewModel.HocKyDTO
 
 @{
-    ViewData["Title"] = "Tạo Học Kỳ Mới";
+    ViewData["Title"] = "Thêm Học Kỳ ";
 }
 
-<h2>@ViewData["Title"]</h2>
+<div class="container mt-4">
+    <h2 class="text-center">@ViewData["Title"]</h2>
 
-<div class="row">
-    <div class="col-md-6">
-        <form asp-action="CreateSemester" method="post">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <form asp-action="CreateSemester" method="post" id="createSemesterForm">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
-            <div class="mb-3">
-                <label asp-for="TenHocKy" class="form-label">Tên Học Kỳ</label>
-                <input asp-for="TenHocKy" class="form-control" />
-                <span asp-validation-for="TenHocKy" class="text-danger"></span>
-            </div>
+                <div class="mb-3">
+                    <label asp-for="TenHocKy" class="form-label">Tên Học Kỳ</label>
+                    <select asp-for="TenHocKy" class="form-select">
+                        <option value="">-- Chọn Học Kỳ --</option>
+                        <option value="Học kỳ 1A">Học kỳ 1A</option>
+                        <option value="Học kỳ 1B">Học kỳ 1B</option>
+                        <option value="Học kỳ 2A">Học kỳ 2A</option>
+                        <option value="Học kỳ 2B">Học kỳ 2B</option>
+                        <option value="Học kỳ 3">Học kỳ 3</option>
+                    </select>
+                    <span asp-validation-for="TenHocKy" class="text-danger"></span>
+                </div>
 
-            <div class="mb-3">
-                <label asp-for="NgayBatDau" class="form-label">Ngày Bắt Đầu</label>
-                <input asp-for="NgayBatDau" class="form-control" type="date" />
-                <span asp-validation-for="NgayBatDau" class="text-danger"></span>
-            </div>
+                <div class="mb-3">
+                    <label asp-for="NgayBatDau" class="form-label">Ngày Bắt Đầu</label>
+                    <input asp-for="NgayBatDau" class="form-control" type="date" id="NgayBatDau" />
+                    <span asp-validation-for="NgayBatDau" class="text-danger"></span>
+                </div>
 
-            <div class="mb-3">
-                <label asp-for="NgayKetThuc" class="form-label">Ngày Kết Thúc</label>
-                <input asp-for="NgayKetThuc" class="form-control" type="date" />
-                <span asp-validation-for="NgayKetThuc" class="text-danger"></span>
-            </div>
+                <div class="mb-3">
+                    <label asp-for="NgayKetThuc" class="form-label">Ngày Kết Thúc</label>
+                    <input asp-for="NgayKetThuc" class="form-control" type="date" id="NgayKetThuc"
+                           data-val="true" data-val-date-comparison="Ngày Kết Thúc phải sau Ngày Bắt Đầu."
+                           data-val-date-comparison-target="#NgayBatDau" data-val-date-comparison-operator="greater_than" />
+                    <span asp-validation-for="NgayKetThuc" class="text-danger"></span>
+                </div>
 
-            <div class="mb-3">
-                <label asp-for="NgayCongBoTKB" class="form-label">Ngày Công Bố TKB</label>
-                <input asp-for="NgayCongBoTKB" class="form-control" type="date" />
-                <span asp-validation-for="NgayCongBoTKB" class="text-danger"></span>
-            </div>
+                <div class="mb-3">
+                    <label asp-for="NgayCongBoTKB" class="form-label">Ngày Công Bố TKB</label>
+                    <input asp-for="NgayCongBoTKB" class="form-control" type="date" id="NgayCongBoTKB" />
+                    <span asp-validation-for="NgayCongBoTKB" class="text-danger"></span>
+                </div>
 
-            <button type="submit" class="btn btn-primary">Tạo Học Kỳ</button>
-            <a asp-action="SemesterManager" class="btn btn-secondary">Hủy</a>
-        </form>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Thêm Học Kỳ</button>
+                    <a asp-action="SemesterManager" class="btn btn-secondary">Hủy</a>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        const ngayBatDauInput = document.getElementById("NgayBatDau");
+        const ngayCongBoInput = document.getElementById("NgayCongBoTKB");
+
+        function validateNgayCongBo() {
+            const start = new Date(ngayBatDauInput.value);
+            const congBo = new Date(ngayCongBoInput.value);
+
+            if (isNaN(start) || isNaN(congBo)) {
+                ngayCongBoInput.setCustomValidity("");
+                ngayCongBoInput.reportValidity();
+                return;
+            }
+
+            const minAllowed = new Date(start);
+            minAllowed.setDate(minAllowed.getDate() + 14);
+
+            if (congBo < minAllowed) {
+                ngayCongBoInput.setCustomValidity("Ngày Công Bố TKB phải cách Ngày Bắt Đầu ít nhất 14 ngày.");
+            } else {
+                ngayCongBoInput.setCustomValidity("");
+            }
+
+            ngayCongBoInput.reportValidity();
+        }
+
+        ngayBatDauInput.addEventListener("change", validateNgayCongBo);
+        ngayCongBoInput.addEventListener("change", validateNgayCongBo);
+                document.getElementById("createSemesterForm").addEventListener("submit", function (e) {
+            validateNgayCongBo();
+            if (!ngayCongBoInput.checkValidity()) {
+                e.preventDefault();
+            }
+        });
+    </script>
 }

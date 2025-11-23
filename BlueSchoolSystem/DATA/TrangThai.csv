@@ -36,3 +36,6 @@
 35,Đã hoàn thành,Lịch thi đã kết thúc và có thể nhập điểm,LichThi
 36,Hoãn,Buổi thi bị hoãn do lý do khách quan,LichThi
 37,Hủy,Lịch thi bị hủy và không tổ chức lại,LichThi
+38,Mới tạo,Học kỳ vừa được tạo và chưa có thay đổi,HocKy
+39,Đang diễn ra,Học kỳ hiện tại đang diễn ra,HocKy
+40,Đã kết thúc,Học kỳ đã hoàn thành,HocKy

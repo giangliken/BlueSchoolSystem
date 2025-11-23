@@ -1,14 +1,17 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
 using Humanizer;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using OfficeOpenXml;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
@@ -1245,61 +1248,91 @@ namespace BlueSchoolSystem.Controllers
         }
         //quản lý học kì
         // lấy danh sách học kì
-        public async Task<IActionResult> SemesterManager()
+        // GET: /Admin/SemesterManager
+        public async Task<IActionResult> SemesterManager(string searchName, int? year)
         {
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri(_apiBaseUrl);
-
-            // Lấy token
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
-            {
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
 
-            // Lấy danh sách trạng thái để đổ vào dropdown filter
             var trangThaiList = await _context.TrangThais
                 .Where(t => t.LoaiTrangThai == "HocKy")
                 .ToListAsync();
             ViewBag.TrangThaiList = trangThaiList;
 
             HttpResponseMessage response;
-            try
+            try { response = await client.GetAsync("api/hocky"); }
+            catch
             {
-                // Gọi API lấy danh sách học kỳ
-                response = await client.GetAsync("api/hocky");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi khi gọi API lấy danh sách học kỳ.");
-                TempData["Error"] = "Không thể kết nối đến hệ thống API.";
+                TempData["Error"] = "Không thể kết nối đến API.";
                 return View(new List<HocKy>());
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                TempData["Error"] = "Không thể lấy danh sách học kỳ từ hệ thống API.";
+                TempData["Error"] = "Không thể lấy dữ liệu học kỳ từ API.";
                 return View(new List<HocKy>());
             }
 
             var body = await response.Content.ReadAsStringAsync();
-            using var document = JsonDocument.Parse(body);
-            var root = document.RootElement;
+            var hockys = JsonConvert.DeserializeObject<List<HocKy>>(JObject.Parse(body)["data"].ToString());
 
-            if (!root.TryGetProperty("data", out var dataElement))
+            // Lọc tên và năm
+            if (!string.IsNullOrEmpty(searchName))
+                hockys = hockys.Where(h => h.TenHocKy.Contains(searchName, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (year.HasValue)
+                hockys = hockys.Where(h => h.NgayBatDau.Year == year.Value).ToList();
+
+            ViewBag.SearchName = searchName;
+            ViewBag.Year = year;
+
+            return View(hockys);
+        }
+
+        // POST: /Admin/DeleteSemester
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteSemester(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+
+            var response = await client.DeleteAsync($"api/hocky/{id}");
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
             {
-                TempData["Error"] = "Dữ liệu học kỳ không hợp lệ.";
-                return View(new List<HocKy>());
+                TempData["Success"] = "Xóa học kỳ thành công!";
+            }
+            else if (response.StatusCode == HttpStatusCode.Unauthorized ||
+                     response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                TempData["Error"] = "Bạn không có quyền thực hiện thao tác này.";
+            }
+            else
+            {
+                try
+                {
+                    var errorObj = JObject.Parse(content);
+                    TempData["Error"] = (string)errorObj["message"] ?? "Không thể xóa học kỳ.";
+                }
+                catch
+                {
+                    TempData["Error"] = "Không thể xóa học kỳ.";
+                }
             }
 
-            // Sử dụng JsonSerializer để deserialize danh sách Học Kỳ
-            var hockys = System.Text.Json.JsonSerializer.Deserialize<List<HocKy>>(dataElement.GetRawText(), new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            return View(hockys ?? new List<HocKy>());
+            return RedirectToAction(nameof(SemesterManager));
         }
+
         // GET: /Admin/CreateSemester
         public async Task<IActionResult> CreateSemester()
         {
@@ -1412,6 +1445,62 @@ namespace BlueSchoolSystem.Controllers
                 return Json(new { success = false, message = $"Lỗi kết nối: {ex.Message}" });
             }
         }
+        // Cập nhật thông tin Học kỳ
+        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPut("hocky/{id}")]
+        public async Task<IActionResult> UpdateHocKy(int id, [FromBody] HocKyDTO dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { result = false, message = "Dữ liệu không hợp lệ." });
+
+            var hocky = await _context.HocKys.FindAsync(id);
+            if (hocky == null)
+                return NotFound(new { result = false, message = "Không tìm thấy Học kỳ." });
+
+            // Kiểm tra ngày tháng
+            if (dto.NgayBatDau >= dto.NgayKetThuc)
+                return BadRequest(new { result = false, message = "Ngày bắt đầu phải trước ngày kết thúc." });
+
+            string oldTenHocKy = hocky.TenHocKy;
+            DateTime oldNgayBatDau = hocky.NgayBatDau;
+            DateTime oldNgayKetThuc = hocky.NgayKetThuc;
+
+            // Cập nhật thông tin
+            hocky.TenHocKy = dto.TenHocKy;
+            hocky.NgayBatDau = dto.NgayBatDau;
+            hocky.NgayKetThuc = dto.NgayKetThuc;
+
+            try
+            {
+                _context.HocKys.Update(hocky);
+                await _context.SaveChangesAsync();
+
+                // Log hoạt động
+                var userId = User.FindFirst("userId")?.Value;
+                var userName = User.FindFirst("username")?.Value;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    await _activityLogService.LogAsync(
+                        userId: userId,
+                        userName: userName ?? "Unknown",
+                        device: Request.Headers["User-Agent"].ToString(),
+                        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                        actionType: "UPDATE",
+                        tableName: "HocKys",
+                        objectId: hocky.Id.ToString(),
+                        description: $"Cập nhật Học kỳ {oldTenHocKy} ({oldNgayBatDau:dd/MM/yyyy} - {oldNgayKetThuc:dd/MM/yyyy}) thành {hocky.TenHocKy} ({hocky.NgayBatDau:dd/MM/yyyy} - {hocky.NgayKetThuc:dd/MM/yyyy})"
+                    );
+                }
+
+                return Ok(new { result = true, code = 200, message = $"Học kỳ {hocky.TenHocKy} đã được cập nhật thành công." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật Học kỳ.");
+                return StatusCode(500, new { result = false, message = "Lỗi server khi cập nhật Học kỳ." });
+            }
+        }
+
         //Quản lý đợt đăng ký
         public async Task<IActionResult> RegistrationPeriods()
         {

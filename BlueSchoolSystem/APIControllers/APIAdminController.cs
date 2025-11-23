@@ -189,7 +189,109 @@ namespace BlueSchoolSystem.APIControllers
                 message = $"Tạo Học kỳ {newHocKy.TenHocKy} và thông báo TKB thành công."
             });
         }
+        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpDelete("hocky/{id}")]
+        public async Task<IActionResult> DeleteHocKy(int id)
+        {
+            var hocky = await _context.HocKys.FindAsync(id);
+            if (hocky == null)
+            {
+                return NotFound(new { result = false, message = "Không tìm thấy Học kỳ." });
+            }
 
+            bool isUsedInLopHocPhan = await _context.LopHocPhans.AnyAsync(l => l.HocKyId == id);
+            if (isUsedInLopHocPhan)
+            {
+                return BadRequest(new
+                {
+                    result = false,
+                    message = $"Không thể xóa học kỳ \"{hocky.TenHocKy}\" vì đã được sử dụng trong Lớp học phần."
+                });
+            }
+
+            bool hasDotDangKy = await _context.DotDangKys.AnyAsync(d => d.HocKyId == id);
+            if (hasDotDangKy)
+            {
+                return BadRequest(new
+                {
+                    result = false,
+                    message = "Không thể xóa học kỳ vì đang có Đợt đăng ký thuộc học kỳ này."
+                });
+            }
+            _context.HocKys.Remove(hocky);
+            await _context.SaveChangesAsync();
+
+            var userId = User.FindFirst("userId")?.Value;
+            var userName = User.FindFirst("username")?.Value;
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                await _activityLogService.LogAsync(
+                    userId: userId,
+                    userName: userName ?? "Unknown",
+                    device: Request.Headers["User-Agent"].ToString(),
+                    ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                    actionType: "DELETE",
+                    tableName: "HocKys",
+                    objectId: hocky.Id.ToString(),
+                    description: $"Xóa Học kỳ {hocky.TenHocKy}"
+                );
+            }
+
+            return Ok(new { result = true, code = 200, message = $"Xóa Học kỳ {hocky.TenHocKy} thành công." });
+        }
+        // Cập nhật thông tin Học kỳ
+        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPut("hocky/{id}")]
+        public async Task<IActionResult> UpdateHocKy(int id, [FromBody] HocKyDTO dto)
+        {
+            var hocky = await _context.HocKys.FindAsync(id);
+            if (hocky == null)
+            {
+                return NotFound(new { result = false, message = "Không tìm thấy Học kỳ." });
+            }
+
+            // Kiểm tra ngày tháng
+            if (dto.NgayBatDau >= dto.NgayKetThuc)
+            {
+                return BadRequest(new { result = false, message = "Ngày bắt đầu phải trước ngày kết thúc." });
+            }
+
+            string oldTenHocKy = hocky.TenHocKy;
+            DateTime oldNgayBatDau = hocky.NgayBatDau;
+            DateTime oldNgayKetThuc = hocky.NgayKetThuc;
+
+            hocky.TenHocKy = dto.TenHocKy;
+            hocky.NgayBatDau = dto.NgayBatDau;
+            hocky.NgayKetThuc = dto.NgayKetThuc;
+
+            _context.HocKys.Update(hocky);
+            await _context.SaveChangesAsync();
+
+            var userId = User.FindFirst("userId")?.Value;
+            var userName = User.FindFirst("username")?.Value;
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                await _activityLogService.LogAsync(
+                    userId: userId,
+                    userName: userName ?? "Unknown",
+                    device: Request.Headers["User-Agent"].ToString(),
+                    ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                    actionType: "UPDATE",
+                    tableName: "HocKys",
+                    objectId: hocky.Id.ToString(),
+                    description: $"Cập nhật Học kỳ {oldTenHocKy} ({oldNgayBatDau:dd/MM/yyyy} - {oldNgayKetThuc:dd/MM/yyyy}) thành {hocky.TenHocKy} ({hocky.NgayBatDau:dd/MM/yyyy} - {hocky.NgayKetThuc:dd/MM/yyyy})"
+                );
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = $"Học kỳ {hocky.TenHocKy} đã được cập nhật thành công."
+            });
+        }
         // Cập nhật Trạng thái Học kỳ
         [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPut("hocky/trangthai")]

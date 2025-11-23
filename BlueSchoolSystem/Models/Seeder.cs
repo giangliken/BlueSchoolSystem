@@ -154,6 +154,8 @@ namespace BlueSchoolSystem.Models
                 using (var reader = new StreamReader(path))
                 using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                 {
+                    csv.Context.RegisterClassMap<HocKyMap>();
+
                     var records = csv.GetRecords<HocKy>().ToList();
 
                     context.Database.OpenConnection();
@@ -171,8 +173,10 @@ namespace BlueSchoolSystem.Models
                 }
             }
 
+
+
             //Load dữ liệu cho Cơ Sở Phòng Học
-            if( !await context.CoSos.AnyAsync())
+            if ( !await context.CoSos.AnyAsync())
             {
                 var path = Path.Combine(Directory.GetCurrentDirectory(), "DATA", "CoSo.csv");
                 using (var reader = new StreamReader(path))
