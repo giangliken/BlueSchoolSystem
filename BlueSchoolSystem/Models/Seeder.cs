@@ -158,20 +158,20 @@ namespace BlueSchoolSystem.Models
 
                     var records = csv.GetRecords<HocKy>().ToList();
 
-            //        context.Database.OpenConnection();
-            //        try
-            //        {
-            //            context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT HocKys ON");
-            //            context.HocKys.AddRange(records);
-            //            await context.SaveChangesAsync();
-            //            context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT HocKys OFF");
-            //        }
-            //        finally
-            //        {
-            //            context.Database.CloseConnection();
-            //        }
-            //    }
-            //}
+                    context.Database.OpenConnection();
+                    try
+                    {
+                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT HocKys ON");
+                        context.HocKys.AddRange(records);
+                        await context.SaveChangesAsync();
+                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT HocKys OFF");
+                    }
+                    finally
+                    {
+                        context.Database.CloseConnection();
+                    }
+                }
+            }
 
 
 
