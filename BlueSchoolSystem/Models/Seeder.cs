@@ -148,28 +148,28 @@ namespace BlueSchoolSystem.Models
             }
 
             //Load dữ liệu mặc định cho học kỳ
-            if (!await context.HocKys.AnyAsync())
-            {
-                var path = Path.Combine(Directory.GetCurrentDirectory(), "DATA", "HocKy.csv");
-                using (var reader = new StreamReader(path))
-                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
-                {
-                    var records = csv.GetRecords<HocKy>().ToList();
+            //if (!await context.HocKys.AnyAsync())
+            //{
+            //    var path = Path.Combine(Directory.GetCurrentDirectory(), "DATA", "HocKy.csv");
+            //    using (var reader = new StreamReader(path))
+            //    using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+            //    {
+            //        var records = csv.GetRecords<HocKy>().ToList();
 
-                    context.Database.OpenConnection();
-                    try
-                    {
-                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT HocKys ON");
-                        context.HocKys.AddRange(records);
-                        await context.SaveChangesAsync();
-                        context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT HocKys OFF");
-                    }
-                    finally
-                    {
-                        context.Database.CloseConnection();
-                    }
-                }
-            }
+            //        context.Database.OpenConnection();
+            //        try
+            //        {
+            //            context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT HocKys ON");
+            //            context.HocKys.AddRange(records);
+            //            await context.SaveChangesAsync();
+            //            context.Database.ExecuteSqlRaw("SET IDENTITY_INSERT HocKys OFF");
+            //        }
+            //        finally
+            //        {
+            //            context.Database.CloseConnection();
+            //        }
+            //    }
+            //}
 
             //Load dữ liệu cho Cơ Sở Phòng Học
             if( !await context.CoSos.AnyAsync())
