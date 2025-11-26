@@ -13,6 +13,15 @@
     </div>
 }
 
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+
 <form asp-action="StudentManager" method="get" class="row mb-3">
     <div class="col-md-3">
         <input type="text" name="keyword" value="@ViewBag.Keyword" class="form-control" placeholder="Tìm kiếm theo họ tên/ mã số sinh viên ..." />

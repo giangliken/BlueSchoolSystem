@@ -4,6 +4,23 @@
     ViewData["Title"] = "ClassManager";
 }
 
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+
 <form method="get" asp-action="ClassManager" class="row mb-4">
     <!-- Từ khóa -->
     <div class="col-md-3">
@@ -64,6 +81,10 @@
 
 </form>
 
+<a href="@Url.Action("AddClass", "Admin")" class="btn btn-primary mb-3">
+    <i class="fa-solid fa-plus"></i> Thêm lớp học
+</a>
+
 
 
 <div class="mb-3"><b>Tổng số:</b> @Model.Count() bản ghi</div>
@@ -102,5 +123,14 @@
 </table>
 <p style="color:black"><i>*Nếu thông tin lớp học có sai sót thì liên hệ quản trị viên hệ thống</i></p>
 @section Scripts {
-    
+    <script>
+    setTimeout(function () {
+        var alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function (alert) {
+            var bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        });
+    }, 5000); // 5000 ms = 5 giây
+</script>
+
 }
