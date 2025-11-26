@@ -4,10 +4,28 @@
     ViewData["Title"] = "Class Details";
 }
 
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
 
+
+<div class="container py-4">
+    
+    <div class="row justify-content-center">
+        
+        <div class="col-md-8">
+            @if (TempData["Success"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fa-solid fa-circle-check me-2"></i> @TempData["Success"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0"><i class="bi bi-person-badge me-2"></i>Thông tin lớp học</h4>
@@ -89,6 +107,14 @@
                     <a asp-action="EditClass" asp-route-maLop="@Model.MaLop" class="btn btn-warning me-2">
                         <i class="fa-solid fa-pen-to-square me-2"></i>Thêm / cập nhật ban cán sự
                     </a>
+                    <form asp-action="DeleteClass" asp-route-maLop="@Model.MaLop" method="post"
+                          onsubmit="return confirm('Bạn có chắc muốn xóa lớp học này không?\nChỉ xóa được nếu lớp chưa có sinh viên!');"
+                          class="d-inline">
+
+                        <button type="submit" class="btn btn-danger me-2">
+                            <i class="fa-solid fa-trash-can me-2"></i>Xóa lớp học
+                        </button>
+                    </form>
                     <a asp-action="ClassManager" class="btn btn-secondary">
                         <i class="fa-solid fa-arrow-left me-2"></i>Quay lại
                     </a>
@@ -98,3 +124,15 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        setTimeout(function () {
+            var alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function (alert) {
+                var bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000); // 5000 ms = 5 giây
+    </script>
+}
