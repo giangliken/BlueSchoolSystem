@@ -1254,6 +1254,9 @@ namespace BlueSchoolSystem.Controllers
 
             return View(lopHoc);
         }
+
+
+        // 2. POST: Xử lý form sửa lớp học
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditClass(LopHoc model, int? LopTruongId, int? LopPhoId, int? BiThuId, int? GiangVienId)
@@ -1338,7 +1341,96 @@ namespace BlueSchoolSystem.Controllers
                 return View(model);
             }
         }
-       
+
+
+        // GET: Trang tạo lớp tự động
+        [HttpGet]
+        public async Task<IActionResult> AutoCreateClass()
+        {
+            ViewBag.NganhList = await _context.NganhHocs
+                .Include(n => n.Khoa)
+                .ToListAsync();
+
+            return View();
+        }
+
+
+
+        // POST: Tạo lớp tự động
+        [HttpPost]
+        public async Task<IActionResult> AutoCreateClass(AutoClassRequest req)
+        {
+            if (!ModelState.IsValid)
+            {
+                ViewBag.NganhList = await _context.NganhHocs.Include(n => n.Khoa).ToListAsync();
+                return View(req);
+            }
+
+            // Kiểm tra số lượng hợp lệ
+            if (req.SoLuong < 1)
+            {
+                ModelState.AddModelError("", "Số lượng lớp phải >= 1");
+                ViewBag.NganhList = await _context.NganhHocs.Include(n => n.Khoa).ToListAsync();
+                return View(req);
+            }
+
+            // Lấy ngành
+            var nganh = await _context.NganhHocs
+                .Include(n => n.Khoa)
+                .FirstOrDefaultAsync(n => n.Id == req.NganhId);
+
+            if (nganh == null)
+            {
+                TempData["Error"] = "Ngành không tồn tại!";
+                return RedirectToAction("AutoCreateClass");
+            }
+
+            string maKhoa = nganh.Khoa.MaKhoa; // DTH, DHQ, QTK...
+            string khoaShort = req.Khoa.ToString().Substring(2, 2); // 2022 → 22
+
+            // Lấy danh sách mã lớp đã có để tránh trùng
+            var existing = await _context.LopHocs
+                .Where(l => l.MaLop.StartsWith(khoaShort + maKhoa))
+                .Select(l => l.MaLop)
+                .ToListAsync();
+
+            // Bộ chữ cái
+            var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
+
+            var created = new List<string>();
+            int index = 1;
+
+            while (created.Count < req.SoLuong)
+            {
+                // A1 A2 B1 B2...
+                int letterIndex = (index - 1) / 2;
+                int number = ((index - 1) % 2) + 1;
+                char letter = letters[letterIndex];
+
+                string maLop = $"{khoaShort}{maKhoa}{letter}{number}";
+
+                if (!existing.Contains(maLop))
+                {
+                    created.Add(maLop);
+
+                    _context.LopHocs.Add(new LopHoc
+                    {
+                        MaLop = maLop,
+                        TenLop = maLop,
+                        NganhId = req.NganhId
+                    });
+                }
+
+                index++;
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"Đã tạo {created.Count} lớp mới!";
+            return RedirectToAction("ClassManager");
+        }
+
+
         public async Task<IActionResult> ActivityLogs()
         {
             var logs = await GetLogsFromApi();
