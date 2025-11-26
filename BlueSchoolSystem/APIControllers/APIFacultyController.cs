@@ -89,8 +89,6 @@ namespace BlueSchoolSystem.APIControllers
                     message = "Vui lòng nhập đầy đủ Mã khoa và Tên khoa"
                 });
             }
-
-            // Kiểm tra trùng Mã Khoa
             var checkExist = _context.Khoas.Any(k => k.MaKhoa == model.MaKhoa);
             if (checkExist)
             {
@@ -102,7 +100,6 @@ namespace BlueSchoolSystem.APIControllers
                 });
             }
 
-            // Tạo mới
             var newKhoa = new Khoa
             {
                 MaKhoa = model.MaKhoa.ToUpper(), 
@@ -204,10 +201,9 @@ namespace BlueSchoolSystem.APIControllers
                 message = "Xóa khoa thành công"
             });
         }
+
+        // Lấy chi tiết Khoa viện
         // =======================
-        // LẤY CHI TIẾT KHOA
-        // =======================
-        // URL: GET /api/laychitietkhoa?id=1
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("laychitietkhoa")]
         public IActionResult GetFacultyDetail(int id)
@@ -225,16 +221,12 @@ namespace BlueSchoolSystem.APIControllers
                     k.Id,
                     k.MaKhoa,
                     k.TenKhoa,
-
-                    // Thống kê giống cách lớp học thống kê Sĩ số
                     SoLuongNganh = _context.NganhHocs.Count(n => n.KhoaId == k.Id),
                     SoLuongGiangVien = _context.GiangViens.Count(gv => gv.KhoaId == k.Id),
 
-                    // Chi tiết khoa: giống ChiTiet lớp học
                     ChiTiet = k.ChiTietKhoaViens.Select(ct => new
                     {
                         ct.Id,
-
                         ct.TruongKhoaId,
                         TruongKhoa = ct.TruongKhoa != null
                             ? ct.TruongKhoa.HoVaTenDem + " " + ct.TruongKhoa.Ten
@@ -252,8 +244,6 @@ namespace BlueSchoolSystem.APIControllers
                     }).ToList()
                 })
                 .FirstOrDefault();
-
-            // Không tìm thấy
             if (facultyDetail == null)
             {
                 return NotFound(new
