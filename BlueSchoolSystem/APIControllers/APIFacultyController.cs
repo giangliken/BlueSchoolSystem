@@ -203,7 +203,7 @@ namespace BlueSchoolSystem.APIControllers
         }
 
         // Lấy chi tiết Khoa viện
-        // =======================
+        //-----------------------
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("laychitietkhoa")]
         public IActionResult GetFacultyDetail(int id)

@@ -1,25 +1,33 @@
 ﻿@model BlueSchoolSystem.Models.Khoa
 
 @{
-    ViewData["Title"] = "Cập nhật ban chủ nhiệm khoa";
+    ViewData["Title"] = "Chỉnh Sửa Ban Chủ Nhiệm Khoa";
     var giangVienList = ViewBag.GiangVienList as SelectList;
+    var truongKhoaList = ViewBag.TruongKhoaList as SelectList;
+    var phoKhoaList = ViewBag.PhoKhoaList as SelectList;
+    var troLyList = ViewBag.TroLyList as SelectList;
+    var currentTruongId = ViewBag.CurrentTruongId ?? 0;
+    var currentPhoId = ViewBag.CurrentPhoId ?? 0;
+    var currentTroLyId = ViewBag.CurrentTroLyId ?? 0;
 }
 
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <h1 class="h3 mb-4 text-gray-800">Cập nhật ban chủ nhiệm khoa</h1>
+            <h1 class="h3 mb-4 text-gray-800">Cập nhật Ban Chủ Nhiệm Khoa</h1>
         </div>
     </div>
+
     <div class="row">
         <div class="col-lg-10">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Thông tin khoa & ban chủ nhiệm</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Thông tin khoa</h6>
                 </div>
                 <div class="card-body">
-                    <form asp-action="EditFaculty" method="post">
+                    <form asp-action="EditFaculty">
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
                         <input type="hidden" asp-for="Id" />
 
                         @if (TempData["Error"] != null)
@@ -29,12 +37,16 @@
 
                         <div class="row">
                             <div class="col-md-6">
-                                <label asp-for="MaKhoa" class="control-label">Mã Khoa</label>
-                                <input asp-for="MaKhoa" class="form-control" />
+                                <div class="form-group">
+                                    <label asp-for="MaKhoa" class="control-label">Mã Khoa</label>
+                                    <input asp-for="MaKhoa" class="form-control" readonly />
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <label asp-for="TenKhoa" class="control-label">Tên Khoa</label>
-                                <input asp-for="TenKhoa" class="form-control" />
+                                <div class="form-group">
+                                    <label asp-for="TenKhoa" class="control-label">Tên Khoa</label>
+                                    <input asp-for="TenKhoa" class="form-control" />
+                                </div>
                             </div>
                         </div>
 
@@ -42,40 +54,34 @@
                         <h6 class="font-weight-bold text-info mt-4 mb-3">Ban Chủ Nhiệm</h6>
 
                         <div class="form-group">
-                            <label for="TruongKhoaId">Trưởng khoa</label>
-                            <select id="TruongKhoaId" name="TruongKhoaId" class="form-control select-searchable" asp-items="giangVienList">
+                            <label for="TruongKhoaId" class="control-label">Trưởng khoa</label>
+                            <select name="TruongKhoaId" id="TruongKhoaId" class="form-control select-searchable" asp-items="truongKhoaList">
                                 <option value="0">- Chưa chọn -</option>
                             </select>
                         </div>
 
                         <div class="form-group">
-                            <label for="PhoKhoaId">Phó khoa</label>
-                            <select id="PhoKhoaId" name="PhoKhoaId" class="form-control select-searchable" asp-items="giangVienList">
+                            <label for="PhoKhoaId"class="control-label">Phó khoa</label>
+                            <select name="PhoKhoaId" id="PhoKhoaId" class="form-control select-searchable" asp-items="phoKhoaList">
                                 <option value="0">- Chưa chọn -</option>
                             </select>
                         </div>
 
                         <div class="form-group">
-                            <label for="TroLiKhoaId">Trợ lý khoa</label>
-                            <select id="TroLiKhoaId" name="TroLiKhoaId" class="form-control select-searchable" asp-items="giangVienList">
+                            <label for="TroLiKhoaId">Trợ lý khoa</label> <select name="TroLiKhoaId" id="TroLiKhoaId" class="form-control select-searchable" asp-items="troLyList">
                                 <option value="0">- Chưa chọn -</option>
                             </select>
                         </div>
 
                         <div class="form-group mt-4">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Lưu Thay Đổi
-                            </button>
-                            <a asp-action="FacultyDetails" asp-route-id="@Model.Id" class="btn btn-secondary ml-2">
-                                <i class="fas fa-arrow-left"></i> Hủy
-                            </a>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Lưu Thay Đổi</button>
+                            <a asp-action="FacultyDetails" asp-route-id="@Model.Id" class="btn btn-secondary ml-2"><i class="fas fa-arrow-left"></i> Hủy</a>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
-    ```
 
 </div>
 
@@ -83,10 +89,11 @@
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
-    <link href="https://raw.githack.com/ttskch/select2-bootstrap4-theme/master/dist/select2-bootstrap4.css" rel="stylesheet">
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+    <link href="https://raw.githack.com/ttskch/select2-bootstrap4-theme/master/dist/select2-bootstrap4.css" rel="stylesheet" />
 
     <style>
         .select2-container--bootstrap4 .select2-selection {
@@ -95,8 +102,8 @@
 
         .select2-container--bootstrap4 .select2-selection__rendered {
             padding-left: .5rem;
-            padding-top: 0.2rem;
-            padding-bottom: 0.75rem;
+            padding-top: .2rem;
+            padding-bottom: .75rem;
             line-height: calc(1em + .2rem);
         }
 
