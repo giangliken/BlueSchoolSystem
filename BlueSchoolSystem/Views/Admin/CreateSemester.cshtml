@@ -14,7 +14,7 @@
 
                 <div class="mb-3">
                     <label asp-for="TenHocKy" class="form-label">Tên Học Kỳ</label>
-                    <select asp-for="TenHocKy" class="form-select">
+                    <select asp-for="TenHocKy" class="form-select" id="TenHocKy">
                         <option value="">-- Chọn Học Kỳ --</option>
                         <option value="Học kỳ 1A">Học kỳ 1A</option>
                         <option value="Học kỳ 1B">Học kỳ 1B</option>
@@ -36,12 +36,14 @@
                     <input asp-for="NgayKetThuc" class="form-control" type="date" id="NgayKetThuc"
                            data-val="true" data-val-date-comparison="Ngày Kết Thúc phải sau Ngày Bắt Đầu."
                            data-val-date-comparison-target="#NgayBatDau" data-val-date-comparison-operator="greater_than" />
+                    <small id="errNgayKetThuc" class="text-danger"></small>
                     <span asp-validation-for="NgayKetThuc" class="text-danger"></span>
                 </div>
 
                 <div class="mb-3">
                     <label asp-for="NgayCongBoTKB" class="form-label">Ngày Công Bố TKB</label>
                     <input asp-for="NgayCongBoTKB" class="form-control" type="date" id="NgayCongBoTKB" />
+                    <small id="errNgayCongBo" class="text-danger"></small>
                     <span asp-validation-for="NgayCongBoTKB" class="text-danger"></span>
                 </div>
 
@@ -58,40 +60,104 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-
     <script>
-        const ngayBatDauInput = document.getElementById("NgayBatDau");
-        const ngayCongBoInput = document.getElementById("NgayCongBoTKB");
+        document.addEventListener("DOMContentLoaded", function () {
 
-        function validateNgayCongBo() {
-            const start = new Date(ngayBatDauInput.value);
-            const congBo = new Date(ngayCongBoInput.value);
+            const hocKySelect = document.getElementById("TenHocKy");
+            const ngayBatDau = document.getElementById("NgayBatDau");
+            const ngayKetThuc = document.getElementById("NgayKetThuc");
+            const ngayCongBo = document.getElementById("NgayCongBoTKB");
 
-            if (isNaN(start) || isNaN(congBo)) {
-                ngayCongBoInput.setCustomValidity("");
-                ngayCongBoInput.reportValidity();
-                return;
+            const errNgayKetThuc = document.getElementById("errNgayKetThuc");
+            const errNgayCongBo = document.getElementById("errNgayCongBo");
+
+            const currentYear = new Date().getFullYear();
+
+            const hocKyDates = {
+                "Học kỳ 1A": { start: `${currentYear}-01-01`, end: `${currentYear}-03-15` },
+                "Học kỳ 1B": { start: `${currentYear}-03-16`, end: `${currentYear}-04-30` },
+                "Học kỳ 2A": { start: `${currentYear}-05-01`, end: `${currentYear}-07-31` },
+                "Học kỳ 2B": { start: `${currentYear}-08-01`, end: `${currentYear}-09-15` },
+                "Học kỳ 3":  { start: `${currentYear}-09-16`, end: `${currentYear}-11-30` }
+            };
+
+            // Khi chọn học kỳ thì auto set ngày
+            hocKySelect.addEventListener("change", function () {
+                const selected = hocKySelect.value;
+
+                if (hocKyDates[selected]) {
+
+                    ngayBatDau.value = hocKyDates[selected].start;
+                    ngayKetThuc.value = hocKyDates[selected].end;
+
+                    const startDate = new Date(hocKyDates[selected].start);
+                    startDate.setDate(startDate.getDate() + 14);
+                    ngayCongBo.value = startDate.toISOString().slice(0, 10);
+
+                    validateNgayKetThuc();
+                    validateNgayCongBo();
+                }
+            });
+
+            // ---- Validate ngày kết thúc > 30 ngày ----
+            function validateNgayKetThuc() {
+                errNgayKetThuc.textContent = "";
+
+                const start = new Date(ngayBatDau.value);
+                const end = new Date(ngayKetThuc.value);
+
+                if (isNaN(start) || isNaN(end)) return;
+
+                const minEnd = new Date(start);
+                minEnd.setDate(minEnd.getDate() + 30);
+
+                if (end < minEnd) {
+                    errNgayKetThuc.textContent =
+                        "Ngày Kết Thúc phải cách Ngày Bắt Đầu ít nhất 30 ngày.";
+                    return false;
+                }
+                return true;
             }
 
-            const minAllowed = new Date(start);
-            minAllowed.setDate(minAllowed.getDate() + 14);
+            ngayBatDau.addEventListener("change", validateNgayKetThuc);
+            ngayKetThuc.addEventListener("change", validateNgayKetThuc);
 
-            if (congBo < minAllowed) {
-                ngayCongBoInput.setCustomValidity("Ngày Công Bố TKB phải cách Ngày Bắt Đầu ít nhất 14 ngày.");
-            } else {
-                ngayCongBoInput.setCustomValidity("");
+
+            // ---- Validate ngày công bố >= +14 ngày ----
+            function validateNgayCongBo() {
+                errNgayCongBo.textContent = "";
+
+                const start = new Date(ngayBatDau.value);
+                const congBo = new Date(ngayCongBo.value);
+
+                if (isNaN(start) || isNaN(congBo)) return;
+
+                const minAllowed = new Date(start);
+                minAllowed.setDate(minAllowed.getDate() + 14);
+
+                if (congBo < minAllowed) {
+                    errNgayCongBo.textContent =
+                        "Ngày Công Bố phải cách Ngày Bắt Đầu ít nhất 14 ngày.";
+                    return false;
+                }
+                return true;
             }
 
-            ngayCongBoInput.reportValidity();
-        }
+            ngayBatDau.addEventListener("change", validateNgayCongBo);
+            ngayCongBo.addEventListener("change", validateNgayCongBo);
 
-        ngayBatDauInput.addEventListener("change", validateNgayCongBo);
-        ngayCongBoInput.addEventListener("change", validateNgayCongBo);
-                document.getElementById("createSemesterForm").addEventListener("submit", function (e) {
-            validateNgayCongBo();
-            if (!ngayCongBoInput.checkValidity()) {
-                e.preventDefault();
-            }
+            // ---- Validate khi submit ----
+            document.getElementById("createSemesterForm").addEventListener("submit", function (e) {
+                let ok1 = validateNgayKetThuc();
+                let ok2 = validateNgayCongBo();
+
+                if (!ok1 || !ok2) {
+                    e.preventDefault();
+                }
+            });
+
         });
     </script>
+
+
 }

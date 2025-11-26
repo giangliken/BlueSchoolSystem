@@ -1,5 +1,4 @@
-﻿
-@model IEnumerable<BlueSchoolSystem.Models.HocKy>
+﻿@model IEnumerable<BlueSchoolSystem.Models.HocKy>
 @using Newtonsoft.Json
 @{
     var trangThaiList = ViewBag.TrangThaiList as List<BlueSchoolSystem.Models.TrangThai>;
@@ -26,7 +25,27 @@
         <input type="text" name="searchName" value="@ViewBag.SearchName" class="form-control" placeholder="Tìm theo tên học kỳ..." />
     </div>
     <div class="col-md-3">
-        <input type="number" name="year" value="@ViewBag.Year" class="form-control" placeholder="Năm bắt đầu..." min="2000" max="2100" />
+        @{
+            // Lấy các năm có trong danh sách học kỳ
+            var yearList = Model
+                .Select(h => h.NgayBatDau.Year)
+                .Distinct()
+                .OrderByDescending(y => y)
+                .ToList();
+            var selectedYear = ViewBag.Year != null ? ViewBag.Year.ToString() : "";
+        }
+
+        <select name="year" class="form-select">
+            <option value="">-- Chọn năm học kỳ --</option>
+
+            @foreach (var year in yearList)
+            {
+                var isSelected = selectedYear == year.ToString();
+                <option value="@year" selected="@(isSelected ? "selected" : null)">
+                    @year
+                </option>
+            }
+        </select>
     </div>
     <div class="col-md-2 d-grid">
         <button type="submit" class="btn btn-primary">Lọc</button>

@@ -462,7 +462,7 @@ namespace BlueSchoolSystem.APIControllers
         [HttpPost("lophocphan")]
         public async Task<IActionResult> CreateLopHocPhan([FromBody] LopHocPhanCreateDTO dto)
         {
-            // 1. Kiểm tra tồn tại các FK
+            // 1. Kiểm tra tồn tại các FK (Giữ nguyên)
             var hocky = await _context.HocKys.FindAsync(dto.HocKyId);
             var monHoc = await _context.MonHocs.FindAsync(dto.MonHocId);
             var giangVien = await _context.GiangViens.FindAsync(dto.GiangVienId);
@@ -474,16 +474,7 @@ namespace BlueSchoolSystem.APIControllers
                 return NotFound(new { result = false, message = "Thiếu thông tin Học kỳ, Môn học, Giảng viên hoặc Trạng thái cấu hình." });
             }
 
-            // 2. Lấy thông tin người dùng từ Bearer token
-            var userId = User.FindFirst("userId")?.Value;
-            var userName = User.FindFirst("username")?.Value;
-
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized(new { result = false, message = "Không xác định được người dùng từ token." });
-            }
-
-            // 3. Tạo Lớp Học Phần (KHÔNG có lịch học)
+            // 2. Tạo Lớp Học Phần (Lưu trước để lấy Id)
             var newLopHP = new LopHocPhan
             {
                 HocKyId = dto.HocKyId,
@@ -500,6 +491,66 @@ namespace BlueSchoolSystem.APIControllers
             _context.LopHocPhans.Add(newLopHP);
             await _context.SaveChangesAsync();
 
+            // --- BỔ SUNG LOGIC TỰ ĐỘNG THÊM LỊCH HỌC ---
+            int schedulesCreated = 0;
+            int conflictCount = 0;
+
+            if (dto.ShouldAutoCreateSchedule == true &&
+                dto.AutoGioBatDau.HasValue && dto.AutoGioKetThuc.HasValue &&
+                dto.AutoPhongHocId.HasValue && dto.AutoCacNgayTrongTuan != null &&
+                dto.AutoCacNgayTrongTuan.Any())
+            {
+                var currentDate = newLopHP.NgayBatDau;
+                var endDate = newLopHP.NgayKetThuc;
+
+                // Chức năng chuyển đổi DayOfWeek sang định dạng tùy chỉnh của bạn
+                // (Bạn cần phải có hàm này trong API Controller, ví dụ: ConvertDayOfWeekToCustomDay)
+                int ConvertDayOfWeekToCustomDay(DayOfWeek dayOfWeek)
+                {
+                    return dayOfWeek == DayOfWeek.Sunday ? 8 : (int)dayOfWeek + 1;
+                }
+
+                while (currentDate <= endDate)
+                {
+                    var customDayOfWeek = ConvertDayOfWeekToCustomDay(currentDate.DayOfWeek);
+
+                    if (dto.AutoCacNgayTrongTuan.Contains(customDayOfWeek))
+                    {
+                        // Kiểm tra trùng lịch Giảng viên
+                        var isGVConflict = await IsGiangVienConflict((int)newLopHP.GiangVienId, currentDate, dto.AutoGioBatDau.Value, dto.AutoGioKetThuc.Value);
+
+                        // Kiểm tra trùng lịch Phòng
+                        var isRoomConflict = await IsPhongHocConflict(dto.AutoPhongHocId.Value, currentDate, dto.AutoGioBatDau.Value, dto.AutoGioKetThuc.Value);
+
+                        if (!isGVConflict && !isRoomConflict)
+                        {
+                            _context.LichHocs.Add(new LichHoc
+                            {
+                                LopHocPhanId = newLopHP.Id,
+                                Ngay = currentDate,
+                                GioBatDau = dto.AutoGioBatDau.Value,
+                                GioKetThuc = dto.AutoGioKetThuc.Value,
+                                PhongHocId = dto.AutoPhongHocId.Value
+                            });
+                            schedulesCreated++;
+                        }
+                        else
+                        {
+                            conflictCount++;
+                        }
+                    }
+                    currentDate = currentDate.AddDays(1);
+                }
+                await _context.SaveChangesAsync(); // Lưu các lịch học đã tạo
+            }
+
+            var userId = User.FindFirst("userId")?.Value;
+            var userName = User.FindFirst("username")?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new { result = false, message = "Không xác định được người dùng từ token." });
+            }
             // 4. Ghi log hoạt động
             await _activityLogService.LogAsync(
                 userId: userId,
@@ -513,11 +564,19 @@ namespace BlueSchoolSystem.APIControllers
             );
 
             // 5. Trả kết quả
+            string scheduleMessage = schedulesCreated > 0
+        ? $"Tạo thành công {schedulesCreated} lịch học."
+        : "Không tạo lịch học tự động.";
+            if (conflictCount > 0)
+            {
+                scheduleMessage += $" ({conflictCount} lịch bị bỏ qua do trùng lịch).";
+            }
+
             return CreatedAtAction(nameof(GetLopHocPhans), new { id = newLopHP.Id }, new
             {
                 result = true,
                 code = 201,
-                message = $"Tạo Lớp Học Phần {newLopHP.MaLopHocPhan} thành công.",
+                message = $"Tạo Lớp Học Phần {newLopHP.MaLopHocPhan} thành công. {scheduleMessage}",
                 lopHocPhanId = newLopHP.Id
             });
         }
@@ -567,6 +626,86 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+        // API 6: Tạo nhiều Lịch học cho một Lớp Học Phần
+        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        // Endpoint nhận MỘT DANH SÁCH các LichHocDTO
+        [HttpPost("lophocphan/lichhoc/batch")]
+        public async Task<IActionResult> CreateBatchLichHoc([FromBody] List<LichHocDTO> dtos)
+        {
+            if (dtos == null || !dtos.Any())
+            {
+                return BadRequest(new { result = false, message = "Danh sách lịch học rỗng." });
+            }
+
+            var lopHocPhanId = dtos.First().LopHocPhanId;
+            var lhp = await _context.LopHocPhans
+                .AsNoTracking()
+                .FirstOrDefaultAsync(l => l.Id == lopHocPhanId);
+
+            if (lhp == null)
+                return NotFound(new { result = false, message = $"Không tìm thấy Lớp Học Phần với Id = {lopHocPhanId}" });
+
+            int giangVienId = (int)lhp.GiangVienId;
+            var newLichHocs = new List<LichHoc>();
+            int conflictCount = 0;
+
+            // 1. Lặp qua danh sách DTO để kiểm tra trùng lặp và tạo đối tượng
+            foreach (var dto in dtos)
+            {
+                // Đảm bảo tất cả DTO đều thuộc cùng một LHP (kiểm tra an toàn)
+                if (dto.LopHocPhanId != lopHocPhanId) continue;
+
+                // **Quan trọng:** Kiểm tra trùng lịch trước khi tạo
+
+                // Kiểm tra trùng lịch Giảng viên
+                var isGVConflict = await IsGiangVienConflict(giangVienId, dto.Ngay, dto.GioBatDau, dto.GioKetThuc);
+                if (isGVConflict)
+                {
+                    conflictCount++;
+                    continue; // Bỏ qua lịch học này
+                }
+
+                // Kiểm tra trùng lịch Phòng
+                var isRoomConflict = await IsPhongHocConflict(dto.PhongHocId, dto.Ngay, dto.GioBatDau, dto.GioKetThuc);
+                if (isRoomConflict)
+                {
+                    conflictCount++;
+                    continue; // Bỏ qua lịch học này
+                }
+
+                // Nếu không trùng, thêm vào danh sách để Save
+                newLichHocs.Add(new LichHoc
+                {
+                    LopHocPhanId = dto.LopHocPhanId,
+                    Ngay = dto.Ngay.Date,
+                    GioBatDau = dto.GioBatDau,
+                    GioKetThuc = dto.GioKetThuc,
+                    PhongHocId = dto.PhongHocId
+                });
+            }
+
+            if (!newLichHocs.Any())
+            {
+                return BadRequest(new { result = false, message = $"Không có lịch học nào được tạo do {conflictCount} lịch bị trùng hoặc danh sách rỗng." });
+            }
+
+            // 2. Thêm tất cả lịch học không bị trùng vào DB
+            _context.LichHocs.AddRange(newLichHocs);
+            await _context.SaveChangesAsync();
+
+            string successMessage = $"Tạo thành công {newLichHocs.Count} lịch học.";
+            if (conflictCount > 0)
+            {
+                successMessage += $" ({conflictCount} lịch đã bị bỏ qua do trùng lịch Giảng viên hoặc Phòng học)";
+            }
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = successMessage
+            });
+        }
         // API 7: Hủy / Mở lại lớp học phần
         [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPut("lophocphan/trangthai")]
@@ -637,28 +776,40 @@ namespace BlueSchoolSystem.APIControllers
         [HttpGet("lophocphans")]
         public async Task<IActionResult> GetLopHocPhans()
         {
-            // Cần tính sĩ số thực tế (tổng số sinh viên đăng ký)
             var lhpList = await _context.LopHocPhans
                 .Include(l => l.MonHoc)
                 .Include(l => l.GiangVien)
                 .Include(l => l.TrangThai)
+                .Include(l => l.HocKy)   // 🔥 Thêm include học kỳ
                 .Select(l => new
                 {
                     l.Id,
                     l.MaLopHocPhan,
                     TenLop = l.TenLopHocPhan,
+
                     MonHoc = l.MonHoc.TenMonHoc,
                     GiangVien = l.GiangVien.HoVaTenDem + " " + l.GiangVien.Ten,
+
+                    // 🔥 Học kỳ
+                    HocKyId = l.HocKyId,
+                    TenHocKy = l.HocKy.TenHocKy,
+                    NgayBatDauHocKy = l.HocKy.NgayBatDau,
+                    NgayKetThucHocKy = l.HocKy.NgayKetThuc,
+
                     SiSoToiDa = l.SiSo,
-                    SiSoThucTe = _context.DangKyHocPhans.Count(dk => dk.LopHocPhanId == l.Id), // Tính Sĩ số
-                    TrangThai = l.TrangThai.TenTrangThai, // Tình trạng lớp: đủ mở / không đủ
-                    LichHoc = _context.LichHocs.Where(lh => lh.LopHocPhanId == l.Id).Select(lh => new
-                    {
-                        lh.Ngay,
-                        lh.GioBatDau,
-                        lh.GioKetThuc,
-                        Phong = lh.PhongHocId.ToString() // Có thể join thêm tên phòng
-                    }).ToList()
+                    SiSoThucTe = _context.DangKyHocPhans.Count(dk => dk.LopHocPhanId == l.Id),
+
+                    TrangThai = l.TrangThai.TenTrangThai,
+
+                    LichHoc = _context.LichHocs
+                        .Where(lh => lh.LopHocPhanId == l.Id)
+                        .Select(lh => new
+                        {
+                            lh.Ngay,
+                            lh.GioBatDau,
+                            lh.GioKetThuc,
+                            Phong = lh.PhongHocId.ToString()
+                        }).ToList()
                 })
                 .ToListAsync();
 
@@ -670,6 +821,7 @@ namespace BlueSchoolSystem.APIControllers
                 data = lhpList
             });
         }
+
 
         // --- HÀM KIỂM TRA TRÙNG LỊCH NỘI BỘ ---
 
