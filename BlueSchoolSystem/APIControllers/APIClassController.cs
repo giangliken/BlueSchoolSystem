@@ -322,6 +322,79 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+
+        [HttpPost("taoloptudong")]
+        public IActionResult TaoLopTuDong(AutoClassRequest req)
+        {
+            // Validate đầu vào
+            if (req.SoLuong < 1)
+                return BadRequest(new { message = "Số lượng lớp phải >= 1" });
+
+            // Lấy ngành
+            var nganh = _context.NganhHocs
+                .Include(n => n.Khoa)
+                .FirstOrDefault(n => n.Id == req.NganhId);
+
+            if (nganh == null)
+                return NotFound(new { message = "Ngành không tồn tại" });
+
+            string maKhoa = nganh.Khoa.MaKhoa;  // ví dụ: DTH
+
+            // Lấy YY từ 2022 → 22
+            string khoaShort = req.Khoa.ToString().Substring(2, 2);
+
+            // Lấy mã lớp đã tồn tại để tránh trùng
+            var existing = _context.LopHocs
+                .Where(l => l.MaLop.StartsWith(khoaShort + maKhoa))
+                .Select(l => l.MaLop)
+                .ToList();
+
+            var createdList = new List<string>();
+            int index = 1;
+
+            while (createdList.Count < req.SoLuong)
+            {
+                string maLop = GenerateClassCode(khoaShort, maKhoa, index);
+
+                if (!existing.Contains(maLop))
+                {
+                    createdList.Add(maLop);
+
+                    _context.LopHocs.Add(new LopHoc
+                    {
+                        MaLop = maLop,
+                        TenLop = maLop,
+                        NganhId = req.NganhId
+                    });
+                }
+                index++;
+            }
+
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                result = true,
+                data = createdList
+            });
+        }
+
+
+        private static readonly char[] GroupLetters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
+
+        private string GenerateClassCode(string khoaShort, string maKhoa, int index)
+        {
+            // Mỗi chữ cái đại diện cho 2 lớp: A1, A2 → B1, B2 → ...
+            int groupIndex = (index - 1) / 2;
+            char groupLetter = GroupLetters[groupIndex];
+
+            int number = ((index - 1) % 2) + 1; // 1 hoặc 2
+
+            return $"{khoaShort}{maKhoa}{groupLetter}{number}";
+        }
+
+
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpDelete("xoalophoc")]
         public IActionResult DeleteClass(string maLop)
