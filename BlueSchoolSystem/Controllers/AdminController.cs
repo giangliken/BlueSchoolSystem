@@ -1031,6 +1031,67 @@ namespace BlueSchoolSystem.Controllers
             return View(classes ?? new List<LopHocViewModel>());
         }
 
+        [HttpGet]
+        public async Task<IActionResult> AddClass()
+        {
+            // Load danh sách ngành để đổ dropdown
+            ViewBag.NganhList = await _context.NganhHocs.ToListAsync();
+            return View();
+        }
+
+
+
+        [HttpPost]
+        public async Task<IActionResult> AddClass(CreateClassRequest request)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.PostAsJsonAsync("api/themlophoc", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                TempData["Success"] = "Thêm lớp thành công!";
+                return RedirectToAction("ClassManager");
+            }
+
+            // Lấy nội dung JSON lỗi trả về
+            var body = await response.Content.ReadAsStringAsync();
+
+            // Tách lỗi message nếu API có property 'message'
+            try
+            {
+                var json = JsonDocument.Parse(body);
+                if (json.RootElement.TryGetProperty("message", out var msg))
+                {
+                    ModelState.AddModelError("", msg.GetString());
+                }
+                else
+                {
+                    ModelState.AddModelError("", "Thêm lớp thất bại!");
+                }
+            }
+            catch
+            {
+                ModelState.AddModelError("", "Lỗi không xác định từ API");
+            }
+
+            // Reload dropdown ngành
+            ViewBag.NganhList = await _context.NganhHocs.ToListAsync();
+
+            return View(request);
+        }
+
+
+
+
 
         //Chi tiết lớp học
         public async Task<IActionResult> ClassDetails(string maLop) 
@@ -1058,6 +1119,54 @@ namespace BlueSchoolSystem.Controllers
 
             return View(lopHoc);
         }
+
+        // Xóa lớp học
+        [HttpPost]
+        public async Task<IActionResult> DeleteClass(string maLop)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.DeleteAsync($"api/xoalophoc?maLop={maLop}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                TempData["Success"] = "Xóa lớp học thành công!";
+                return RedirectToAction("ClassManager");
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+
+            string message = "Không thể xóa lớp học!";
+
+            try
+            {
+                using var json = JsonDocument.Parse(body);
+
+                if (json.RootElement.TryGetProperty("message", out var msgProperty))
+                {
+                    message = msgProperty.GetString() ?? message;
+                }
+            }
+            catch
+            {
+                // fallback nếu parse lỗi
+            }
+
+            TempData["Error"] = message;
+            return RedirectToAction("ClassDetails", new { maLop });
+
+
+        }
+
+
 
         // Phương thức private helper để tạo tất cả SelectLists cần thiết
         private async Task<(SelectList nganhList, SelectList giangVienList, SelectList lopTruongList, SelectList lopPhoList, SelectList biThuList)>
