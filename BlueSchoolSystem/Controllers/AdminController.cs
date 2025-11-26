@@ -70,7 +70,7 @@ namespace BlueSchoolSystem.Controllers
 
             // Lấy danh sách lớp để đổ vào dropdown
             var classResponse = await client.GetAsync("api/laydanhsachlophoc");
-            
+
             List<LopHocViewModel> lopList;
             if (classResponse.IsSuccessStatusCode)
             {
@@ -225,8 +225,8 @@ namespace BlueSchoolSystem.Controllers
                 Email = model.User.Email,
                 PhoneNumber = model.User.PhoneNumber,
                 NganhHocId = nganhHocId,
-                Password = "Abc@123", 
-                Student = model 
+                Password = "Abc@123",
+                Student = model
             };
 
             var apiUrl = "https://localhost:5001/api/taomoisinhvien";
@@ -310,7 +310,7 @@ namespace BlueSchoolSystem.Controllers
 
                         if (lopId == null)
                         {
-                            continue; 
+                            continue;
                         }
 
                         var sv = new SinhVien
@@ -555,10 +555,10 @@ namespace BlueSchoolSystem.Controllers
 
                 var token = HttpContext.Session.GetString("access_token");
                 // Nếu model.User có tồn tại (tức là từ form nhập), thì dùng lấy info xong set null
-                
+
                 string email = model.User?.Email;
                 string phone = model.User?.PhoneNumber;
-                model.User = null; 
+                model.User = null;
 
                 var apiRequest = new CreateGiangVienWithUserRequest
                 {
@@ -651,7 +651,7 @@ namespace BlueSchoolSystem.Controllers
             }
 
             var teachers = new List<GiangVien>();
-            var userInfos = new List<(string Email, string Phone)>(); 
+            var userInfos = new List<(string Email, string Phone)>();
             var importErrors = new List<string>();
 
             using (var stream = new MemoryStream())
@@ -662,7 +662,7 @@ namespace BlueSchoolSystem.Controllers
                     var worksheet = package.Workbook.Worksheets[0];
                     int rowCount = worksheet.Dimension.Rows;
 
-                    
+
                     var allKhoa = _context.Khoas
                         .Select(k => new { k.Id, k.MaKhoa })
                         .ToList()
@@ -935,7 +935,7 @@ namespace BlueSchoolSystem.Controllers
             }
 
             try {
-            
+
                 HttpResponseMessage response = await client.GetAsync("api/laydanhsachkhoa");
 
                 if (!response.IsSuccessStatusCode)
@@ -994,7 +994,164 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<Khoa>());
             }
         }
-        
+
+        // ================================
+        // 2. TRANG CHI TIẾT KHOA
+        // ================================
+        public async Task<IActionResult> FacultyDetails(int id)
+        {
+            var khoa = await _context.Khoas
+                .Include(k => k.ChiTietKhoaViens)
+                    .ThenInclude(ct => ct.TruongKhoa).ThenInclude(u => u.User)
+                .Include(k => k.ChiTietKhoaViens)
+                    .ThenInclude(ct => ct.PhoKhoa).ThenInclude(u => u.User)
+                .Include(k => k.ChiTietKhoaViens)
+                    .ThenInclude(ct => ct.TroLiKhoa).ThenInclude(u => u.User)
+                .FirstOrDefaultAsync(k => k.Id == id);
+
+            if (khoa == null)
+                return NotFound();
+
+            return View(khoa);
+        }
+
+        // ================================
+        // 3. HELPER: TẠO SELECT LISTS
+        // ================================
+        private async Task<(SelectList giangVienList, int? truong, int? pho, int? troLy)>
+            CreateFacultySelectLists(int facultyId)
+        {
+            var khoa = await _context.Khoas
+                .Include(k => k.ChiTietKhoaViens)
+                .FirstOrDefaultAsync(k => k.Id == facultyId);
+
+            var detail = khoa?.ChiTietKhoaViens?.FirstOrDefault();
+
+            int? currentTruongId = detail?.TruongKhoaId;
+            int? currentPhoId = detail?.PhoKhoaId;
+            int? currentTroLyId = detail?.TroLiKhoaId;
+
+            var giangViens = await _context.GiangViens
+                .Where(gv => gv.KhoaId == facultyId) // Giảng viên phải thuộc khoa
+                .Select(gv => new
+                {
+                    gv.Id,
+                    HoTen = gv.HoVaTenDem + " " + gv.Ten + " (" + gv.MaGiangVien + ")"
+                })
+                .OrderBy(gv => gv.HoTen)
+                .ToListAsync();
+
+            var giangVienList = new SelectList(giangViens, "Id", "HoTen", currentTruongId);
+
+            return (giangVienList, currentTruongId, currentPhoId, currentTroLyId);
+        }
+
+        // ================================
+        // 4. GET: EDIT FACULTY
+        // ================================
+        public async Task<IActionResult> EditFaculty(int id)
+        {
+            var khoa = await _context.Khoas
+                        .Include(k => k.ChiTietKhoaViens)
+                            .ThenInclude(ct => ct.TruongKhoa)
+                        .Include(k => k.ChiTietKhoaViens)
+                            .ThenInclude(ct => ct.PhoKhoa)
+                        .Include(k => k.ChiTietKhoaViens)
+                            .ThenInclude(ct => ct.TroLiKhoa)
+                        .FirstOrDefaultAsync(k => k.Id == id);
+
+            if (khoa == null)
+            {
+                TempData["Error"] = "Không tìm thấy khoa cần chỉnh sửa!";
+                return RedirectToAction("FacultyManager");
+            }
+
+            var lists = await LoadFacultySelectLists(id);
+            ViewBag.GiangVienList = lists.giangVienList;
+            ViewBag.CurrentTruongId = lists.selectedTruong;
+            ViewBag.CurrentPhoId = lists.selectedPho;
+            ViewBag.CurrentTroLyId = lists.selectedTroLy;
+
+            return View(khoa);
+        }
+
+
+        // ================================
+        // 5. POST: EDIT FACULTY
+        // ================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditFaculty(Khoa model, int? TruongKhoaId, int? PhoKhoaId, int? TroLiKhoaId)
+        {
+            // Kiểm tra 1 người nhiều chức vụ
+            var selected = new List<int>();
+            if (TruongKhoaId.HasValue && TruongKhoaId.Value > 0) selected.Add(TruongKhoaId.Value);
+            if (PhoKhoaId.HasValue && PhoKhoaId.Value > 0) selected.Add(PhoKhoaId.Value);
+            if (TroLiKhoaId.HasValue && TroLiKhoaId.Value > 0) selected.Add(TroLiKhoaId.Value);
+
+            if (selected.Count != selected.Distinct().Count())
+            {
+                ModelState.AddModelError("", "Một giảng viên không thể giữ nhiều hơn một chức vụ trong khoa.");
+                TempData["Error"] = "Một giảng viên không thể giữ nhiều hơn một chức vụ.";
+            }
+
+            if (!ModelState.IsValid)
+            {
+                // Tạo lại select lists và truyền selected values (sau khi user đã chọn)
+                var lists = await LoadFacultySelectLists(model.Id, TruongKhoaId, PhoKhoaId, TroLiKhoaId);
+                ViewBag.GiangVienList = lists.giangVienList;
+                ViewBag.CurrentTruongId = lists.selectedTruong;
+                ViewBag.CurrentPhoId = lists.selectedPho;
+                ViewBag.CurrentTroLyId = lists.selectedTroLy;
+
+                return View(model);
+            }
+
+            try
+            {
+                var khoa = await _context.Khoas
+                            .Include(k => k.ChiTietKhoaViens)
+                            .FirstOrDefaultAsync(k => k.Id == model.Id);
+
+                if (khoa == null) return RedirectToAction("FacultyManager");
+
+                // Cập nhật cơ bản
+                khoa.MaKhoa = model.MaKhoa;
+                khoa.TenKhoa = model.TenKhoa;
+
+                var detail = khoa.ChiTietKhoaViens.FirstOrDefault();
+                if (detail == null)
+                {
+                    detail = new ChiTietKhoaVien { KhoaId = khoa.Id };
+                    _context.ChiTietKhoaViens.Add(detail);
+                }
+
+                detail.TruongKhoaId = TruongKhoaId > 0 ? TruongKhoaId : null;
+                detail.PhoKhoaId = PhoKhoaId > 0 ? PhoKhoaId : null;
+                detail.TroLiKhoaId = TroLiKhoaId > 0 ? TroLiKhoaId : null;
+
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = "Cập nhật khoa thành công!";
+                return RedirectToAction("FacultyDetails", new { id = model.Id });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật khoa ID {Id}", model.Id);
+                ModelState.AddModelError("", "Lỗi hệ thống: " + ex.Message);
+
+                var lists = await LoadFacultySelectLists(model.Id, TruongKhoaId, PhoKhoaId, TroLiKhoaId);
+                ViewBag.GiangVienList = lists.giangVienList;
+                ViewBag.CurrentTruongId = lists.selectedTruong;
+                ViewBag.CurrentPhoId = lists.selectedPho;
+                ViewBag.CurrentTroLyId = lists.selectedTroLy;
+
+                return View(model);
+            }
+        }
+
+
+
         //Trang quản lí lớp học
         public async Task<IActionResult> ClassManager()
         {
@@ -1034,6 +1191,39 @@ namespace BlueSchoolSystem.Controllers
 
             return View(lophocs ?? new List<LopHocViewModel>());
         }
+        // Controller của bạn (AdminController hoặc FacultyController)
+        private async Task<(SelectList giangVienList, int? selectedTruong, int? selectedPho, int? selectedTroLy)>
+            LoadFacultySelectLists(int facultyId, int? forcedTruong = null, int? forcedPho = null, int? forcedTroLy = null)
+        {
+            // Lấy đối tượng khoa kèm chi tiết (nếu có)
+            var khoa = await _context.Khoas
+                        .Include(k => k.ChiTietKhoaViens) // <--- đảm bảo đúng tên nav prop trong model của bạn
+                        .FirstOrDefaultAsync(k => k.Id == facultyId);
+
+            var detail = khoa?.ChiTietKhoaViens?.FirstOrDefault();
+
+            // Nếu caller truyền giá trị ép buộc (ví dụ khi post lỗi và người dùng đã chọn)
+            int? selTruong = forcedTruong ?? detail?.TruongKhoaId;
+            int? selPho = forcedPho ?? detail?.PhoKhoaId;
+            int? selTroLy = forcedTroLy ?? detail?.TroLiKhoaId;
+
+            // Lấy danh sách giảng viên thuộc khoa (chỉ giảng viên của khoa đó mới được chọn)
+            var giangViens = await _context.GiangViens
+                                .Where(gv => gv.KhoaId == facultyId)
+                                .Select(gv => new
+                                {
+                                    Id = gv.Id,
+                                    HoTen = gv.HoVaTenDem + " " + gv.Ten + " (" + gv.MaGiangVien + ")"
+                                })
+                                .OrderBy(gv => gv.HoTen)
+                                .ToListAsync();
+
+            // Tạo SelectList (asp-items sẽ đọc và tự đánh dấu selected)
+            var giangVienList = new SelectList(giangViens, "Id", "HoTen", selTruong);
+
+            return (giangVienList, selTruong, selPho, selTroLy);
+        }
+
 
         //Chi tiết lớp học
         public async Task<IActionResult> ClassDetails(string maLop) 

@@ -6,6 +6,8 @@
 }
 
 <input type="hidden" id="hiddenAccessToken" value="@accessToken" />
+
+<!-- 1. CÁC MODAL HỆ THỐNG -->
 <div class="modal fade" id="connectionModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-danger">
@@ -34,32 +36,11 @@
     </div>
 </div>
 
-<!-- Modal Xác Nhận Xóa -->
-<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title fw-bold"><i class="fa-solid fa-trash-can me-2"></i>Xác nhận xóa</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body fs-6">
-                Bạn có chắc chắn muốn xóa khoa này không? <br>
-                <span class="text-danger small fst-italic">*Hành động này không thể hoàn tác.</span>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-danger" onclick="performDelete()">Xóa ngay</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Thêm/Sửa -->
 <div class="modal fade" id="facultyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="modalTitle">Thông tin Khoa Viện</h5>
+                <h5 class="modal-title" id="modalTitle">Thêm Khoa Mới</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -81,52 +62,38 @@
     </div>
 </div>
 
+<div class="mt-4"></div>
 
-<h3 class="mt-4 mb-3 text-uppercase text-dark fw-bold border-bottom pb-2">
-    <i class="fas fa-university me-2"></i>Quản lý Khoa - Viện
-</h3>
-
-<div class="card p-3 mb-3 shadow-sm border-0">
-    <div class="row g-2 align-items-center">
-        <div class="col-md-4">
-            <input type="text" id="txtKeyword" class="form-control" placeholder="Tìm kiếm theo mã khoa hoặc tên khoa...">
-        </div>
-        <div class="col-md-3">
-            <select id="ddlMaKhoa" class="form-select"><option value="">-- Tất cả mã khoa --</option></select>
-        </div>
-        <div class="col-md-3">
-            <select id="ddlTenKhoa" class="form-select"><option value="">-- Tất cả tên khoa --</option></select>
-        </div>
-        <div class="col-md-auto ms-auto">
-            <button type="button" class="btn btn-info text-white shadow-sm fw-bold px-3" onclick="searchData()">
-                <i class="fa-solid fa-magnifying-glass me-1"></i> Tìm kiếm
-            </button>
-            <button type="button" class="btn btn-secondary shadow-sm fw-bold px-3" onclick="resetFilter()">
-                <i class="fa-solid fa-rotate-right me-1"></i> Reset
-            </button>
-        </div>
+<!-- KHU VỰC BỘ LỌC & TOOLBAR -->
+<div class="d-flex justify-content-end mb-3">
+    <div class="d-flex gap-2 align-items-center">
+        <input type="text" id="txtKeyword" class="form-control form-control-sm" placeholder="Tìm kiếm theo mã/tên..." style="width: 250px;">
+        <button type="button" class="btn btn-info btn-sm text-white fw-bold px-3 text-nowrap" onclick="searchData()">
+            <i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm
+        </button>
+        <button type="button" class="btn btn-dark btn-sm fw-bold px-3 text-nowrap" onclick="resetFilter()">
+            <i class="fa-solid fa-rotate-right"></i> Reset
+        </button>
     </div>
 </div>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <button class="btn btn-primary shadow-sm" onclick="openModal('create')">
-            <i class="fa-solid fa-plus-circle me-2"></i> Thêm mới
-        </button>
+<div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
+    <div class="text-danger fw-bold fs-6">
+        Tổng số: <span id="totalCount">0</span> bản ghi
     </div>
-    <div class="text-muted fst-italic fw-bold">
-        Tổng số: <span id="totalCount" class="text-danger">0</span> bản ghi
-    </div>
+
+    <button class="btn btn-primary btn-sm shadow-sm fw-bold" onclick="openModal('create')">
+        <i class="fa-solid fa-plus-circle me-2"></i> Thêm mới
+    </button>
 </div>
 
 <div class="table-responsive bg-white shadow-sm rounded">
-    <table class="table table-hover table-striped table-bordered align-middle mb-0">
+    <table class="table table-hover table-bordered table-striped align-middle mb-0">
         <thead class="table-dark">
             <tr>
                 <th class="text-center" style="width: 60px;">STT</th>
                 <th class="text-center" style="width: 150px;">Mã khoa</th>
                 <th class="text-start">Tên khoa</th>
-                <th class="text-center" style="width: 150px;">Thao tác</th>
             </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -137,7 +104,7 @@
     <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
 </div>
 
-<p class="mt-3" style="color:black"><i>*Nếu thông tin khoa viện có sai sót thì liên hệ quản trị viên hệ thống</i></p>
+<p class="mt-3 small text-muted"><i>*Nhấn vào hàng để xem chi tiết và quản lý nhân sự khoa.</i></p>
 
 @section Scripts {
     <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
@@ -146,10 +113,7 @@
         const TOKEN = $('#hiddenAccessToken').val();
         const API_URL = "/api";
 
-        let idToDelete = 0;
-
         $(document).ready(function () {
-            initDropdowns();
             loadData();
             $('#txtKeyword').keypress(function (e) { if (e.which == 13) searchData(); });
         });
@@ -159,31 +123,10 @@
             bootstrap.Modal.getOrCreateInstance(document.getElementById('notificationModal')).show();
         }
 
-
-        function initDropdowns() {
-            $.ajax({
-                url: `${API_URL}/laydanhsachkhoa`, type: 'GET',
-                headers: { "Authorization": "Bearer " + TOKEN },
-                success: function (res) {
-                    if (res.result && res.data) {
-                        var htmlMa = '<option value="">-- Tất cả mã khoa --</option>';
-                        var htmlTen = '<option value="">-- Tất cả tên khoa --</option>';
-                        $.each(res.data, function (i, item) {
-                            htmlMa += `<option value="${item.maKhoa}">${item.maKhoa}</option>`;
-                            htmlTen += `<option value="${item.tenKhoa}">${item.tenKhoa}</option>`;
-                        });
-                        $('#ddlMaKhoa').html(htmlMa);
-                        $('#ddlTenKhoa').html(htmlTen);
-                    }
-                }
-            });
-        }
-
         function searchData() { loadData(); }
+
         function resetFilter() {
             $('#txtKeyword').val('');
-            $('#ddlMaKhoa').val('');
-            $('#ddlTenKhoa').val('');
             loadData();
         }
 
@@ -192,8 +135,6 @@
             $('#tableBody').empty();
 
             var keyword = $('#txtKeyword').val().trim();
-            var maFilter = $('#ddlMaKhoa').val();
-            var tenFilter = $('#ddlTenKhoa').val();
 
             $.ajax({
                 url: `${API_URL}/laydanhsachkhoa`, type: 'GET',
@@ -202,17 +143,12 @@
                 success: function (res) {
                     $('#loadingText').hide();
                     if (res.result && res.data) {
-                        var filteredData = res.data.filter(function(item) {
-                            var checkMa = !maFilter || item.maKhoa === maFilter;
-                            var checkTen = !tenFilter || item.tenKhoa === tenFilter;
-                            return checkMa && checkTen;
-                        });
-                        renderTable(filteredData);
+                        renderTable(res.data);
                     }
                 },
                 error: function (err) {
                     $('#loadingText').hide();
-                    // Nếu lỗi kết nối, hiện Modal 
+                    if (err.status === 401) { location.reload(); return; }
                     bootstrap.Modal.getOrCreateInstance(document.getElementById('connectionModal')).show();
                 }
             });
@@ -224,38 +160,24 @@
             if (data.length > 0) {
                 $.each(data, function (i, item) {
                     html += `
-                        <tr>
+                            <tr style="cursor:pointer;"onclick="window.location.href='/Admin/FacultyDetails/${item.id}'"'" title="Xem chi tiết khoa ${item.tenKhoa}">
                             <td class="text-center fw-bold text-secondary">${i + 1}</td>
                             <td class="text-center fw-bold text-dark">${item.maKhoa}</td>
-                            <td class="text-start fw-500">${item.tenKhoa}</td>
-                            <td class="text-center">
-                                <button class="btn btn-sm btn-outline-warning border-0" onclick="openModal('edit', ${item.id}, '${item.maKhoa}', '${item.tenKhoa}')">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger border-0" onclick="confirmDelete(${item.id})">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </td>
+                            <td class="text-start fw-500 text-dark">${item.tenKhoa}</td>
                         </tr>`;
                 });
             } else {
-                html = '<tr><td colspan="4" class="text-center text-muted py-4">Không tìm thấy dữ liệu phù hợp</td></tr>';
+                html = '<tr><td colspan="3" class="text-center text-muted py-4">Không tìm thấy dữ liệu phù hợp</td></tr>';
             }
             $('#tableBody').html(html);
         }
 
         function saveData() {
-            var id = $('#hiddenId').val();
             var obj = { maKhoa: $('#txtMaKhoa').val().trim(), tenKhoa: $('#txtTenKhoa').val().trim() };
             if (!obj.maKhoa || !obj.tenKhoa) { showNotification("Vui lòng nhập đầy đủ thông tin!"); return; }
 
-            var isUpdate = (id != 0 && id != "0");
-            var url = isUpdate ? `${API_URL}/capnhat-khoa/${id}` : `${API_URL}/taomoi-khoa`;
-            var method = isUpdate ? "PUT" : "POST";
-            if(isUpdate) obj.id = parseInt(id);
-
             $.ajax({
-                url: url, type: method,
+                url: `${API_URL}/taomoi-khoa`, type: "POST",
                 headers: { "Authorization": "Bearer " + TOKEN },
                 contentType: "application/json", data: JSON.stringify(obj),
                 success: function (res) {
@@ -264,44 +186,15 @@
                         $('.modal-backdrop').remove();
                         $('body').removeClass('modal-open').css('padding-right', '');
                         searchData();
-                        if(!isUpdate) initDropdowns();
                     } else { showNotification(res.message); }
                 },
                 error: function (err) { showNotification("Lỗi hệ thống"); }
             });
         }
 
-        function confirmDelete(id) {
-            idToDelete = id;
-            bootstrap.Modal.getOrCreateInstance(document.getElementById('deleteConfirmModal')).show();
-        }
-
-        function performDelete() {
-            bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
-            $.ajax({
-                url: `${API_URL}/xoa-khoa/${idToDelete}`, type: 'DELETE',
-                headers: { "Authorization": "Bearer " + TOKEN },
-                success: function (res) {
-                    $('.modal-backdrop').remove();
-                    $('body').removeClass('modal-open').css('padding-right', '');
-                    if (res.result) { searchData(); initDropdowns(); }
-                    else { showNotification(res.message); }
-                },
-                error: function (err) { showNotification("Lỗi hệ thống"); }
-            });
-        }
-
-        function openModal(type, id, ma, ten) {
-            $('#hiddenId').val(0);
-            $('#txtMaKhoa').val('').prop('disabled', false);
+        function openModal(type) {
+            $('#txtMaKhoa').val('');
             $('#txtTenKhoa').val('');
-            if (type === 'create') { $('#modalTitle').html('<i class="fas fa-plus-circle me-2"></i>Thêm Khoa Mới'); }
-            else {
-                $('#modalTitle').html('<i class="fas fa-edit me-2"></i>Cập Nhật Khoa');
-                $('#hiddenId').val(id);
-                $('#txtMaKhoa').val(ma).prop('disabled', false);
-                $('#txtTenKhoa').val(ten);
-            }
             bootstrap.Modal.getOrCreateInstance(document.getElementById('facultyModal')).show();
         }
     </script>

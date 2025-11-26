@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace BlueSchoolSystem.APIControllers
 {
@@ -72,9 +74,9 @@ namespace BlueSchoolSystem.APIControllers
 
 
         }
-       
+
         // 2. THÊM MỚI KHOA
-        [Authorize(Roles = "Admin,C", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPost("taomoi-khoa")]
         public IActionResult CreateFaculty([FromBody] Khoa model)
         {
@@ -120,7 +122,7 @@ namespace BlueSchoolSystem.APIControllers
         }
 
         // 3. CẬP NHẬT (SỬA) KHOA
-        [Authorize(Roles = "Admin,CanBo", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPut("capnhat-khoa/{id}")]
         public IActionResult UpdateFaculty(int id, [FromBody] Khoa model)
         {
@@ -202,5 +204,74 @@ namespace BlueSchoolSystem.APIControllers
                 message = "Xóa khoa thành công"
             });
         }
+        // =======================
+        // LẤY CHI TIẾT KHOA
+        // =======================
+        // URL: GET /api/laychitietkhoa?id=1
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpGet("laychitietkhoa")]
+        public IActionResult GetFacultyDetail(int id)
+        {
+            var facultyDetail = _context.Khoas
+                .Where(k => k.Id == id)
+                .Include(k => k.ChiTietKhoaViens)
+                    .ThenInclude(ct => ct.TruongKhoa)
+                .Include(k => k.ChiTietKhoaViens)
+                    .ThenInclude(ct => ct.PhoKhoa)
+                .Include(k => k.ChiTietKhoaViens)
+                    .ThenInclude(ct => ct.TroLiKhoa)
+                .Select(k => new
+                {
+                    k.Id,
+                    k.MaKhoa,
+                    k.TenKhoa,
+
+                    // Thống kê giống cách lớp học thống kê Sĩ số
+                    SoLuongNganh = _context.NganhHocs.Count(n => n.KhoaId == k.Id),
+                    SoLuongGiangVien = _context.GiangViens.Count(gv => gv.KhoaId == k.Id),
+
+                    // Chi tiết khoa: giống ChiTiet lớp học
+                    ChiTiet = k.ChiTietKhoaViens.Select(ct => new
+                    {
+                        ct.Id,
+
+                        ct.TruongKhoaId,
+                        TruongKhoa = ct.TruongKhoa != null
+                            ? ct.TruongKhoa.HoVaTenDem + " " + ct.TruongKhoa.Ten
+                            : null,
+
+                        ct.PhoKhoaId,
+                        PhoKhoa = ct.PhoKhoa != null
+                            ? ct.PhoKhoa.HoVaTenDem + " " + ct.PhoKhoa.Ten
+                            : null,
+
+                        ct.TroLiKhoaId,
+                        TroLiKhoa = ct.TroLiKhoa != null
+                            ? ct.TroLiKhoa.HoVaTenDem + " " + ct.TroLiKhoa.Ten
+                            : null
+                    }).ToList()
+                })
+                .FirstOrDefault();
+
+            // Không tìm thấy
+            if (facultyDetail == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy khoa với ID đã cho"
+                });
+            }
+
+            // Thành công
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                data = facultyDetail
+            });
+        }
+
     }
 }
