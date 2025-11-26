@@ -1,4 +1,5 @@
 ﻿using BlueSchoolSystem.Models;
+using BlueSchoolSystem.Models.ViewModel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -254,6 +255,127 @@ namespace BlueSchoolSystem.APIControllers
                 data = classDetail
             });
         }
+
+        // API thêm lớp học
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPost("themlophoc")]
+        public IActionResult CreateClass([FromBody] CreateClassRequest model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new
+                {
+                    result = false,
+                    code = 400,
+                    message = "Dữ liệu gửi lên không hợp lệ"
+                });
+            }
+
+            // Check ngành tồn tại
+            var nganh = _context.NganhHocs.FirstOrDefault(n => n.Id == model.NganhId);
+            if (nganh == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Ngành học không tồn tại"
+                });
+            }
+
+            // Check trùng mã lớp
+            var exists = _context.LopHocs.Any(l => l.MaLop.ToLower() == model.MaLop.ToLower());
+            if (exists)
+            {
+                return Conflict(new
+                {
+                    result = false,
+                    code = 409,
+                    message = "Mã lớp đã tồn tại"
+                });
+            }
+
+            // Tạo lớp học
+            var lop = new LopHoc
+            {
+                MaLop = model.MaLop,
+                TenLop = model.TenLop,
+                MoTa = model.MoTa,
+                NganhId = model.NganhId
+            };
+
+            _context.LopHocs.Add(lop);
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Thêm lớp học thành công",
+                data = new
+                {
+                    lop.Id,
+                    lop.MaLop,
+                    lop.TenLop,
+                    lop.NganhId
+                }
+            });
+        }
+
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpDelete("xoalophoc")]
+        public IActionResult DeleteClass(string maLop)
+        {
+            if (string.IsNullOrEmpty(maLop))
+            {
+                return BadRequest(new
+                {
+                    result = false,
+                    code = 400,
+                    message = "Mã lớp không hợp lệ"
+                });
+            }
+
+            var lop = _context.LopHocs.FirstOrDefault(l => l.MaLop.ToLower() == maLop.ToLower());
+            if (lop == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy lớp học"
+                });
+            }
+
+            // Check lớp có sinh viên không
+            var sinhVienCount = _context.SinhViens.Count(sv => sv.LopId == lop.Id);
+            if (sinhVienCount > 0)
+            {
+                return Conflict(new
+                {
+                    result = false,
+                    code = 409,
+                    message = "Không thể xóa lớp học vì vẫn còn sinh viên thuộc lớp này"
+                });
+            }
+
+            // Xóa chi tiết trước
+            var chitiet = _context.ChiTietLopHocs.Where(ct => ct.LopHocId == lop.Id);
+            _context.ChiTietLopHocs.RemoveRange(chitiet);
+
+            // Xóa lớp
+            _context.LopHocs.Remove(lop);
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Xóa lớp học thành công"
+            });
+        }
+
+
 
     }
 }
