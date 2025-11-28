@@ -467,7 +467,7 @@ namespace BlueSchoolSystem.APIControllers
             var monHoc = await _context.MonHocs.FindAsync(dto.MonHocId);
             var giangVien = await _context.GiangViens.FindAsync(dto.GiangVienId);
             var trangThaiMoiTao = await _context.TrangThais
-                .FirstOrDefaultAsync(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Đang mở");
+                .FirstOrDefaultAsync(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Chờ mở");
 
             if (hocky == null || monHoc == null || giangVien == null || trangThaiMoiTao == null)
             {
@@ -837,11 +837,13 @@ namespace BlueSchoolSystem.APIControllers
                 .AsNoTracking()
                 .ToListAsync();
 
-            return lichGV.Any(x =>
-                x.LichHoc.Ngay.Date == ngay.Date &&
-                x.LichHoc.GioBatDau < gioKetThuc &&
-                x.LichHoc.GioKetThuc > gioBatDau
-            );
+            return await _context.LichHocs
+                .AnyAsync(l =>
+                    l.LopHocPhan.GiangVienId == giangVienId &&
+                    l.Ngay.Date == ngay.Date &&
+                    l.GioBatDau < gioKetThuc &&
+                    l.GioKetThuc > gioBatDau
+                );
         }
         // Kiểm tra Phòng học có trùng lịch không
         private async Task<bool> IsPhongHocConflict(int phongHocId, DateTime ngay, TimeSpan gioBatDau, TimeSpan gioKetThuc)
@@ -851,11 +853,13 @@ namespace BlueSchoolSystem.APIControllers
                 .AsNoTracking()
                 .ToListAsync();
 
-            return lichPhong.Any(l =>
-                l.Ngay.Date == ngay.Date &&
-                l.GioBatDau < gioKetThuc &&
-                l.GioKetThuc > gioBatDau
-            );
+            return await _context.LichHocs
+                .AnyAsync(l =>
+                    l.PhongHocId == phongHocId &&
+                    l.Ngay.Date == ngay.Date &&
+                    l.GioBatDau < gioKetThuc &&
+                    l.GioKetThuc > gioBatDau
+                );
         }
 
         // --- CHỨC NĂNG 4: AUTO ĐĂNG KÝ HỌC PHẦN BẮT BUỘC ---

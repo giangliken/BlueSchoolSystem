@@ -1,0 +1,120 @@
+﻿@* File: Views/Admin/CourseClassDetail.cshtml *@
+@model BlueSchoolSystem.Models.LopHocPhan
+@{
+    ViewData["Title"] = "Chi Tiết Lớp Học Phần";
+    var lichHoc = ViewBag.LichHoc as IEnumerable<dynamic>;
+}
+
+<div class="container mt-4">
+
+    <a asp-action="CourseClassManager" class="btn btn-secondary mb-3">
+        <i class="fa fa-arrow-left"></i> Quay lại danh sách
+    </a>
+
+    <h3 class="fw-bold mb-3">Thông tin lớp học phần: @Model.MaLopHocPhan</h3>
+    <hr />
+
+    <div class="row">
+        <div class="col-md-6">
+            <table class="table table-borderless">
+                <tr>
+                    <th class="text-muted">Mã LHP</th>
+                    <td>@Model.MaLopHocPhan</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Tên lớp</th>
+                    <td>@Model.TenLopHocPhan</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Môn học</th>
+                    <td>@Model.MonHoc?.TenMonHoc</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Giảng viên</th>
+                    <td>@Model.GiangVien?.HoVaTenDem @Model.GiangVien?.Ten</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="col-md-6">
+            <table class="table table-borderless">
+                <tr>
+                    <th class="text-muted">Học kỳ</th>
+                    <td>@Model.HocKy?.TenHocKy</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Thời gian</th>
+                    <td>@Model.NgayBatDau.ToString("dd/MM/yyyy") - @Model.NgayKetThuc.ToString("dd/MM/yyyy")</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Sĩ số tối đa</th>
+                    <td>@Model.SiSo</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Trạng thái</th>
+                    <td>
+                        <span class="fw-normal">
+                            @Model.TrangThai?.TenTrangThai
+                        </span>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    @* ======================================================= *@
+    @* VÙNG HÀNH ĐỘNG THÊM LỊCH HỌC                  *@
+    @* ======================================================= *@
+    <div class="d-flex justify-content-start align-items-center mt-3 mb-4 p-3 border rounded shadow-sm bg-light">
+        <h5 class="fw-bold text-primary me-4 mb-0">Thiết Lập Lịch:</h5>
+
+        @* Nút 1: Thêm lịch học thủ công *@
+        <a asp-action="AddSchedule" asp-route-lhpId="@Model.Id"
+           class="btn btn-info me-2 shadow-sm"
+           title="Thêm lịch học đơn lẻ">
+            <i class="fa fa-calendar-plus"></i> Lịch thủ công
+        </a>
+
+        @* Nút 2: Thêm lịch học tự động *@
+        <a asp-action="AutoAddSchedule" asp-route-lhpId="@Model.Id"
+           class="btn btn-primary shadow-sm"
+           title="Tự động tạo lịch học theo tuần">
+            <i class="fa fa-clock"></i> Lịch tự động
+        </a>
+    </div>
+    @* ======================================================= *@
+
+
+    <h3 class="fw-bold mt-4 mb-3">Lịch học đã tạo</h3>
+
+    @if (lichHoc == null || !lichHoc.Any())
+    {
+        <div class="alert alert-info">Chưa có lịch học nào được tạo cho lớp học phần này.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Ngày</th>
+                        <th>Giờ bắt đầu</th>
+                        <th>Giờ kết thúc</th>
+                        <th>Phòng</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var lh in lichHoc)
+                    {
+                        <tr>
+                            <td>@Convert.ToDateTime(lh.Ngay).ToString("dddd, dd/MM/yyyy")</td>
+                            <td>@lh.GioBatDau</td>
+                            <td>@lh.GioKetThuc</td>
+                            <td>@lh.Phong</td> 
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

@@ -1,91 +1,108 @@
 ﻿@* File: Views/Admin/CreateCourseClass.cshtml *@
 @model BlueSchoolSystem.Models.ViewModel.LopHocPhanCreateDTO
 @{
-    ViewData["Title"] = "Tạo Lớp Học Phần Mới";
+    ViewData["Title"] = "Mở Lớp Học Phần Mới";
+    // Lấy ID trạng thái "Đang mở" mặc định từ ViewBag nếu có
+    var defaultOpenStatusId = ((List<BlueSchoolSystem.Models.TrangThai>)ViewBag.TrangThaiLHPList)?.FirstOrDefault(t => t.TenTrangThai == "Chờ mở")?.Id ?? 0;
 }
 
 <div class="container mt-4">
-    <div class="row">
-        <div class="col-md-10 offset-md-1">
-            <h2>➕ Tạo Lớp Học Phần Mới</h2>
-            <hr />
-
+    <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title">@ViewData["Title"]</h3>
+        </div>
+        <div class="card-body">
             <form asp-action="CreateCourseClass" method="post">
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">Thông Tin Cơ Bản</div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 form-group">
-                                <label asp-for="MaLopHocPhan">Mã Lớp Học Phần (*)</label>
-                                <input asp-for="MaLopHocPhan" class="form-control" placeholder="Ví dụ: CSE101_01" />
-                                <span asp-validation-for="MaLopHocPhan" class="text-danger"></span>
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label asp-for="TenLopHocPhan">Tên Lớp Học Phần</label>
-                                <input asp-for="TenLopHocPhan" class="form-control" />
-                                <span asp-validation-for="TenLopHocPhan" class="text-danger"></span>
-                            </div>
+                <div class="row">
+
+                    @* --- Cột 1: Thông tin cơ bản --- *@
+                    <div class="col-md-6">
+                        <h4>Thông tin cơ bản</h4>
+                        <hr />
+
+                        @* 1. Học Kỳ *@
+                        <div class="mb-3">
+                            <label asp-for="HocKyId" class="form-label">Học Kỳ (<span class="text-danger">*</span>)</label>
+                            <select asp-for="HocKyId" asp-items="ViewBag.HocKyList" class="form-select">
+                                <option value="">-- Chọn Học Kỳ --</option>
+                            </select>
+                            <span asp-validation-for="HocKyId" class="text-danger"></span>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6 form-group">
-                                <label asp-for="HocKyId">Học Kỳ (*)</label>
-                                <select asp-for="HocKyId" asp-items="ViewBag.HocKyList" class="form-control">
-                                    <option value="">-- Chọn Học kỳ --</option>
-                                </select>
-                                <span asp-validation-for="HocKyId" class="text-danger"></span>
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label asp-for="MonHocId">Môn Học (*)</label>
-                                <select asp-for="MonHocId" asp-items="ViewBag.MonHocList" class="form-control">
-                                    <option value="">-- Chọn Môn học --</option>
-                                </select>
-                                <span asp-validation-for="MonHocId" class="text-danger"></span>
-                            </div>
+                        @* 2. Môn Học *@
+                        <div class="mb-3">
+                            <label asp-for="MonHocId" class="form-label">Môn Học (<span class="text-danger">*</span>)</label>
+                            <select asp-for="MonHocId" asp-items="ViewBag.MonHocList" class="form-select" id="MonHocSelect">
+                                <option value="">-- Chọn Môn Học --</option>
+                            </select>
+                            <span asp-validation-for="MonHocId" class="text-danger"></span>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-8 form-group">
-                                <label asp-for="GiangVienId">Giảng Viên (*)</label>
-                                <select asp-for="GiangVienId" asp-items="ViewBag.GiangVienList" class="form-control">
-                                    <option value="">-- Chọn Giảng viên --</option>
-                                </select>
-                                <span asp-validation-for="GiangVienId" class="text-danger"></span>
-                            </div>
-                            <div class="col-md-4 form-group">
-                                <label asp-for="SiSoToiDa">Sĩ Số Tối Đa (*)</label>
-                                <input asp-for="SiSoToiDa" type="number" min="1" class="form-control" />
-                                <span asp-validation-for="SiSoToiDa" class="text-danger"></span>
-                            </div>
+                        @* 3. Giảng Viên *@
+                        <div class="mb-3">
+                            <label asp-for="GiangVienId" class="form-label">Giảng Viên Phụ Trách (<span class="text-danger">*</span>)</label>
+                            @* Danh sách này sẽ được tải lại bằng AJAX *@
+                            <select asp-for="GiangVienId" asp-items="ViewBag.GiangVienList" class="form-select" id="GiangVienSelect">
+                                <option value="">-- Chọn Giảng Viên --</option>
+                            </select>
+                            <span asp-validation-for="GiangVienId" class="text-danger"></span>
+                            <small class="form-text text-muted">Danh sách giảng viên được lọc theo môn học.</small>
                         </div>
+
+                        @* 4. Sĩ số tối đa *@
+                        <div class="mb-3">
+                            <label asp-for="SiSoToiDa" class="form-label"></label>
+                            <input asp-for="SiSoToiDa" class="form-control" />
+                            <span asp-validation-for="SiSoToiDa" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    @* --- Cột 2: Mã, Tên và Ngày Tháng --- *@
+                    <div class="col-md-6">
+                        <h4>Chi tiết Lớp Học Phần</h4>
+                        <hr />
+
+                        @* 5. Tên Lớp HP *@
+                        <div class="mb-3">
+                            <label asp-for="TenLopHocPhan" class="form-label"></label>
+                            <input asp-for="TenLopHocPhan" class="form-control" />
+                            <span asp-validation-for="TenLopHocPhan" class="text-danger"></span>
+                        </div>
+
+                        @* 6. Mã LHP *@
+                        <div class="mb-3">
+                            <label asp-for="MaLopHocPhan" class="form-label"></label>
+                            <input asp-for="MaLopHocPhan" class="form-control" placeholder="Để trống để hệ thống tự sinh" />
+                            <span asp-validation-for="MaLopHocPhan" class="text-danger"></span>
+                        </div>
+
+                        @* 7. Ngày Bắt đầu LHP *@
+                        <div class="mb-3">
+                            <label asp-for="NgayBatDauLHP" class="form-label"></label>
+                            <input asp-for="NgayBatDauLHP" type="date" class="form-control" />
+                            <span asp-validation-for="NgayBatDauLHP" class="text-danger"></span>
+                        </div>
+
+                        @* 8. Ngày Kết thúc LHP *@
+                        <div class="mb-3">
+                            <label asp-for="NgayKetThucLHP" class="form-label"></label>
+                            <input asp-for="NgayKetThucLHP" type="date" class="form-control" />
+                            <span asp-validation-for="NgayKetThucLHP" class="text-danger"></span>
+                        </div>
+
+                        @* 9. Trạng thái mặc định (Dùng hidden field để truyền ID mặc định) *@
+                        <input type="hidden" name="TrangThaiId" value="@defaultOpenStatusId" />
+                        <p class="text-success">Trạng thái mặc định: **Chờ mở**</p>
                     </div>
                 </div>
 
-                <div class="card mb-4">
-                    <div class="card-header bg-secondary text-white">Thời Gian Học Phần</div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 form-group">
-                                <label asp-for="NgayBatDauLHP">Ngày Bắt Đầu LHP (*)</label>
-                                <input asp-for="NgayBatDauLHP" type="date" class="form-control" />
-                                <span asp-validation-for="NgayBatDauLHP" class="text-danger"></span>
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label asp-for="NgayKetThucLHP">Ngày Kết Thúc LHP (*)</label>
-                                <input asp-for="NgayKetThucLHP" type="date" class="form-control" />
-                                <span asp-validation-for="NgayKetThucLHP" class="text-danger"></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group mt-4 text-right">
-                    <button type="submit" class="btn btn-success btn-lg">
+                <div class="mt-4 pt-3 border-top">
+                    <button type="submit" class="btn btn-primary btn-lg me-2">
                         <i class="fa fa-save"></i> Tạo Lớp Học Phần
                     </button>
-                    <a asp-action="CourseClassManager" class="btn btn-secondary ml-2">
+                    <a asp-action="CourseClassManager" class="btn btn-secondary btn-lg">
                         <i class="fa fa-arrow-left"></i> Quay lại
                     </a>
                 </div>
@@ -98,4 +115,132 @@
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
+
+    <script>
+        $(function() {
+            var monHocSelect = $('#MonHocSelect');
+            var hocKySelect = $('#HocKyId');
+            var maLhpInput = $('#MaLopHocPhan');
+            var tenLhpInput = $('#TenLopHocPhan');
+
+            var ngayBatDauLhpInput = $('#NgayBatDauLHP');
+            var ngayKetThucLhpInput = $('#NgayKetThucLHP');
+
+            // HÀM: Lấy và điền ngày Bắt đầu/Kết thúc của Học kỳ
+            function populateLhpDates(hocKyId) {
+                if (hocKyId > 0) {
+                    // ... (Logic AJAX gọi GetHocKyDates)
+                    $.get('@Url.Action("GetHocKyDates", "Admin")', { hocKyId: hocKyId }, function(data) {
+                        if (data.success) {
+                            ngayBatDauLhpInput.val(data.ngayBatDau);
+                            ngayKetThucLhpInput.val(data.ngayKetThuc);
+                        } else {
+                            console.error("Lỗi lấy ngày Học kỳ:", data.message);
+                        }
+                    }).fail(function() {
+                        console.error("Lỗi kết nối server khi lấy ngày Học kỳ.");
+                    });
+                } else {
+                    ngayBatDauLhpInput.val('');
+                    ngayKetThucLhpInput.val('');
+                }
+            }
+
+            // HÀM: Tải lại danh sách giảng viên theo môn
+            function loadGiangVien(monHocId, selectedGiangVienId) {
+                var giangVienSelect = $('#GiangVienSelect');
+                giangVienSelect.empty().append('<option value="">-- Đang tải Giảng Viên --</option>');
+
+                if (monHocId > 0) {
+                    $.get('@Url.Action("GetGiangVienTheoMon", "Admin")', { monHocId: monHocId, search: "" }, function(data) {
+                        giangVienSelect.empty().append('<option value="">-- Chọn Giảng Viên --</option>');
+                        $.each(data, function(i, giangVien) {
+                            var option = $('<option>', {
+                                value: giangVien.id,
+                                text: giangVien.hoTen
+                            });
+                            if (selectedGiangVienId && giangVien.id == selectedGiangVienId) {
+                                option.attr('selected', 'selected');
+                            }
+                            giangVienSelect.append(option);
+                        });
+                        if (data.length === 0) {
+                            giangVienSelect.append('<option value="">-- Không có Giảng viên nào đủ điều kiện --</option>');
+                        }
+                    }).fail(function() {
+                        giangVienSelect.empty().append('<option value="">-- Lỗi tải dữ liệu Giảng Viên --</option>');
+                    });
+                } else {
+                    giangVienSelect.empty().append('<option value="">-- Chọn Giảng Viên --</option>');
+                }
+            }
+
+            // HÀM: Tự động điền Mã và Tên LHP
+            function autoPopulateLhpInfo() {
+                var hocKyId = hocKySelect.val();
+                var monHocId = monHocSelect.val();
+
+                if (hocKyId > 0 && monHocId > 0) {
+                    maLhpInput.attr('placeholder', 'Đang tự sinh mã...');
+
+                    $.get('@Url.Action("GenerateLopHocPhanInfo", "Admin")', { hocKyId: hocKyId, monHocId: monHocId }, function(data) {
+                        if (data.success) {
+                            if (maLhpInput.val() === '') {
+                                maLhpInput.val(data.maLopHocPhan);
+                            } else {
+                                maLhpInput.attr('placeholder', data.maLopHocPhan);
+                            }
+
+                            if (tenLhpInput.val() === '') {
+                                tenLhpInput.val(data.tenLopHocPhan);
+                            }
+                        } else {
+                            console.error("Lỗi sinh mã LHP:", data.message);
+                            maLhpInput.attr('placeholder', 'Lỗi sinh mã');
+                        }
+                    }).fail(function() {
+                        maLhpInput.attr('placeholder', 'Lỗi kết nối server');
+                    });
+                } else {
+                    maLhpInput.val('');
+                    tenLhpInput.val('');
+                    maLhpInput.attr('placeholder', 'Để trống để hệ thống tự sinh');
+                }
+            }
+
+            // --- GẮN SỰ KIỆN CHANGE ---
+            monHocSelect.change(function() {
+                autoPopulateLhpInfo();
+                var monHocId = $(this).val();
+                loadGiangVien(monHocId, null);
+            });
+
+            hocKySelect.change(function() {
+                autoPopulateLhpInfo();
+                populateLhpDates($(this).val());
+            });
+
+            // --- LOGIC TẢI DỮ LIỆU BAN ĐẦU (POSTBACK) ---
+            var initialMonHocId = monHocSelect.val();
+            var initialHocKyId = hocKySelect.val(); // Đã sửa lỗi: Lấy giá trị ban đầu của Học kỳ
+            var initialGiangVienId = '@Model.GiangVienId';
+
+            // 1. Tải Giảng viên và Mã/Tên LHP nếu Môn học đã được chọn ban đầu
+            if (initialMonHocId > 0) {
+                loadGiangVien(initialMonHocId, initialGiangVienId);
+                autoPopulateLhpInfo();
+            }
+
+            // 2. Tải Ngày tháng nếu Học kỳ đã được chọn ban đầu (chỉ khi ngày đang trống hoặc là giá trị mặc định của model)
+            if (initialHocKyId > 0) {
+                 // Dùng giá trị mặc định ban đầu là DateTime.Today.ToString("yyyy-MM-dd")
+                var initialNgayBatDauLhpString = '@Model.NgayBatDauLHP.ToString("yyyy-MM-dd")';
+
+                // Nếu trường ngày đang trống, hoặc chưa được thay đổi so với giá trị POSTBACK
+                if (ngayBatDauLhpInput.val() === initialNgayBatDauLhpString) {
+                    populateLhpDates(initialHocKyId);
+                }
+            }
+        });
+    </script>
 }

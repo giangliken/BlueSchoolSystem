@@ -1,9 +1,9 @@
-﻿@* File: Views/Admin/AddSchedule.cshtml *@
-@model BlueSchoolSystem.Models.ViewModel.AddScheduleDTO
+﻿@* File: Views/Admin/AutoAddSchedule.cshtml *@
+@model BlueSchoolSystem.Models.ViewModel.AutoAddScheduleDTO
 @{
-    ViewData["Title"] = "Thêm Lịch Học Thủ Công";
+    ViewData["Title"] = "Tạo Lịch Học Tự Động";
     var lhp = ViewBag.LHP as BlueSchoolSystem.Models.LopHocPhan;
-
+    var daysOfWeek = (List<object>)ViewBag.DaysOfWeek;
     // Lấy Map Tiết học
     var tietStartMap = ViewBag.TietStartMap as Dictionary<int, string>;
     var tietEndMap = ViewBag.TietEndMap as Dictionary<int, string>;
@@ -14,10 +14,10 @@
 
 <div class="container mt-4">
     <div class="card shadow-lg">
-        <div class="card-header bg-info bg-gradient text-dark py-3">
+        <div class="card-header bg-primary bg-gradient text-white py-3">
             <div class="d-flex flex-column">
                 <h3 class="card-title mb-2">
-                    <i class="fa fa-calendar-plus me-2"></i> @ViewData["Title"]
+                    <i class="fa fa-clock me-2"></i> @ViewData["Title"]
                 </h3>
 
                 <div class="small">
@@ -28,32 +28,17 @@
             </div>
         </div>
         <div class="card-body">
-            <form asp-action="AddSchedule" method="post">
+            <form asp-action="AutoAddSchedule" method="post">
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
                 @* Trường ẩn ID LHP *@
                 <input type="hidden" asp-for="LopHocPhanId" value="@Model.LopHocPhanId" />
 
-                <div class="row">
-                    @* 1. Ngày học *@
-                    <div class="col-md-12 mb-4">
-                        <label asp-for="Ngay" class="form-label">Ngày học (<span class="text-danger">*</span>)</label>
-                        <input asp-for="Ngay" type="date" class="form-control form-control-lg"
-                               title="Ngày phải nằm trong khoảng thời gian của Lớp Học Phần"
-                               min="@lhp?.NgayBatDau.ToString("yyyy-MM-dd")"
-                               max="@lhp?.NgayKetThuc.ToString("yyyy-MM-dd")" />
-                        <span asp-validation-for="Ngay" class="text-danger"></span>
 
-                        <small class="form-text text-muted">
-                            Lịch phải nằm trong khoảng:
-                            <span class="fw-bold">@lhp?.NgayBatDau.ToString("dd/MM/yyyy")</span> đến
-                            <span class="fw-bold">@lhp?.NgayKetThuc.ToString("dd/MM/yyyy")</span>.
-                        </small>
-                    </div>
-                </div>
+
 
                 <div class="row">
-                    @* 2. Tiết Bắt Đầu *@
+                    @* 1. Tiết Bắt Đầu *@
                     <div class="col-md-6 mb-3">
                         <label asp-for="TietBatDau" class="form-label">Tiết Bắt Đầu </label>
                         <select asp-for="TietBatDau" class="form-select" id="TietBatDauSelect">
@@ -68,7 +53,7 @@
                         <span asp-validation-for="TietBatDau" class="text-danger"></span>
                     </div>
 
-                    @* 3. Tiết Kết Thúc *@
+                    @* 2. Tiết Kết Thúc *@
                     <div class="col-md-6 mb-3">
                         <label asp-for="TietKetThuc" class="form-label">Tiết Kết Thúc </label>
                         <select asp-for="TietKetThuc" class="form-select" id="TietKetThucSelect">
@@ -85,7 +70,7 @@
                 </div>
 
                 <div class="row">
-                    @* 4. Phòng Học *@
+                    @* 3. Phòng Học *@
                     <div class="col-md-6 mb-3">
 
                         @* --- THÔNG BÁO ĐIỀU KIỆN CHỌN PHÒNG --- *@
@@ -102,23 +87,46 @@
                             </div>
                         }
 
-                        <label asp-for="PhongHocId" class="form-label">Phòng Học </label>
+                        <label asp-for="PhongHocId" class="form-label">Phòng Học Mặc Định </label>
                         <select asp-for="PhongHocId" asp-items="ViewBag.PhongHocList" class="form-select">
                             <option value="">-- Chọn Phòng Học --</option>
                         </select>
                         <span asp-validation-for="PhongHocId" class="text-danger"></span>
                     </div>
+                </div>
 
-                @*     5. Giảng viên (Hiển thị)
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Giảng Viên</label>
-                        <p class="form-control-plaintext fw-bold">@ViewBag.GiangVien</p>
+                @* 4. Các Ngày Trong Tuần *@
+                @if (daysOfWeek != null)
+                {
+                    <div class="mb-3 p-3 border rounded">
+                        <label class="form-label fw-bold">Các Ngày Trong Tuần Lặp Lại </label>
+                        <div class="row">
+                            @foreach (dynamic day in daysOfWeek)
+                            {
+                                var dayId = (int)day.Id;
+                                var dayName = (string)day.Name;
+
+                                <div class="col-md-3 col-sm-4">
+                                    <div class="form-check">
+                                        <input type="checkbox" id="day_@dayId" name="CacNgayTrongTuan" value="@dayId"
+                                               class="form-check-input"
+                                               @(Model.CacNgayTrongTuan.Contains(dayId) ? "checked" : "") />
+                                        <label class="form-check-label" for="day_@dayId">@dayName</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <span asp-validation-for="CacNgayTrongTuan" class="text-danger d-block mt-2"></span>
                     </div>
-                </div> *@
+                }
+                else
+                {
+                    <div class="alert alert-danger">Lỗi: Không thể tải danh sách các ngày trong tuần.</div>
+                }
 
                 <div class="mt-4 pt-3 border-top">
-                    <button type="submit" class="btn btn-info btn-lg me-2 text-dark">
-                        <i class="fa fa-save"></i> Thêm Lịch
+                    <button type="submit" class="btn btn-primary btn-lg me-2">
+                        <i class="fa fa-magic"></i> Tự Động Tạo Lịch
                     </button>
                     <a asp-action="CourseClassDetail" asp-route-id="@Model.LopHocPhanId" class="btn btn-secondary btn-lg">
                         <i class="fa fa-arrow-left"></i> Quay lại
@@ -144,10 +152,9 @@
                 var startTiet = parseInt(tietBatDauSelect.val());
                 var endTiet = parseInt(tietKetThucSelect.val());
 
-                if (isNaN(startTiet)) return; // Bỏ qua nếu Tiết bắt đầu chưa được chọn hoặc lỗi
+                if (isNaN(startTiet)) return;
 
                 if (endTiet < startTiet) {
-                    // Tự động điều chỉnh Tiết kết thúc bằng Tiết bắt đầu nếu nó nhỏ hơn
                     tietKetThucSelect.val(startTiet);
                 }
 
@@ -161,7 +168,7 @@
             tietBatDauSelect.change(enforceTietRange);
             tietKetThucSelect.change(enforceTietRange);
 
-            // Chạy lần đầu khi load trang (để xử lý giá trị mặc định 1-3)
+            // Chạy lần đầu khi load trang
             enforceTietRange();
         });
     </script>

@@ -6,103 +6,109 @@
 
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>📚 @ViewData["Title"]</h2>
+        <h2 class="fw-bold"> @ViewData["Title"]</h2>
         <div>
-            <a asp-action="CreateCourseClass" class="btn btn-primary me-2">
-                <i class="fa fa-plus"></i> Tạo Lớp Học Phần Mới
+            <a asp-action="CreateCourseClass" class="btn btn-primary me-2 shadow-sm">
+                <i class="fa fa-plus"></i> Mở lớp học phần
             </a>
-            <button type="button" class="btn btn-success" id="btnAutoDangKy">
-                <i class="fa fa-magic"></i> Auto Đăng ký HP Bắt Buộc
+            <button type="button" class="btn btn-success shadow-sm" id="btnAutoDangKy">
+                <i class="fa fa-magic"></i> Mở đợt đăng ký HP tự động
             </button>
         </div>
     </div>
 
     @if (TempData["Success"] != null)
     {
-        <div class="alert alert-success">@TempData["Success"]</div>
+        <div class="alert alert-success shadow-sm">@TempData["Success"]</div>
     }
     @if (TempData["Error"] != null)
     {
-        <div class="alert alert-danger">@Html.Raw(TempData["Error"])</div>
+        <div class="alert alert-danger shadow-sm">@Html.Raw(TempData["Error"])</div>
     }
 
     @if (Model == null || !Model.Any())
     {
-        <div class="alert alert-info">Chưa có Lớp Học Phần nào được tạo.</div>
+        <div class="alert alert-info shadow-sm">Chưa có Lớp Học Phần nào được tạo.</div>
     }
     else
     {
         <div class="table-responsive">
-            <table class="table table-striped table-bordered" id="lhpTable">
+            <table class="table table-hover table-bordered align-middle shadow-sm" id="lhpTable">
                 <thead class="table-dark">
                     <tr>
+                        <th class="text-center" style="width: 60px;">STT</th>
                         <th>Mã LHP</th>
                         <th>Môn Học</th>
                         <th>Giảng Viên</th>
-                        <th>Sĩ Số (Thực tế/Tối đa)</th>
-                        <th>Trạng Thái</th>
-                        <th>Lịch Học</th>
-                        <th>Hành Động</th>
+                        <th class="text-center">Sĩ Số</th>
+                        <th class="text-center">Trạng Thái</th>
+                        <th>Học Kỳ</th>
+                        <th class="text-center">Hành Động</th>
                     </tr>
                 </thead>
                 <tbody>
+                    @{
+                        int stt = 1;
+                    }
                     @foreach (var item in Model)
                     {
-                        <tr>
+                        
+                        <tr class="clickable-row" data-url="@Url.Action("CourseClassDetail", "Admin", new { id = item.id })">
+                            <td class="text-center fw-normal">@stt</td>
                             <td><strong>@item.maLopHocPhan</strong></td>
                             <td>@item.monHoc</td>
                             <td>@item.giangVien</td>
-                            <td>
-                                <span class="badge @(item.siSoThucTe >= item.siSoToiDa ? "bg-danger" : "bg-info") text-dark">
-                                    @item.siSoThucTe / @item.siSoToiDa
-                                </span>
+
+                            @* --- Sĩ số (Chữ đen, kích cỡ bình thường) --- *@
+                            <td class="text-center fw-normal">
+                                @item.siSoThucTe / @item.siSoToiDa
                             </td>
-                            <td>
-                                <span class="badge @(item.trangThai == "Đang mở" ? "bg-success" : (item.trangThai == "Bị Hủy" ? "bg-danger" : "bg-secondary")) text-dark">
-                                    @item.trangThai
-                                </span>
+
+                            @* --- Trạng thái (Chữ đen, kích cỡ bình thường) --- *@
+                            <td class="text-center fw-normal">
+                                @item.trangThai
                             </td>
-                            <td>
-                                @if (item.lichHoc != null && item.lichHoc.Count > 0)
-                                {
-                                    @foreach (var lich in item.lichHoc)
-                                    {
-                                        <div class="small">
-                                            @Convert.ToDateTime(lich.ngay).ToString("dd/MM"): @lich.gioBatDau - @lich.gioKetThuc (@lich.phong)
-                                        </div>
-                                    }
-                                }
-                                else
-                                {
-                                    <span class="text-danger">Chưa có</span>
-                                }
+
+                            @* --- Học kỳ (Chữ đen, kích cỡ bình thường) --- *@
+                            <td class="fw-normal">
+                                @item.tenHocKy
                             </td>
-                            <td>
-                                <a asp-action="AddSchedule" asp-route-lhpId="@item.id" class="btn btn-sm btn-outline-info mb-1">
-                                    <i class="fa fa-calendar-plus"></i> Thêm Lịch
-                                </a>
-                                <button type="button" class="btn btn-sm btn-outline-warning btn-update-status mb-1"
+
+
+                            @* --- Hành động (BỎ nút AddSchedule) --- *@
+                            <td class="text-center">
+                                
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-warning btn-update-status mb-1 px-3"
                                         data-lhp-id="@item.id"
                                         data-lhp-ma="@item.maLopHocPhan"
                                         data-bs-toggle="modal"
-                                        data-bs-target="#statusModal">
-                                    <i class="fa fa-edit"></i> Sửa TT
+                                        data-bs-target="#statusModal"
+                                        title="Cập nhật trạng thái">
+                                    <i class="fa fa-edit"></i>
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-delete-lhp mb-1"
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-danger btn-delete-lhp mb-1 px-3"
                                         data-lhp-id="@item.id"
                                         data-lhp-ma="@item.maLopHocPhan"
                                         data-bs-toggle="modal"
-                                        data-bs-target="#deleteModal">
-                                    <i class="fa fa-trash"></i> Xóa
+                                        data-bs-target="#deleteModal"
+                                        title="Xóa Lớp HP">
+                                    <i class="fa fa-trash"></i>
                                 </button>
                             </td>
                         </tr>
+                        {
+                            stt++;
+                        }
                     }
                 </tbody>
             </table>
         </div>
     }
 </div>
+
+
 
 @* --- Modal Cập nhật trạng thái --- *@
 <div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
@@ -169,14 +175,14 @@
                     <label class="form-label">Học kỳ:</label>
                     <select id="modalHocKy" class="form-select">
                         <option value="">-- Chọn Học Kỳ --</option>
-                        @foreach (var hk in (List<BlueSchoolSystem.Models.HocKy>)ViewBag.HocKyList)
+                        @foreach (var hk in (SelectList)ViewBag.HocKyList)
                         {
-                            <option value="@hk.Id">@hk.TenHocKy</option>
+                            <option value="@hk.Value">@hk.Text</option>
                         }
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Thứ tự học kỳ:</label>
+                    <label class="form-label">Thứ tự học kỳ (Kỳ sinh viên đang theo học):</label>
                     <select id="modalThuTuHocKy" class="form-select">
                         @for (int i = 1; i <= 18; i++)
                         {
@@ -193,28 +199,47 @@
     </div>
 </div>
 
+
+
 @section Scripts {
     <script>
         $(function() {
+            // Lấy ID trạng thái Hủy từ DOM/ViewBag (An toàn hơn nếu để một ViewBag riêng)
+            var huyStatusId = '@(((List<BlueSchoolSystem.Models.TrangThai>)ViewBag.TrangThaiLHPList).FirstOrDefault(t => t.TenTrangThai == "Bị Hủy")?.Id ?? 0)';
+
+            // Helper để hiển thị thông báo (Có thể thay bằng Toastr/Bootstrap Toasts)
+            function showResult(isSuccess, message) {
+                if (isSuccess) {
+                    alert('Thành công: ' + message);
+                } else {
+                    alert('Lỗi: ' + message);
+                }
+            }
+
             // --- Auto đăng ký modal ---
             $('#btnAutoDangKy').click(function() {
-                new bootstrap.Modal(document.getElementById('autoDangKyModal')).show();
+                var modal = new bootstrap.Modal(document.getElementById('autoDangKyModal'));
+                modal.show();
             });
+
             $('#btnConfirmAutoDangKy').click(function() {
                 var hocKyId = $('#modalHocKy').val();
                 var thuTuHocKy = $('#modalThuTuHocKy').val();
-                if(!hocKyId) { alert('Vui lòng chọn học kỳ!'); return; }
-                if(!thuTuHocKy) { alert('Vui lòng chọn thứ tự học kỳ!'); return; }
-                if(!confirm('Bạn có chắc chắn muốn chạy Auto đăng ký HP?')) return;
+                if (!hocKyId) { showResult(false, 'Vui lòng chọn học kỳ!'); return; }
+                if (!thuTuHocKy) { showResult(false, 'Vui lòng chọn thứ tự học kỳ!'); return; }
 
-                $.post('@Url.Action("RunAutoDangKyBatBuocFromAdmin", "Admin")', { hocKyId, thuTuHocKy }, function(res){
-                    alert(res.message || 'Hoàn tất!');
-                    location.reload();
-                });
+                if (!confirm('Bạn có chắc chắn muốn chạy Auto đăng ký HP? Hành động này sẽ gây ra Redirect.')) return;
+
+                // TẠO FORM ẨN ĐỂ ĐẢM BẢO POST REQUEST cho Controller
+                var form = $('<form action="@Url.Action("RunAutoDangKyBatBuocFromAdmin", "Admin")" method="post">' +
+                    '<input type="hidden" name="hocKyId" value="' + hocKyId + '" />' +
+                    '<input type="hidden" name="thuTuHocKy" value="' + thuTuHocKy + '" />' +
+                    '</form>');
+                $('body').append(form);
+                form.submit();
             });
 
-            // --- Sửa trạng thái ---
-            var huyStatusId = '@(((List<BlueSchoolSystem.Models.TrangThai>)ViewBag.TrangThaiLHPList).FirstOrDefault(t => t.TenTrangThai == "Bị Hủy")?.Id ?? 0)';
+            // --- Cập nhật trạng thái (Sửa trạng thái) ---
             $('.btn-update-status').click(function() {
                 var lhpId = $(this).data('lhp-id');
                 var lhpMa = $(this).data('lhp-ma');
@@ -223,20 +248,28 @@
                 $('#lyDo').val('');
                 $('#lyDoGroup').hide();
             });
+
             $('#newStatus').change(function() {
-                if($(this).val() == huyStatusId) $('#lyDoGroup').show(); else $('#lyDoGroup').hide();
+                if ($(this).val() == huyStatusId) $('#lyDoGroup').show(); else $('#lyDoGroup').hide();
             });
+
             $('#btnSaveStatus').click(function() {
                 var lhpId = $('#currentLhpId').val();
                 var trangThaiId = $('#newStatus').val();
                 var lyDo = $('#lyDo').val();
                 var text = $('#newStatus option:selected').text().trim();
-                if(!trangThaiId) { alert('Chọn trạng thái mới!'); return; }
-                if(text=="Bị Hủy" && !lyDo) { alert('Nhập lý do hủy!'); return; }
-                if(confirm('Xác nhận cập nhật trạng thái?')) {
+
+                if (!trangThaiId) { showResult(false, 'Chọn trạng thái mới!'); return; }
+                if (text == "Bị Hủy" && !lyDo) { showResult(false, 'Nhập lý do hủy!'); return; }
+
+                if (confirm('Xác nhận cập nhật trạng thái?')) {
                     $.post('@Url.Action("UpdateCourseClassStatus", "Admin")', { lopHocPhanId: lhpId, trangThaiId, lyDo }, function(res){
-                        alert(res.message || 'Hoàn tất');
-                        location.reload();
+                        showResult(res.success, res.message || 'Hoàn tất');
+                        if (res.success) {
+                            location.reload();
+                        } else {
+                            $('#statusModal').modal('hide');
+                        }
                     });
                 }
             });
@@ -248,15 +281,31 @@
                 $('#deleteLhpId').val(lhpId);
                 $('#deleteLhpMa').text(lhpMa);
             });
+
             $('#btnConfirmDelete').click(function() {
                 var lhpId = $('#deleteLhpId').val();
-                if(!lhpId) { alert('Lỗi'); return; }
-                if(confirm('Xác nhận xóa lớp học phần?')) {
+                if (!lhpId) { showResult(false, 'Lỗi: Không tìm thấy ID Lớp HP.'); return; }
+
+                if (confirm('Xác nhận xóa lớp học phần? Hành động này không thể hoàn tác.')) {
                     $.post('@Url.Action("DeleteCourseClass", "Admin")', { lopHocPhanId: lhpId }, function(res){
-                        alert(res.message || 'Hoàn tất');
-                        location.reload();
+                        showResult(res.success, res.message || 'Hoàn tất');
+                        if (res.success) {
+                            location.reload();
+                        } else {
+                            $('#deleteModal').modal('hide');
+                        }
                     });
                 }
+            });
+
+            // --- Click cả hàng để xem chi tiết ---
+            $(document).on('click', '.clickable-row', function (e) {
+                if ($(e.target).closest('button').length > 0 ||
+                    $(e.target).closest('a').length > 0 ||
+                    $(e.target).closest('i').length > 0) {
+                    return; // Không chuyển hướng nếu click vào nút hành động
+                }
+                window.location = $(this).data('url');
             });
         });
     </script>

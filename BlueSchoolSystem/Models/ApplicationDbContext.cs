@@ -43,7 +43,7 @@ namespace BlueSchoolSystem.Models
         public DbSet<ChuongTrinhDaoTao> ChuongTrinhDaoTaos { get; set; } // Bảng chương trình đào tạo
         public DbSet<ChiTietChuongTrinhDaoTao> ChiTietChuongTrinhDaoTaos { get; set; } // Bảng chi tiết chương trình đào tạo
         public DbSet<DotDangKy> DotDangKys { get; set; } // Bảng đợt đăng ký
-
+        public DbSet<GiangVienMonHoc> GiangVienMonHocs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -123,7 +123,20 @@ namespace BlueSchoolSystem.Models
                 .HasOne(dk => dk.LopHocPhan)
                 .WithMany() 
                 .HasForeignKey(dk => dk.LopHocPhanId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<GiangVienMonHoc>()
+        .HasKey(x => new { x.GiangVienId, x.MonHocId });
+
+            builder.Entity<GiangVienMonHoc>()
+                .HasOne(x => x.GiangVien)
+                .WithMany(x => x.GiangVienMonHocs)
+                .HasForeignKey(x => x.GiangVienId);
+
+            builder.Entity<GiangVienMonHoc>()
+                .HasOne(x => x.MonHoc)
+                .WithMany(x => x.GiangVienMonHocs)
+                .HasForeignKey(x => x.MonHocId);
 
             builder.Entity<UserFaceTemplate>(e =>
             {
@@ -147,6 +160,7 @@ namespace BlueSchoolSystem.Models
                 e.Property(x => x.Score).HasColumnType("real"); // float32
                 e.ToTable("FaceVerifyLogs");
             });
+
 
         }
     }

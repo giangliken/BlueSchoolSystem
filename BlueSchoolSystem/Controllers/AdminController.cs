@@ -1904,71 +1904,263 @@ namespace BlueSchoolSystem.Controllers
         }
 
         // Quản lý lớp học phần
+        #region ======= Helper Methods =======
 
-        // GET: /Admin/CourseClassManager
-        public async Task<IActionResult> CourseClassManager()
+        private async Task PopulateViewBags(LopHocPhanCreateDTO dto = null)
         {
-            var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri(_apiBaseUrl);
+            // Lấy ID của các trạng thái hợp lệ cho việc mở lớp học phần
+            var validStatusNames = new List<string> { "Mới tạo", "Đang diễn ra" };
 
-            var token = HttpContext.Session.GetString("access_token");
-            if (!string.IsNullOrEmpty(token))
+            // Tìm ID của các trạng thái này trong bảng TrangThai
+            var validStatusIds = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "HocKy" && validStatusNames.Contains(t.TenTrangThai))
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            // Lọc Học kỳ theo các trạng thái hợp lệ
+            var hocKys = await _context.HocKys
+                .Where(hk => validStatusIds.Contains(hk.TrangThaiId)) // Giả sử HocKy có TrangThaiId
+                .ToListAsync();
+
+            var monHocs = await _context.MonHocs.ToListAsync();
+            var phongHocs = await _context.PhongHocs.ToListAsync();
+
+            ViewBag.HocKyList = new SelectList(hocKys, "Id", "TenHocKy", dto?.HocKyId);
+            ViewBag.MonHocList = new SelectList(monHocs, "Id", "TenMonHoc", dto?.MonHocId);
+            ViewBag.PhongHocList = new SelectList(phongHocs, "Id", "MaPhongHoc", dto?.PhongHocId);
+            
+
+            if (dto?.MonHocId > 0)
             {
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var giangViens = await _context.GiangViens
+    // Lọc giảng viên: kiểm tra xem có bất kỳ bản ghi nào trong GiangVienMonHocs
+    // mà MonHocId khớp với MonHocId đã chọn hay không.
+    .Where(gv => gv.GiangVienMonHocs.Any(gvmh => gvmh.MonHocId == dto.MonHocId))
+    .Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten })
+    .ToListAsync();
+                ViewBag.GiangVienList = new SelectList(giangViens, "Id", "HoTen", dto.GiangVienId);
+            }
+            else
+            {
+                ViewBag.GiangVienList = new SelectList(new List<dynamic>(), "Id", "HoTen");
             }
 
-            HttpResponseMessage response;
+            ViewBag.TrangThaiLHPList = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "LopHocPhan")
+                .ToListAsync();
+        }
+
+        private async Task<(bool success, JsonElement data, string error)> CallApiAsync(string url, HttpMethod method, object body = null)
+        {
             try
             {
-                // Gọi API lấy danh sách LHP
-                response = await client.GetAsync("api/lophocphans");
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+
+                // Lấy token từ session và thiết lập Authorization Header (ĐÃ SỬA)
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    // Đặt header Authorization cho mọi request
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                HttpResponseMessage response;
+
+                // Xử lý request
+                if (method == HttpMethod.Get)
+                {
+                    response = await client.GetAsync(url);
+                }
+                else if (method == HttpMethod.Post)
+                {
+                    var json = JsonConvert.SerializeObject(body);
+                    response = await client.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
+                }
+                else if (method == HttpMethod.Put)
+                {
+                    var json = JsonConvert.SerializeObject(body);
+                    response = await client.PutAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
+                }
+                else
+                {
+                    throw new NotImplementedException("HTTP method chưa hỗ trợ.");
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    // Cố gắng phân tích lỗi từ API nếu có
+                    return (false, default, $"API error: {response.StatusCode}, {content}");
+
+                var doc = JsonDocument.Parse(content);
+                return (true, doc.RootElement, null);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi khi gọi API lấy danh sách Lớp Học Phần.");
-                TempData["Error"] = "Không thể kết nối đến hệ thống API.";
-                return View(new List<object>()); // Trả về list rỗng nếu lỗi
+                _logger.LogError(ex, "Lỗi gọi API");
+                return (false, default, ex.Message);
             }
+        }
 
-            if (!response.IsSuccessStatusCode)
-            {
-                TempData["Error"] = "Không thể lấy danh sách Lớp Học Phần từ hệ thống API.";
-                return View(new List<object>());
-            }
+        private IActionResult RePopulateViewAndReturn(object dto, LopHocPhan lhp = null)
+        {
+            ViewBag.LHP = lhp;
 
-            var body = await response.Content.ReadAsStringAsync();
-            using var document = JsonDocument.Parse(body);
-            var root = document.RootElement;
-            var dataElement = root.GetProperty("data");
+            // 1. PHÒNG HỌC: Đảm bảo SelectList được tạo lại từ context.
+            ViewBag.PhongHocList = new SelectList(_context.PhongHocs.ToList(), "Id", "MaPhongHoc");
 
-            // Dùng dynamic hoặc ViewModel nếu bạn có định nghĩa
-            // Trong ví dụ này, tôi dùng dynamic để đơn giản hóa việc parse object phức tạp
-            var lhpList = JsonConvert.DeserializeObject<List<ExpandoObject>>(
-                dataElement.GetRawText(),
-                new JsonSerializerSettings
-                {
-                    Converters = { new ExpandoObjectConverter() }
-                }
-            );
+            // 2. DAYS OF WEEK: Đảm bảo List này luôn được tạo lại.
+            ViewBag.DaysOfWeek = new List<object>
+    {
+        new { Id = 2, Name = "Thứ Hai" },
+        new { Id = 3, Name = "Thứ Ba" },
+        new { Id = 4, Name = "Thứ Tư" },
+        new { Id = 5, Name = "Thứ Năm" },
+        new { Id = 6, Name = "Thứ Sáu" },
+        new { Id = 7, Name = "Thứ Bảy" },
+        new { Id = 8, Name = "Chủ Nhật" }
+    };
+            if (lhp != null && lhp.GiangVien != null)
+                ViewBag.GiangVien = $"{lhp.GiangVien.HoVaTenDem} {lhp.GiangVien.Ten} (Mã: {lhp.GiangVien.MaGiangVien})";
+            else
+                ViewBag.GiangVien = "Không rõ";
 
-            // Lấy danh sách trạng thái để đổ vào modal cập nhật
-            ViewBag.TrangThaiLHPList = await _context.TrangThais
-                .Where(t => t.LoaiTrangThai == "LopHocPhan")
-                .ToListAsync();
-            // Lấy danh sách trạng thái
-            ViewBag.TrangThaiLHPList = await _context.TrangThais
-                .Where(t => t.LoaiTrangThai == "LopHocPhan")
-                .ToListAsync();
+            return View(dto);
+        }
 
-            // 🔹 Nạp danh sách học kỳ cho modal Auto đăng ký
-            var hocKyList = await _context.HocKys.ToListAsync();
-            ViewBag.HocKyList = hocKyList;
-            ViewBag.HocKyId = hocKyList.FirstOrDefault()?.Id ?? 0;
-            return View(lhpList);
+        private int ConvertDayOfWeekToCustomDay(DayOfWeek dayOfWeek) => dayOfWeek switch
+        {
+            DayOfWeek.Monday => 2,
+            DayOfWeek.Tuesday => 3,
+            DayOfWeek.Wednesday => 4,
+            DayOfWeek.Thursday => 5,
+            DayOfWeek.Friday => 6,
+            DayOfWeek.Saturday => 7,
+            DayOfWeek.Sunday => 8,
+            _ => 0
+        };
+
+        private async Task<string> GenerateAutoMaLHP(int hocKyId, int monHocId)
+        {
+            var hocKy = await _context.HocKys.FindAsync(hocKyId);
+            var monHoc = await _context.MonHocs.FindAsync(monHocId);
+
+            if (hocKy == null || monHoc == null) return null;
+
+            string hocKyShort = hocKy.TenHocKy.Contains(" ")
+                ? hocKy.TenHocKy.Substring(hocKy.TenHocKy.LastIndexOf(" ") + 1)
+                : hocKy.TenHocKy;
+
+            string maMon = monHoc.MaMonHoc.ToUpper();
+            int year = hocKy.NgayBatDau.Year;
+            int count = await _context.LopHocPhans
+                .Where(l => l.HocKyId == hocKyId && l.MonHocId == monHocId)
+                .CountAsync();
+
+            return $"{hocKyShort.ToUpper()}-{maMon}-{year}-{(count + 1):D3}";
         }
 
 
-        // chi tiết lớp học phần
+        private readonly Dictionary<int, string> TietStartMap = new Dictionary<int, string> {
+    {1,"06:45"},{2,"07:30"},{3,"08:15"}, {4,"09:20"},{5,"10:05"},{6,"10:50"},
+    {7,"12:30"},{8,"13:10"},{9,"14:00"}, {10,"15:05"},{11,"15:50"},{12,"16:35"},
+    {13,"18:00"},{14,"18:45"},{15,"19:30"}
+};
+
+        private readonly Dictionary<int, string> TietEndMap = new Dictionary<int, string> {
+    {1,"07:30"},{2,"08:15"},{3,"09:00"}, {4,"10:05"},{5,"10:50"},{6,"11:35"},
+    {7,"13:15"},{8,"13:55"},{9,"14:45"}, {10,"15:50"},{11,"16:35"},{12,"17:20"},
+    {13,"18:45"},{14,"19:30"},{15,"20:15"}
+};
+
+        // Hàm chuyển đổi Tiết sang TimeSpan
+        private (TimeSpan start, TimeSpan end) ConvertTietToTimeSpan(int startTiet, int endTiet)
+        {
+            var startTime = TimeSpan.Parse(TietStartMap[startTiet]);
+            var endTime = TimeSpan.Parse(TietEndMap[endTiet]);
+            return (startTime, endTime);
+        }
+
+        private async Task<List<LichHocDTO>> CheckLichTrungAsync(List<LichHocDTO> newSchedules, int giangVienId)
+        {
+            var lichTrung = new List<LichHocDTO>();
+
+            foreach (var newLich in newSchedules)
+            {
+                // Kiểm tra trùng phòng học
+                var trungPhong = await _context.LichHocs
+                    .Include(l => l.LopHocPhan)
+                    .Where(l => l.PhongHocId == newLich.PhongHocId &&
+                                l.Ngay == newLich.Ngay &&
+                                // Kiểm tra thời gian chồng lấn: (StartA < EndB) && (EndA > StartB)
+                                (newLich.GioBatDau < l.GioKetThuc) &&
+                                (newLich.GioKetThuc > l.GioBatDau))
+                    .AnyAsync();
+
+                // Kiểm tra trùng lịch giảng viên
+                var trungGiangVien = await _context.LichHocs
+                    .Include(l => l.LopHocPhan)
+                    .Where(l => l.LopHocPhan.GiangVienId == giangVienId &&
+                                l.Ngay == newLich.Ngay &&
+                                (newLich.GioBatDau < l.GioKetThuc) &&
+                                (newLich.GioKetThuc > l.GioBatDau))
+                    .AnyAsync();
+
+                if (trungPhong || trungGiangVien)
+                {
+                    // Thêm lịch bị trùng vào danh sách báo cáo lỗi
+                    lichTrung.Add(newLich);
+                }
+            }
+            return lichTrung;
+        }
+
+        private async Task<List<PhongHoc>> GetPhongHocList(MonHoc monHoc)
+        {
+            var query = _context.PhongHocs.AsQueryable();
+
+            if (monHoc != null && monHoc.MoTa != null && monHoc.MoTa.ToUpper().Contains("TH"))
+            {
+                // Yêu cầu: Nếu Mô tả môn học có "TH" (Thực Hành), chỉ lấy Phòng Thực Hành
+                // Giả sử tên/mã phòng thực hành có chứa chuỗi "Phòng Thực Hành" (hoặc "TH")
+                // Tôi sẽ dùng điều kiện mạnh hơn là MaPhongHoc chứa "TH" hoặc Mô tả Phòng học chứa "Thực Hành"
+
+                query = query.Where(ph => ph.MaPhongHoc.ToUpper().Contains("TH") || ph.TenPhongHoc.ToUpper().Contains("THỰC HÀNH"));
+            }
+            else
+            {
+                // Ngược lại, chỉ lấy các phòng không phải là Phòng Thực Hành (Phòng học lý thuyết)
+                query = query.Where(ph => !ph.MaPhongHoc.ToUpper().Contains("TH") && !ph.TenPhongHoc.ToUpper().Contains("THỰC HÀNH"));
+            }
+
+            return await query.ToListAsync();
+        }
+
+
+        #endregion
+
+        #region ======= Course Class Manager =======
+
+        public async Task<IActionResult> CourseClassManager()
+        {
+            var (success, data, error) = await CallApiAsync("api/lophocphans", HttpMethod.Get);
+            if (!success)
+            {
+                TempData["Error"] = error ?? "Không thể lấy danh sách Lớp Học Phần.";
+                return View(new List<object>());
+            }
+
+            var lhpList = JsonConvert.DeserializeObject<List<ExpandoObject>>(
+                data.GetProperty("data").GetRawText(),
+                new JsonSerializerSettings { Converters = { new ExpandoObjectConverter() } }
+            );
+
+            await PopulateViewBags();
+            return View(lhpList);
+        }
+
         public async Task<IActionResult> CourseClassDetail(int id)
         {
             var lhp = await _context.LopHocPhans
@@ -1981,203 +2173,78 @@ namespace BlueSchoolSystem.Controllers
             if (lhp == null)
             {
                 TempData["Error"] = "Không tìm thấy lớp học phần.";
-                return RedirectToAction("CourseClassManager");
+                return RedirectToAction(nameof(CourseClassManager));
             }
 
             var lichHoc = await _context.LichHocs
-                .Where(l => l.LopHocPhanId == id)
-                .Select(l => new
-                {
-                    l.Id,
-                    l.Ngay,
-                    l.GioBatDau,
-                    l.GioKetThuc,
-                    Phong = l.PhongHocId.ToString()
-                })
-                .ToListAsync();
+        .Include(l => l.PhongHoc) 
+        .Where(l => l.LopHocPhanId == id)
+        .Select(l => new
+        {
+            l.Id,
+            l.Ngay,
+            l.GioBatDau,
+            l.GioKetThuc,
+            Phong = l.PhongHoc.MaPhongHoc
+        })
+        .ToListAsync();
 
             ViewBag.LichHoc = lichHoc;
 
             return View(lhp);
         }
-        // tự động tạo mã lhp
-        private async Task<string> GenerateAutoMaLHP(int hocKyId, int monHocId)
-        {
-            var hocKy = await _context.HocKys.FindAsync(hocKyId);
-            var monHoc = await _context.MonHocs.FindAsync(monHocId);
 
-            if (hocKy == null || monHoc == null)
-                return null;
+        #endregion
 
-            string hocKyShort = hocKy.TenHocKy;
+        #region ======= Create Course Class =======
 
-            if (hocKyShort.Contains(" "))
-            {
-                // Lấy phần sau khoảng trắng cuối cùng
-                hocKyShort = hocKyShort.Substring(hocKyShort.LastIndexOf(" ") + 1);
-            }
-
-            hocKyShort = $"{hocKyShort}".ToUpper();
-
-            string maMon = monHoc.MaMonHoc.ToUpper();
-
-            int year = DateTime.Now.Year;
-
-            int count = await _context.LopHocPhans
-                .Where(l => l.HocKyId == hocKyId && l.MonHocId == monHocId)
-                .CountAsync();
-
-            int stt = count + 1;
-
-            return $"{hocKyShort}-{maMon}-{year}-{stt.ToString("D3")}";
-        }
-        // GET: /Admin/CreateCourseClass
         public async Task<IActionResult> CreateCourseClass()
         {
-            // Chuẩn bị SelectList cho form tạo LHP
-            ViewBag.HocKyList = new SelectList(await _context.HocKys.ToListAsync(), "Id", "TenHocKy");
-            ViewBag.MonHocList = new SelectList(await _context.MonHocs.ToListAsync(), "Id", "TenMonHoc");
-            ViewBag.GiangVienList = new SelectList(
-                await _context.GiangViens.Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten }).ToListAsync(),
-                "Id", "HoTen");
+            await PopulateViewBags();
 
-            ViewBag.PhongHocList = new SelectList(
-                await _context.PhongHocs.ToListAsync(),
-                "Id", "MaPhongHoc" 
-            );
-            ViewBag.HocKyList = new SelectList(
-                await _context.HocKys
-                    .Where(hk => hk.NgayKetThuc > DateTime.Today) // chỉ học kỳ tương lai
-                    .ToListAsync(),
-                "Id", "TenHocKy"
-            );
-            var defaultDto = new LopHocPhanCreateDTO
+            var dto = new LopHocPhanCreateDTO
             {
                 NgayBatDauLHP = DateTime.Today,
-                NgayKetThucLHP = DateTime.Today.AddMonths(3),
+                NgayKetThucLHP = DateTime.Today.AddMonths(3)
             };
 
-            return View(defaultDto);
+            return View(dto);
         }
 
-        // POST: /Admin/CreateCourseClass
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateCourseClass(LopHocPhanCreateDTO dto)
         {
             if (!ModelState.IsValid)
             {
-                ViewBag.HocKyList = new SelectList(await _context.HocKys.ToListAsync(), "Id", "TenHocKy", dto.HocKyId);
-                ViewBag.MonHocList = new SelectList(await _context.MonHocs.ToListAsync(), "Id", "TenMonHoc", dto.MonHocId);
-                ViewBag.GiangVienList = new SelectList(
-                    await _context.GiangViens.Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten }).ToListAsync(),
-                    "Id", "HoTen", dto.GiangVienId);
-
+                await PopulateViewBags(dto);
                 return View(dto);
             }
 
-            // 🔥🔥🔥 TẠO MÃ LỚP HỌC PHẦN TỰ ĐỘNG 🔥🔥🔥
+            // Nếu chưa có mã LHP, tự sinh
             if (string.IsNullOrWhiteSpace(dto.MaLopHocPhan))
-            {
                 dto.MaLopHocPhan = await GenerateAutoMaLHP(dto.HocKyId, dto.MonHocId);
-            }
 
-            var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri(_apiBaseUrl);
-            var token = HttpContext.Session.GetString("access_token");
+            var (success, data, error) = await CallApiAsync("api/lophocphan", HttpMethod.Post, dto);
 
-            if (!string.IsNullOrEmpty(token))
+            if (success)
             {
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", token);
+                int newLhpId = data.GetProperty("lopHocPhanId").GetInt32();
+                TempData["Success"] = data.GetProperty("message").GetString() ?? $"Tạo Lớp Học Phần **{dto.MaLopHocPhan}** thành công!";
+                return RedirectToAction(nameof(CourseClassDetail), new { id = newLhpId });
             }
 
-            try
-            {
-                var json = JsonConvert.SerializeObject(dto);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await client.PostAsync("api/lophocphan", content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var apiResult = await response.Content.ReadAsStringAsync();
-                    dynamic resultObj = JsonConvert.DeserializeObject(apiResult);
-
-                    int newLhpId = resultObj.lopHocPhanId;
-                    string apiMessage = resultObj.message ??
-                                        $"Tạo Lớp Học Phần **{dto.MaLopHocPhan}** thành công!";
-
-                    TempData["Success"] = apiMessage;
-                    return RedirectToAction(nameof(CourseClassDetail), new { id = newLhpId });
-                }
-                else
-                {
-                    var apiError = await response.Content.ReadAsStringAsync();
-                    dynamic errObj = JsonConvert.DeserializeObject(apiError);
-
-                    ModelState.AddModelError("", errObj?.message ?? "Lỗi tạo Lớp Học Phần từ API.");
-
-                    ViewBag.HocKyList = new SelectList(await _context.HocKys.ToListAsync(), "Id", "TenHocKy", dto.HocKyId);
-                    ViewBag.MonHocList = new SelectList(await _context.MonHocs.ToListAsync(), "Id", "TenMonHoc", dto.MonHocId);
-                    ViewBag.GiangVienList = new SelectList(
-                        await _context.GiangViens.Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten }).ToListAsync(),
-                        "Id", "HoTen", dto.GiangVienId);
-
-                    return View(dto);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi kết nối khi tạo Lớp Học Phần.");
-                ModelState.AddModelError("", $"Lỗi kết nối: {ex.Message}");
-
-                ViewBag.HocKyList = new SelectList(await _context.HocKys.ToListAsync(), "Id", "TenHocKy", dto.HocKyId);
-                ViewBag.MonHocList = new SelectList(await _context.MonHocs.ToListAsync(), "Id", "TenMonHoc", dto.MonHocId);
-                ViewBag.GiangVienList = new SelectList(
-                    await _context.GiangViens.Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten }).ToListAsync(),
-                    "Id", "HoTen", dto.GiangVienId);
-
-                return View(dto);
-            }
-        }
-        //tìm giảng viên theo môn
-        [HttpGet]
-        public async Task<IActionResult> GetGiangVienTheoMon(int monHocId, string search)
-        {
-            if (monHocId == 0)
-                return BadRequest("monHocId is required");
-
-            // 1) Lấy giảng viên dạy môn học đó
-            var query = _context.GiangViens
-                .Where(g => g.MonHocs.Any(m => m.Id == monHocId));
-
-            // 2) Tìm kiếm theo mã hoặc tên
-            if (!string.IsNullOrEmpty(search))
-            {
-                search = search.Trim().ToLower();
-                query = query.Where(g =>
-                    g.MaGiangVien.ToLower().Contains(search) ||
-                    (g.HoVaTenDem + " " + g.Ten).ToLower().Contains(search)
-                );
-            }
-
-            // 3) Trả về dữ liệu cho Select2
-            var result = await query
-                .Select(g => new
-                {
-                    id = g.Id,
-                    text = $"{g.MaGiangVien} - {g.HoVaTenDem} {g.Ten}"
-                })
-                .ToListAsync();
-
-            return Json(result);
+            ModelState.AddModelError("", error ?? "Lỗi tạo Lớp Học Phần từ API.");
+            await PopulateViewBags(dto);
+            return View(dto);
         }
 
+        #endregion
+
+        #region ======= Add Schedule =======
 
 
 
-        // GET: /Admin/AddSchedule?lhpId=X (Thêm lịch học cho LHP đã tạo)
         public async Task<IActionResult> AddSchedule(int lhpId)
         {
             var lhp = await _context.LopHocPhans
@@ -2191,234 +2258,116 @@ namespace BlueSchoolSystem.Controllers
                 return RedirectToAction(nameof(CourseClassManager));
             }
 
+            // 1. Gán ViewBag cần thiết
             ViewBag.LHP = lhp;
-            ViewBag.PhongHocList = new SelectList(
-                _context.PhongHocs.ToList(),
-                "Id", "MaPhongHoc"
-            );
+            var phongHocs = await GetPhongHocList(lhp.MonHoc);
+            ViewBag.PhongHocList = new SelectList(phongHocs, "Id", "MaPhongHoc");
 
-            var model = new LichHocDTO
+            // Gán Map Tiết học
+            ViewBag.TietStartMap = TietStartMap;
+            ViewBag.TietEndMap = TietEndMap;
+
+            // Gán thông tin giảng viên
+            if (lhp.GiangVien != null)
+                ViewBag.GiangVien = $"{lhp.GiangVien.HoVaTenDem} {lhp.GiangVien.Ten} (Mã: {lhp.GiangVien.MaGiangVien})";
+            else
+                ViewBag.GiangVien = "Không rõ";
+
+            // 2. Tạo DTO và Return View
+            var model = new AddScheduleDTO // SỬ DỤNG DTO MỚI
             {
                 LopHocPhanId = lhp.Id,
-                Ngay = DateTime.Today,
-                GioBatDau = TimeSpan.FromHours(8),
-                GioKetThuc = TimeSpan.FromHours(10)
+                Ngay = DateTime.Now.Date,
+                TietBatDau = 2,
+                TietKetThuc = 6
             };
 
-            return View(model); // ✅ luôn trả về model không null
+            return View(model);
         }
 
-
-
-
-        // POST: /Admin/AddSchedule
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddSchedule(LichHocDTO dto)
+        public async Task<IActionResult> AddSchedule(AddScheduleDTO dto)
         {
-            // Lấy LHP và các thuộc tính liên quan
             var lhp = await _context.LopHocPhans
                 .Include(l => l.GiangVien)
                 .Include(l => l.MonHoc)
                 .FirstOrDefaultAsync(l => l.Id == dto.LopHocPhanId);
 
-            // Logic chung để nạp lại ViewBag trong trường hợp lỗi (được đặt trước return View)
-            Func<IActionResult> RePopulateViewAndReturn = () =>
+            // GÁN MAP TIẾT HỌC CHO TRƯỜNG HỢP LỖI
+            ViewBag.TietStartMap = TietStartMap;
+            ViewBag.TietEndMap = TietEndMap;
+
+            // 1. Validation cơ bản
+            if (!ModelState.IsValid || lhp == null || dto.PhongHocId <= 0)
             {
-                ViewBag.LHP = lhp;
-                // Luôn đảm bảo PhongHocList được nạp
-                ViewBag.PhongHocList = new SelectList(
-                    _context.PhongHocs.ToList(),
-                    "Id", "MaPhong",
-                    dto.PhongHocId
-                );
+                ModelState.AddModelError("", "Vui lòng điền đủ thông tin bắt buộc.");
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+            var validPhongHocs = await GetPhongHocList(lhp?.MonHoc);
+            ViewBag.PhongHocList = new SelectList(validPhongHocs, "Id", "MaPhongHoc");
 
-                // Kiểm tra an toàn cho GiangVien
-                if (lhp != null && lhp.GiangVien != null)
-                {
-                    ViewBag.GiangVien = $"{lhp.GiangVien.HoVaTenDem} {lhp.GiangVien.Ten} (Mã: {lhp.GiangVien.MaGiangVien})";
-                }
-                else
-                {
-                    ViewBag.GiangVien = "Không rõ (Lỗi dữ liệu giảng viên)";
-                }
+            // 3. Validation Phía Server: Kiểm tra Phòng đã chọn có hợp lệ không
+            if (!validPhongHocs.Any(ph => ph.Id == dto.PhongHocId))
+            {
+                ModelState.AddModelError(nameof(dto.PhongHocId), "Phòng học được chọn không phù hợp với loại môn học (Thực hành/Lý thuyết).");
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+            // 2. Validation Tiết học
+            if (dto.TietBatDau > dto.TietKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.TietKetThuc), "Tiết kết thúc phải lớn hơn hoặc bằng Tiết bắt đầu.");
+                return RePopulateViewAndReturn(dto, lhp);
+            }
 
-                // Nếu LHP bị mất sau khi POST, ta không thể tiếp tục
-                if (lhp == null)
-                {
-                    TempData["Error"] = "Lỗi nghiêm trọng: Không tìm thấy Lớp Học Phần khi xử lý lịch học.";
-                    return RedirectToAction(nameof(CourseClassManager));
-                }
+            // 3. CHUYỂN ĐỔI TIẾT SANG TIMESPAN
+            var (startTime, endTime) = ConvertTietToTimeSpan(dto.TietBatDau, dto.TietKetThuc);
 
-                return View(dto);
+            // 4. Chuẩn bị đối tượng LichHocDTO (đã có TimeSpan)
+            var scheduleToCreate = new LichHocDTO
+            {
+                LopHocPhanId = dto.LopHocPhanId,
+                Ngay = dto.Ngay, 
+                GioBatDau = startTime,
+                GioKetThuc = endTime,
+                PhongHocId = dto.PhongHocId
             };
 
-            if (!ModelState.IsValid)
+            // 5. KIỂM TRA TRÙNG LỊCH
+            var giangVienId = lhp.GiangVienId.GetValueOrDefault();
+            var lichTrung = await CheckLichTrungAsync(new List<LichHocDTO> { scheduleToCreate }, giangVienId);
+
+            if (lichTrung.Any())
             {
-                return RePopulateViewAndReturn();
+                ModelState.AddModelError("", $"Lỗi trùng lịch học. Lịch này trùng lịch giảng viên hoặc phòng học.");
+                return RePopulateViewAndReturn(dto, lhp);
             }
 
-            // Kiểm tra lhp có null không trước khi tiếp tục (trường hợp LHP bị xóa giữa chừng)
-            if (lhp == null)
+            // 6. GỌI API TẠO 1 LỊCH
+            var (success, data, error) = await CallApiAsync("api/lophocphan/lichhoc", HttpMethod.Post, scheduleToCreate);
+
+            if (success)
             {
-                TempData["Error"] = "Lỗi: Không tìm thấy Lớp Học Phần để thêm lịch học.";
-                return RedirectToAction(nameof(CourseClassManager));
+                TempData["Success"] = $"Thêm lịch học thành công vào ngày {dto.Ngay.ToString("dd/MM/yyyy")}!";
+                return RedirectToAction(nameof(CourseClassDetail), new { id = dto.LopHocPhanId });
             }
 
-            var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri(_apiBaseUrl);
-            var token = HttpContext.Session.GetString("access_token");
-
-            if (!string.IsNullOrEmpty(token))
-            {
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
-
-            try
-            {
-                var json = JsonConvert.SerializeObject(dto);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                // Gọi API tạo Lịch Học
-                var response = await client.PostAsync("api/lophocphan/lichhoc", content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    TempData["Success"] = $"Thêm lịch học thành công cho LHP ID {dto.LopHocPhanId}!";
-                    return RedirectToAction(nameof(CourseClassManager));
-                }
-                else
-                {
-                    var apiError = await response.Content.ReadAsStringAsync();
-                    dynamic errObj = JsonConvert.DeserializeObject(apiError);
-                    ModelState.AddModelError("", errObj?.message ?? "Lỗi thêm lịch học từ API.");
-
-                    // Re-populate ViewBags
-                    return RePopulateViewAndReturn();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi kết nối khi thêm lịch học.");
-                ModelState.AddModelError("", $"Lỗi kết nối: {ex.Message}");
-
-                // Re-populate ViewBags
-                return RePopulateViewAndReturn();
-            }
+            ModelState.AddModelError("", error ?? "Lỗi API khi tạo lịch học thủ công.");
+            return RePopulateViewAndReturn(dto, lhp);
         }
 
-
-        // POST: /Admin/UpdateCourseClassStatus
-        // Thường gọi qua Ajax từ trang CourseClassManager
-        [HttpPost]
-        public async Task<IActionResult> UpdateCourseClassStatus(int lopHocPhanId, int trangThaiId, string lyDo = null)
-        {
-            var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri(_apiBaseUrl);
-            var token = HttpContext.Session.GetString("access_token");
-
-            if (!string.IsNullOrEmpty(token))
-            {
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
-
-            var dto = new UpdateLopHocPhanStatusDTO { LopHocPhanId = lopHocPhanId, TrangThaiId = trangThaiId, LyDo = lyDo };
-            var json = JsonConvert.SerializeObject(dto);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            try
-            {
-                var response = await client.PutAsync("api/lophocphan/trangthai", content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var body = await response.Content.ReadAsStringAsync();
-                    dynamic successObj = JsonConvert.DeserializeObject(body);
-                    return Json(new { success = true, message = successObj.message });
-                }
-                else
-                {
-                    var apiError = await response.Content.ReadAsStringAsync();
+        #endregion
 
 
-                    _logger.LogWarning("API UpdateStatus failed. StatusCode: {StatusCode}. Error: {Error}", response.StatusCode, apiError);
 
-                    dynamic errObj = JsonConvert.DeserializeObject(apiError);
-                    return Json(new { success = false, message = errObj?.message ?? "Cập nhật trạng thái không thành công." });
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi kết nối khi cập nhật trạng thái LHP.");
-                return Json(new { success = false, message = $"Lỗi kết nối: {ex.Message}" });
-            }
-        }
-        [HttpPost]
-        public IActionResult DeleteCourseClass(int lopHocPhanId)
-        {
-            try
-            {
-                var lhp = _context.LopHocPhans.Find(lopHocPhanId);
-                if (lhp == null)
-                {
-                    return Json(new { success = false, message = "Không tìm thấy lớp học phần." });
-                }
+        #region ======= Auto Add Schedule =======
 
-                _context.LopHocPhans.Remove(lhp);
-                _context.SaveChanges();
-
-                return Json(new { success = true, message = "Xóa lớp học phần thành công." });
-            }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = ex.Message });
-            }
-        }
-        //chức năng tự động đăng kí lhp
-        [HttpPost]
-        public async Task<IActionResult> RunAutoDangKyBatBuocFromAdmin(int hocKyId, int thuTuHocKy)
-        {
-            var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri(_apiBaseUrl);
-            var token = HttpContext.Session.GetString("access_token");
-
-            if (!string.IsNullOrEmpty(token))
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-            try
-            {
-                var response = await client.PostAsync(
-                    $"api/auto-dangky-batbuoc/{hocKyId}?thuTuHocKy={thuTuHocKy}",
-                    null
-                );
-
-                var body = await response.Content.ReadAsStringAsync();
-                dynamic resultObj = JsonConvert.DeserializeObject(body);
-
-                if (response.IsSuccessStatusCode && resultObj.result == true)
-                {
-                    TempData["Success"] = resultObj.message.ToString();
-                }
-                else
-                {
-                    TempData["Error"] = resultObj?.message ?? "Chạy Auto đăng ký thất bại.";
-                }
-            }
-            catch (Exception ex)
-            {
-                TempData["Error"] = $"Lỗi kết nối API: {ex.Message}";
-            }
-
-            return RedirectToAction(nameof(CourseClassManager));
-        }
-
-        // GET: /Admin/AutoAddSchedule?lhpId=X (Giao diện cấu hình tự động thêm lịch)
         public async Task<IActionResult> AutoAddSchedule(int lhpId)
         {
             var lhp = await _context.LopHocPhans
-                .Include(l => l.MonHoc)
-                .Include(l => l.GiangVien)
-                .FirstOrDefaultAsync(l => l.Id == lhpId);
+        .Include(l => l.MonHoc)
+        .Include(l => l.GiangVien)
+        .FirstOrDefaultAsync(l => l.Id == lhpId);
 
             if (lhp == null)
             {
@@ -2426,159 +2375,306 @@ namespace BlueSchoolSystem.Controllers
                 return RedirectToAction(nameof(CourseClassManager));
             }
 
+            // 1. Gán tất cả ViewBag trước khi gọi View
             ViewBag.LHP = lhp;
-            ViewBag.PhongHocList = new SelectList(
-                _context.PhongHocs.ToList(),
-                "Id", "MaPhongHoc"
-            );
-
-            // Chuẩn bị danh sách các ngày trong tuần (để tạo checkbox)
+            var phongHocs = await GetPhongHocList(lhp.MonHoc);
+            ViewBag.PhongHocList = new SelectList(phongHocs, "Id", "MaPhongHoc");
             ViewBag.DaysOfWeek = new List<object>
     {
-        new { Id = 2, Name = "Thứ Hai" },
-        new { Id = 3, Name = "Thứ Ba" },
-        new { Id = 4, Name = "Thứ Tư" },
-        new { Id = 5, Name = "Thứ Năm" },
-        new { Id = 6, Name = "Thứ Sáu" },
-        new { Id = 7, Name = "Thứ Bảy" },
+        new { Id = 2, Name = "Thứ Hai" }, new { Id = 3, Name = "Thứ Ba" }, new { Id = 4, Name = "Thứ Tư" },
+        new { Id = 5, Name = "Thứ Năm" }, new { Id = 6, Name = "Thứ Sáu" }, new { Id = 7, Name = "Thứ Bảy" },
         new { Id = 8, Name = "Chủ Nhật" }
     };
+            // Gán Map Tiết học (Đã có)
+            ViewBag.TietStartMap = TietStartMap;
+            ViewBag.TietEndMap = TietEndMap;
 
-            var model = new AutoAddScheduleDTO
+            // Gán thông tin giảng viên cho ViewBag (Cần cho RePopulateViewAndReturn)
+            ViewBag.GiangVien = $"{lhp.GiangVien.HoVaTenDem} {lhp.GiangVien.Ten} (Mã: {lhp.GiangVien.MaGiangVien})";
+
+
+            // 2. Chỉ Return View một lần duy nhất
+            return View(new AutoAddScheduleDTO
             {
                 LopHocPhanId = lhp.Id,
-                // Có thể lấy giá trị mặc định từ DTO (8h-10h)
-            };
+                TietBatDau = 2,
+                TietKetThuc = 6
+            });
+        }
 
-            return View(model);
-        }
-        // Add this private helper method inside the AdminController class
-        private int ConvertDayOfWeekToCustomDay(DayOfWeek dayOfWeek)
-        {
-            // Mapping: 2=Monday, ..., 8=Sunday
-            switch (dayOfWeek)
-            {
-                case DayOfWeek.Monday: return 2;
-                case DayOfWeek.Tuesday: return 3;
-                case DayOfWeek.Wednesday: return 4;
-                case DayOfWeek.Thursday: return 5;
-                case DayOfWeek.Friday: return 6;
-                case DayOfWeek.Saturday: return 7;
-                case DayOfWeek.Sunday: return 8;
-                default: return 0;
-            }
-        }
-        // POST: /Admin/AutoAddSchedule
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AutoAddSchedule(AutoAddScheduleDTO dto)
         {
-            // Lấy LHP để nạp lại ViewBag nếu lỗi, và lấy thông tin ngày bắt đầu/kết thúc
             var lhp = await _context.LopHocPhans
-                .Include(l => l.GiangVien)
-                .Include(l => l.MonHoc)
-                .FirstOrDefaultAsync(l => l.Id == dto.LopHocPhanId);
+        .Include(l => l.GiangVien)
+        .Include(l => l.MonHoc)
+        .Include(l => l.HocKy)
+        .FirstOrDefaultAsync(l => l.Id == dto.LopHocPhanId);
 
-            // Logic chung để nạp lại ViewBag trong trường hợp lỗi (giống như AddSchedule)
-            Func<IActionResult> RePopulateViewAndReturn = () =>
+            // 1. Validation cơ bản (Giữ nguyên)
+            if (!ModelState.IsValid || dto.CacNgayTrongTuan == null || !dto.CacNgayTrongTuan.Any() || lhp == null)
             {
-                ViewBag.LHP = lhp;
-                ViewBag.PhongHocList = new SelectList(_context.PhongHocs.ToList(), "Id", "MaPhongHoc", dto.PhongHocId);
-                ViewBag.DaysOfWeek = new List<object>
+                ModelState.AddModelError("", "Vui lòng chọn ít nhất một ngày và điền đủ thông tin.");
+                ViewBag.TietStartMap = TietStartMap;
+                ViewBag.TietEndMap = TietEndMap;
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+
+            // Thêm validation: Tiết kết thúc phải >= Tiết bắt đầu
+            if (dto.TietBatDau > dto.TietKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.TietKetThuc), "Tiết kết thúc phải lớn hơn hoặc bằng Tiết bắt đầu.");
+                ViewBag.TietStartMap = TietStartMap;
+                ViewBag.TietEndMap = TietEndMap;
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+            // 3. VALIDATION RÀNG BUỘC NGHIỆP VỤ: Kiểm tra Phòng học có hợp lệ với loại Môn học không
+            var validPhongHocs = await GetPhongHocList(lhp.MonHoc);
+
+            // TẢI LẠI PHÒNG HỌC ĐÃ LỌC TRONG REPOPULATEVIEWANDRETURN BỊ LỖI
+            // (Vì RePopulateViewAndReturn không có thông tin MonHoc, chúng ta phải gán lại ViewBag.PhongHocList nếu validation server-side thất bại)
+            ViewBag.PhongHocList = new SelectList(validPhongHocs, "Id", "MaPhongHoc");
+
+            if (!validPhongHocs.Any(ph => ph.Id == dto.PhongHocId))
+            {
+                ModelState.AddModelError(nameof(dto.PhongHocId), "Phòng học được chọn không phù hợp với loại môn học (Thực hành/Lý thuyết).");
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+            // 2. CHUYỂN ĐỔI TIẾT SANG TIMESPAN VÀO BIẾN CỤC BỘ
+            var (startTime, endTime) = ConvertTietToTimeSpan(dto.TietBatDau, dto.TietKetThuc);
+            // (Bây giờ startTime và endTime là TimeSpan, sẵn sàng để lưu)
+
+            // 3. Chuẩn bị danh sách lịch học
+            var schedulesToCreate = Enumerable.Range(0, (lhp.NgayKetThuc - lhp.NgayBatDau).Days + 1)
+                .Select(i => lhp.NgayBatDau.AddDays(i))
+                .Where(d => dto.CacNgayTrongTuan.Contains(ConvertDayOfWeekToCustomDay(d.DayOfWeek)))
+                .Select(d => new LichHocDTO
+                {
+                    LopHocPhanId = dto.LopHocPhanId,
+                    Ngay = d,
+                    // SỬ DỤNG TIMESPAN ĐÃ CHUYỂN ĐỔI TỪ BƯỚC 2 ĐỂ TẠO DTO
+                    GioBatDau = startTime,
+                    GioKetThuc = endTime,
+                    PhongHocId = dto.PhongHocId
+                }).ToList();
+
+            // 4. KIỂM TRA TRÙNG LỊCH (Logic CheckLichTrungAsync vẫn sử dụng LichHocDTO với TimeSpan)
+            var giangVienId = lhp.GiangVienId.GetValueOrDefault();
+            var lichTrung = await CheckLichTrungAsync(schedulesToCreate, giangVienId);
+            if (lichTrung.Any())
+            {
+                ModelState.AddModelError("", "Lỗi trùng lịch học. Vui lòng kiểm tra các ngày và phòng học sau:");
+                foreach (var lich in lichTrung)
+                {
+                    // Báo cáo lỗi vẫn dùng TimeSpan để hiển thị chi tiết
+                    ModelState.AddModelError("", $"- GV {lhp.GiangVien.MaGiangVien} trùng lịch vào {lich.Ngay.ToString("dd/MM/yyyy")} ({lich.GioBatDau} - {lich.GioKetThuc}) tại Phòng ID {lich.PhongHocId}");
+                }
+
+                ViewBag.TietStartMap = TietStartMap;
+                ViewBag.TietEndMap = TietEndMap;
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+
+            // 5. GỌI API BATCH
+            // schedulesToCreate đã chứa TimeSpan (GioBatDau, GioKetThuc) nên việc lưu trữ là chính xác.
+            var (success, data, error) = await CallApiAsync("api/lophocphan/lichhoc/batch", HttpMethod.Post, schedulesToCreate);
+
+            if (success)
+            {
+                TempData["Success"] = $"Tạo **{schedulesToCreate.Count}** lịch học tự động thành công cho LHP **{lhp.MaLopHocPhan}**!";
+                return RedirectToAction(nameof(CourseClassDetail), new { id = dto.LopHocPhanId });
+            }
+
+            ModelState.AddModelError("", error ?? "Lỗi API khi tạo hàng loạt lịch học.");
+            ViewBag.TietStartMap = TietStartMap;
+            ViewBag.TietEndMap = TietEndMap;
+            return RePopulateViewAndReturn(dto, lhp);
+        }
+
+        #endregion
+
+        #region ======= Other Actions (Update/Delete) =======
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateCourseClassStatus(int lopHocPhanId, int trangThaiId, string lyDo = null)
         {
-            new { Id = 2, Name = "Thứ Hai" }, new { Id = 3, Name = "Thứ Ba" }, new { Id = 4, Name = "Thứ Tư" },
-            new { Id = 5, Name = "Thứ Năm" }, new { Id = 6, Name = "Thứ Sáu" }, new { Id = 7, Name = "Thứ Bảy" },
-            new { Id = 8, Name = "Chủ Nhật" }
-        };
-                if (lhp == null)
+            var dto = new UpdateLopHocPhanStatusDTO { LopHocPhanId = lopHocPhanId, TrangThaiId = trangThaiId, LyDo = lyDo };
+            var (success, data, error) = await CallApiAsync("api/lophocphan/trangthai", HttpMethod.Put, dto);
+
+            // Khắc phục lỗi tại đây:
+            string message = error ?? "Cập nhật trạng thái không thành công.";
+
+            if (success)
+            {
+                // Kiểm tra xem thuộc tính 'message' có tồn tại không trước khi lấy giá trị
+                if (data.TryGetProperty("message", out var messageElement))
                 {
-                    TempData["Error"] = "Lỗi nghiêm trọng: Không tìm thấy Lớp Học Phần khi xử lý tự động thêm lịch.";
-                    return RedirectToAction(nameof(CourseClassManager));
-                }
-                return View(dto);
-            };
-
-            if (!ModelState.IsValid || dto.CacNgayTrongTuan == null || !dto.CacNgayTrongTuan.Any())
-            {
-                ModelState.AddModelError("", "Vui lòng chọn ít nhất một ngày trong tuần để tạo lịch học.");
-                return RePopulateViewAndReturn();
-            }
-
-            if (lhp == null)
-            {
-                TempData["Error"] = "Lỗi: Không tìm thấy Lớp Học Phần để thêm lịch học.";
-                return RedirectToAction(nameof(CourseClassManager));
-            }
-
-            // 1. Chuẩn bị danh sách các lịch học cần tạo
-            var schedulesToCreate = new List<LichHocDTO>();
-            var currentDate = lhp.NgayBatDau;
-            var endDate = lhp.NgayKetThuc;
-
-            while (currentDate <= endDate)
-            {
-                // Chuyển đổi DayOfWeek của C# sang số ngày trong tuần tùy chỉnh của bạn (2=Thứ Hai, ..., 8=Chủ Nhật)
-                var customDayOfWeek = ConvertDayOfWeekToCustomDay(currentDate.DayOfWeek);
-
-                // Nếu ngày hiện tại là một trong những ngày đã chọn để lặp lại
-                if (dto.CacNgayTrongTuan.Contains(customDayOfWeek))
-                {
-                    schedulesToCreate.Add(new LichHocDTO
-                    {
-                        LopHocPhanId = dto.LopHocPhanId,
-                        Ngay = currentDate,
-                        GioBatDau = dto.GioBatDau,
-                        GioKetThuc = dto.GioKetThuc,
-                        PhongHocId = dto.PhongHocId
-                    });
-                }
-
-                // Di chuyển sang ngày tiếp theo
-                currentDate = currentDate.AddDays(1);
-            }
-
-            if (!schedulesToCreate.Any())
-            {
-                ModelState.AddModelError("", "Không có lịch học nào được tạo trong khoảng thời gian đã chọn.");
-                return RePopulateViewAndReturn();
-            }
-
-            // 2. Gọi API để tạo hàng loạt lịch học
-            var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri(_apiBaseUrl);
-            var token = HttpContext.Session.GetString("access_token");
-
-            if (!string.IsNullOrEmpty(token))
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-            try
-            {
-                // Gửi danh sách các lịch học cần tạo đến một endpoint API mới (ví dụ: api/lophocphan/lichhoc/batch)
-                var json = JsonConvert.SerializeObject(schedulesToCreate);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                // *LƯU Ý QUAN TRỌNG*: Bạn cần phải tạo API endpoint này ở Backend/API của mình
-                var response = await client.PostAsync("api/lophocphan/lichhoc/batch", content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    TempData["Success"] = $"Tạo **{schedulesToCreate.Count}** lịch học tự động thành công cho LHP **{lhp.MaLopHocPhan}**!";
-                    return RedirectToAction(nameof(CourseClassDetail), new { id = dto.LopHocPhanId });
+                    message = messageElement.GetString() ?? message;
                 }
                 else
                 {
-                    var apiError = await response.Content.ReadAsStringAsync();
-                    dynamic errObj = JsonConvert.DeserializeObject(apiError);
-                    ModelState.AddModelError("", errObj?.message ?? "Lỗi API khi tạo hàng loạt lịch học.");
-                    return RePopulateViewAndReturn();
+                    message = "Cập nhật trạng thái thành công.";
                 }
+            }
+
+            // Trả về JSON với message đã được xử lý
+            return Json(new { success, message });
+        }
+
+        [HttpPost]
+        public IActionResult DeleteCourseClass(int lopHocPhanId)
+        {
+            try
+            {
+                var lhp = _context.LopHocPhans.Find(lopHocPhanId);
+                if (lhp == null) return Json(new { success = false, message = "Không tìm thấy lớp học phần." });
+
+                _context.LopHocPhans.Remove(lhp);
+                _context.SaveChanges();
+                return Json(new { success = true, message = "Xóa lớp học phần thành công." });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi kết nối khi tự động thêm lịch học.");
-                ModelState.AddModelError("", $"Lỗi kết nối: {ex.Message}");
-                return RePopulateViewAndReturn();
+                return Json(new { success = false, message = ex.Message });
             }
         }
+
+        #endregion
+
+        #region ======= Get Giang Vien =======
+
+        [HttpGet]
+        public async Task<IActionResult> GetGiangVienTheoMon(int? monHocId, string search = "")
+        {
+            var query = _context.GiangViens.AsQueryable();
+
+            if (monHocId.HasValue && monHocId.Value > 0)
+                query = query.Where(gv => gv.GiangVienMonHocs.Any(gvmh => gvmh.MonHocId == monHocId.Value));
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(gv => (gv.HoVaTenDem + " " + gv.Ten).Contains(search));
+
+            var giangViens = await query
+                .Select(gv => new { Id = gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten })
+                .ToListAsync();
+
+            return Json(giangViens);
+        }
+
+        #endregion
+        #region ======= Auto Dang Ky Bat Buoc =======
+
+
+        [HttpPost]
+        public async Task<IActionResult> RunAutoDangKyBatBuocFromAdmin(int hocKyId, int thuTuHocKy)
+        {
+            if (hocKyId <= 0 || thuTuHocKy <= 0)
+            {
+                TempData["Error"] = "Vui lòng chọn Học kỳ và Thứ tự học kỳ hợp lệ.";
+                return RedirectToAction(nameof(CourseClassManager));
+            }
+
+            // Gọi API POST để kích hoạt quy trình tự động trên Backend
+            var (success, data, error) = await CallApiAsync(
+                url: $"api/auto-dangky-batbuoc/{hocKyId}?thuTuHocKy={thuTuHocKy}",
+                method: HttpMethod.Post);
+
+            if (success)
+            {
+                string message = "Quá trình đăng ký tự động đã hoàn tất.";
+
+                // Cố gắng lấy thông báo chi tiết từ phản hồi API
+                if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("message", out var messageElement))
+                {
+                    message = messageElement.GetString() ?? message;
+                }
+
+                TempData["Success"] = message;
+            }
+            else
+            {
+                // Xử lý lỗi API
+                TempData["Error"] = error ?? "Chạy tự động đăng ký bắt buộc thất bại.";
+            }
+
+            // Luôn redirect trở lại trang quản lý lớp học phần để thấy kết quả
+            return RedirectToAction(nameof(CourseClassManager));
+        }
+
+        #endregion
+        #region ======= Auto Generate LHP Code and Name =======
+
+        /// <summary>
+        /// Sinh tự động Mã LHP và tên gợi ý khi chọn Học kỳ và Môn học.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GenerateLopHocPhanInfo(int hocKyId, int monHocId)
+        {
+            if (hocKyId <= 0 || monHocId <= 0)
+            {
+                return Json(new { success = false, message = "Thiếu Học kỳ hoặc Môn học ID." });
+            }
+
+            try
+            {
+                // 1. Sinh Mã LHP
+                var maLopHocPhan = await GenerateAutoMaLHP(hocKyId, monHocId);
+
+                // 2. Gợi ý Tên LHP (Thường là tên Môn học + Mã nhóm)
+                var monHoc = await _context.MonHocs.FindAsync(monHocId);
+
+                string tenGoiY = "";
+                if (monHoc != null)
+                {
+                    // Ví dụ: "Tên Môn Học (Tên Học Kỳ )" hoặc đơn giản là Tên Môn học
+                    tenGoiY = $"{monHoc.TenMonHoc} ";
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    maLopHocPhan = maLopHocPhan,
+                    tenLopHocPhan = tenGoiY
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi sinh thông tin LHP tự động");
+                return Json(new { success = false, message = "Lỗi server khi sinh mã." });
+            }
+        }
+
+        #endregion
+        #region ======= Get Hoc Ky Dates =======
+
+        /// <summary>
+        /// Lấy ngày bắt đầu và kết thúc của một Học kỳ cụ thể.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetHocKyDates(int hocKyId)
+        {
+            if (hocKyId <= 0)
+            {
+                return Json(new { success = false, message = "Thiếu Học kỳ ID." });
+            }
+
+            var hocKy = await _context.HocKys.FindAsync(hocKyId);
+
+            if (hocKy == null)
+            {
+                return Json(new { success = false, message = "Không tìm thấy Học kỳ." });
+            }
+
+            // Trả về ngày dưới dạng chuỗi format 'yyyy-MM-dd' để JavaScript/HTML input type='date' có thể đọc được
+            return Json(new
+            {
+                success = true,
+                ngayBatDau = hocKy.NgayBatDau.ToString("yyyy-MM-dd"),
+                ngayKetThuc = hocKy.NgayKetThuc.ToString("yyyy-MM-dd")
+            });
+        }
+
+        #endregion
     }
 }
