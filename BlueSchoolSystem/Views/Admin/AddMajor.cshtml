@@ -1,0 +1,41 @@
+﻿@model BlueSchoolSystem.Models.NganhHoc
+@{
+    var khoas = ViewBag.Khoas as List<Khoa> ?? new List<Khoa>();
+}
+
+
+<h2 class="mb-4">Thêm ngành học mới</h2>
+
+<form asp-action="AddMajor" method="post" class="card shadow-sm p-4">
+    <div class="mb-3">
+        <label class="form-label">Mã ngành</label>
+        <input asp-for="MaNganh" class="form-control" />
+        <span asp-validation-for="MaNganh" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Tên ngành</label>
+        <input asp-for="TenNganh" class="form-control" />
+        <span asp-validation-for="TenNganh" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Khoa</label>
+        <select asp-for="KhoaId" class="form-select">
+            <option value="">-- Chọn khoa --</option>
+            @foreach (var khoa in khoas)
+            {
+                <option value="@khoa.Id">@khoa.TenKhoa</option>
+            }
+        </select>
+        <span asp-validation-for="KhoaId" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+        <i class="fa-solid fa-plus me-1"></i> Thêm ngành
+    </button>
+
+    <a asp-action="MajorManager" class="btn btn-secondary ms-2">
+        <i class="fa-solid fa-arrow-left me-1"></i> Quay lại
+    </a>
+</form>

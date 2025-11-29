@@ -1,0 +1,96 @@
+﻿@model List<BlueSchoolSystem.Models.NganhHoc>
+@{
+    ViewBag.Title = "Quản lý ngành học";
+    var khoas = ViewBag.Khoas as List<Khoa>;
+}
+
+<form method="get" asp-action="MajorManager" class="row g-2 mb-4">
+    <div class="col-md-4">
+        <input type="text" name="keyword" class="form-control" value="@ViewBag.Keyword" placeholder="Tìm theo mã ngành hoặc tên ngành..." />
+    </div>
+
+    <div class="col-md-4">
+        <select name="khoaId" class="form-select">
+            <option value="">-- Tất cả Khoa/Viện --</option>
+
+            @foreach (var khoa in khoas)
+            {
+                // Lấy giá trị khoaId từ query hoặc ViewBag
+                var selectedId = Context.Request.Query["khoaId"].ToString();
+                if (string.IsNullOrEmpty(selectedId))
+                {
+                    selectedId = ViewBag.KhoaId?.ToString();
+                }
+
+                // Nếu trùng → selected
+                if (selectedId == khoa.Id.ToString())
+                {
+                    <option value="@khoa.Id" selected>@khoa.TenKhoa</option>
+                }
+                else
+                {
+                    <option value="@khoa.Id">@khoa.TenKhoa</option>
+                }
+            }
+        </select>
+    </div>
+
+
+    <div class="col-md-4 d-flex gap-2">
+        <button type="submit" class="btn btn-info">Lọc</button>
+        <a asp-action="MajorManager" class="btn btn-secondary">Xóa lọc</a>
+       
+    </div>
+</form>
+
+<div class="mt-2 mb-2">
+    <a asp-controller="Admin" asp-action="AddMajor" class="btn btn-primary">
+        <i class="fa fa-plus"></i> Thêm ngành
+    </a>
+
+</div>
+<table class="table table-bordered">
+    <thead class="table-dark">
+        <tr>
+            <th class="text-center">STT</th>
+            <th class="text-center">Mã ngành</th>
+            <th class="text-center">Tên ngành</th>
+            <th class="text-center">Khoa</th>
+            <th class="text-center">Hành động</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (!Model.Any())
+        {
+            <tr>
+                <td colspan="5" class="text-center text-muted fst-italic">Không có ngành nào.</td>
+            </tr>
+        }
+        else
+        {
+            var index = 1;
+            foreach (var item in Model)
+            {
+                <tr style="cursor: pointer;" onclick="location.href='@Url.Action("MajorDetails", "Admin", new { id = item.Id })'">
+                    <td class="text-center">@index</td>
+                    <td class="text-center">@item.MaNganh</td>
+                    <td>@item.TenNganh</td>
+                    <td>@khoas.FirstOrDefault(k => k.Id == item.KhoaId)?.TenKhoa</td>
+                    <td class="text-center">
+                        <a asp-action="EditMajor" asp-route-id="@item.Id" class="btn btn-sm btn-warning" title="Sửa ngành">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </a>
+                        <form asp-action="DeleteMajor" asp-route-id="@item.Id" method="post" class="d-inline"
+                              onsubmit="return confirm('Xác nhận xóa ngành này?');">
+                            <button type="submit" class="btn btn-sm btn-danger" title="Xóa ngành">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+
+                </tr>
+                index++;
+            }
+        }
+    </tbody>
+</table>
