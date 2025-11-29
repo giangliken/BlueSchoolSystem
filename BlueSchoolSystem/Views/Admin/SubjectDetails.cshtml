@@ -1,0 +1,138 @@
+﻿@model BlueSchoolSystem.Models.ViewModel.SubjectDetailViewModel
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<h2 class="mb-4 fw-bold" style="position: relative; padding-left: 16px;">
+    <span style="position: absolute; left: 0; top: 0; bottom: 0;
+                 width: 6px; background: var(--bs-primary); border-radius: 4px;"></span>
+    Thông tin môn học
+</h2>
+
+<div class="card shadow-sm p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+        <h3 class="fw-bold mb-0">
+            @Model.TenMonHoc
+            <span class="text-muted">(@Model.MaMonHoc)</span>
+        </h3>
+
+        <span class="badge bg-info text-dark fs-6 px-3 py-2">
+            <i class="fa-solid fa-graduation-cap me-1"></i>
+            @Model.SoTinChi tín chỉ
+        </span>
+    </div>
+
+    <div>
+        <b>Mô tả:</b><br />
+        @if (string.IsNullOrWhiteSpace(Model.MoTa))
+        {
+            <span class="text-muted fst-italic">Không có mô tả.</span>
+        }
+        else
+        {
+            <span>@Model.MoTa</span>
+        }
+    </div>
+</div>
+
+
+<!-- DANH SÁCH NGÀNH ÁP DỤNG -->
+<div class="card shadow-sm p-4 mb-4">
+    <h5 class="fw-bold mb-3">Ngành áp dụng</h5>
+
+    @if (Model.Nganhs.Any())
+    {
+        <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th class="text-center">STT</th>
+                    <th class="text-center">Mã ngành</th>
+                    <th class="text-center">Tên ngành</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var stt = 1;
+                    foreach (var item in Model.Nganhs)
+                    {
+                        <tr>
+                            <td class="text-center">@stt</td>
+                            <td class="text-center">@item.MaNganh</td>
+                            <td>@item.TenNganh</td>
+                        </tr>
+                        ;
+                        stt++;
+                    }
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="text-muted fst-italic">Chưa có ngành nào áp dụng.</div>
+    }
+</div>
+
+<!-- DANH SÁCH GIẢNG VIÊN DẠY MÔN -->
+<div class="card shadow-sm p-4 mb-4">
+    <h5 class="fw-bold mb-3">Giảng viên giảng dạy</h5>
+
+    @if (Model.GiangViens.Any())
+    {
+        <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th class="text-center">STT</th>
+                    <th class="text-center">Mã giảng viên</th>
+                    <th class="text-center">Tên giảng viên</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var index = 1;
+                    foreach (var gv in Model.GiangViens)
+                    {
+                        <tr>
+                            <td class="text-center">@index</td>
+                            <td class="text-center">@gv.MaGiangVien</td>
+                            <td>@gv.HoTen</td>
+                        </tr>
+                        ;
+                        index++;
+                    }
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="text-muted fst-italic">Chưa có giảng viên nào dạy môn này.</div>
+    }
+</div>
+
+<div class="mb-4 d-flex gap-2 justify-content-center align-items-center">
+    <a href="@Url.Action("SubjectManager", "Admin")" class="btn btn-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i> Quay lại danh sách
+    </a>
+
+    <a href="@Url.Action("EditSubject", "Admin", new { id = Model.Id })"
+       class="btn btn-warning">
+        <i class="fa-solid fa-pen-to-square me-2"></i> Sửa môn học
+    </a>
+    <a href="@Url.Action("AssignNganh", "Admin", new { id = Model.Id })"
+       class="btn btn-primary ms-2">
+        <i class="fa-solid fa-layer-group me-2"></i> Gán môn cho ngành
+    </a>
+    <a href="@Url.Action("AssignGiangVien", "Admin", new { id = Model.Id })"
+       class="btn btn-success">
+        <i class="fa-solid fa-chalkboard-teacher me-2"></i> Chỉ định GV phụ trách
+    </a>
+
+
+</div>
+
