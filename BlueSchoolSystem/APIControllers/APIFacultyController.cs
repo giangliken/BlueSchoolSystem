@@ -17,6 +17,8 @@ namespace BlueSchoolSystem.APIControllers
         {
             _context = context;
         }
+
+
         // Lấy danh sách tất cả các khoa tại trường
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("laydanhsachkhoa")]
