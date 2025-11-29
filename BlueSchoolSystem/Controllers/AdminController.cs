@@ -3554,5 +3554,124 @@ namespace BlueSchoolSystem.Controllers
         }
 
 
+        // GET: Quản lý ngành
+        [HttpGet]
+        public async Task<IActionResult> MajorManager(string keyword, int? khoaId)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            // Gọi danh sách khoa để lọc
+            var khoaResponse = await client.GetAsync("api/laydanhsachkhoa");
+            var khoaData = JsonDocument.Parse(await khoaResponse.Content.ReadAsStringAsync()).RootElement.GetProperty("data");
+            var khoas = JsonSerializer.Deserialize<List<Khoa>>(khoaData.ToString(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            ViewBag.Khoas = khoas;
+
+            // Gọi danh sách ngành
+            var response = await client.GetAsync("api/laydanhsachnganhhoc");
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Không thể tải danh sách ngành!";
+                return View(new List<NganhHoc>());
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var data = JsonDocument.Parse(json).RootElement.GetProperty("data");
+            var nganhList = JsonSerializer.Deserialize<List<NganhHoc>>(data.ToString(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                keyword = keyword.ToLower();
+                nganhList = nganhList.Where(n =>
+                    n.MaNganh.ToLower().Contains(keyword) ||
+                    n.TenNganh.ToLower().Contains(keyword)).ToList();
+            }
+
+            if (khoaId.HasValue)
+            {
+                nganhList = nganhList.Where(n => n.KhoaId == khoaId).ToList();
+            }
+
+            ViewBag.Keyword = keyword;
+            ViewBag.KhoaId = khoaId;
+
+            return View(nganhList);
+        }
+
+
+        //Trang thêm ngành học
+        [HttpGet]
+        public IActionResult AddMajor()
+        {
+            var khoas = _context.Khoas.OrderBy(k => k.TenKhoa).ToList();
+            ViewBag.Khoas = khoas;
+
+            return View();
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> AddMajor(NganhHoc model)
+        {
+            // Gán lại danh sách khoa khi submit thất bại
+            var khoas = _context.Khoas.OrderBy(k => k.TenKhoa).ToList();
+            ViewBag.Khoas = khoas;
+
+            if (!ModelState.IsValid)
+            {
+                TempData["Error"] = "Dữ liệu không hợp lệ.";
+                return View(model);
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.PostAsJsonAsync("api/them-nganhhoc", model);
+
+            if (response.IsSuccessStatusCode)
+            {
+                TempData["Success"] = "Thêm ngành học thành công.";
+                return RedirectToAction("MajorManager");
+            }
+
+            var errorMsg = await response.Content.ReadAsStringAsync();
+            TempData["Error"] = $"Lỗi khi thêm ngành: {errorMsg}";
+
+            return View(model);
+        }
+
+        //Xem chi tiết ngành học
+        public IActionResult MajorDetails(int id)
+        {
+            // Lấy ngành học, bao gồm cả thông tin khoa và các môn học liên quan
+            var major = _context.NganhHocs
+                .Include(n => n.Khoa)
+                .Include(n => n.MonHocs)
+                .FirstOrDefault(n => n.Id == id);
+
+            if (major == null)
+            {
+                TempData["Error"] = "Không tìm thấy ngành học.";
+                return RedirectToAction("MajorManager");
+            }
+
+            return View("MajorDetails", major);
+        }
+
+
+
     }
 }
