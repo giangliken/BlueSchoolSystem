@@ -1,0 +1,43 @@
+﻿@model BlueSchoolSystem.Models.ViewModel.SubjectDetailViewModel
+@{
+    var allNganhs = ViewBag.AllNganhs as List<NganhHoc>;
+}
+
+<h2 class="mb-4 fw-bold" style="position: relative; padding-left: 16px;">
+    <span style="position: absolute; left: 0; top: 0; bottom: 0;
+                 width: 6px; background: var(--bs-primary); border-radius: 4px;"></span>
+    Ngành áp dụng cho môn @Model.TenMonHoc - @Model.MaMonHoc
+</h2>
+<form method="post" asp-action="AssignNganh">
+    <input type="hidden" name="id" value="@Model.Id" />
+
+    <div class="card p-4 shadow-sm mb-4">
+        <h5 class="fw-bold mb-3">Danh sách ngành</h5>
+
+        @foreach (var n in allNganhs)
+        {
+            bool isChecked = Model.Nganhs.Any(x => x.MaNganh == n.MaNganh);
+
+            <div class="form-check">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="selectedNganhs"
+                       value="@n.Id"
+                       @(isChecked ? "checked" : "") />
+
+                <label class="form-check-label">
+                    @n.TenNganh (@n.MaNganh)
+                </label>
+            </div>
+        }
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+        <i class="fa-solid fa-check me-2"></i> Lưu thay đổi
+    </button>
+
+    <a href="@Url.Action("SubjectDetails", "Admin", new { id = Model.Id })"
+       class="btn btn-secondary ms-2">
+        <i class="fa-solid fa-arrow-left me-2"></i> Quay lại
+    </a>
+</form>

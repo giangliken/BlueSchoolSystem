@@ -2359,7 +2359,7 @@ namespace BlueSchoolSystem.Controllers
             ViewBag.HocKyList = new SelectList(hocKys, "Id", "TenHocKy", dto?.HocKyId);
             ViewBag.MonHocList = new SelectList(monHocs, "Id", "TenMonHoc", dto?.MonHocId);
             ViewBag.PhongHocList = new SelectList(phongHocs, "Id", "MaPhongHoc", dto?.PhongHocId);
-            
+
 
             if (dto?.MonHocId > 0)
             {
@@ -2608,7 +2608,7 @@ namespace BlueSchoolSystem.Controllers
             }
 
             var lichHoc = await _context.LichHocs
-        .Include(l => l.PhongHoc) 
+        .Include(l => l.PhongHoc)
         .Where(l => l.LopHocPhanId == id)
         .Select(l => new
         {
@@ -2758,7 +2758,7 @@ namespace BlueSchoolSystem.Controllers
             var scheduleToCreate = new LichHocDTO
             {
                 LopHocPhanId = dto.LopHocPhanId,
-                Ngay = dto.Ngay, 
+                Ngay = dto.Ngay,
                 GioBatDau = startTime,
                 GioKetThuc = endTime,
                 PhongHocId = dto.PhongHocId
@@ -3107,5 +3107,452 @@ namespace BlueSchoolSystem.Controllers
         }
 
         #endregion
+
+        //Trang quản lý môn học
+        public async Task<IActionResult> SubjectManager(string? keyword)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                HttpResponseMessage response =
+                    await client.GetAsync("api/laydanhsachmonhoc");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["Error"] = "Không thể lấy danh sách môn học!";
+                    return View(new List<MonHocViewModel>());
+                }
+
+                var body = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(body);
+
+                var root = doc.RootElement;
+
+                var data = root.GetProperty("data").GetRawText();
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                var subjects = JsonSerializer.Deserialize<List<MonHocViewModel>>(data, options);
+
+                // Lọc theo keyword
+                if (!string.IsNullOrEmpty(keyword))
+                {
+                    subjects = subjects
+                        .Where(s =>
+                            s.MaMonHoc.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                            s.TenMonHoc.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+                        )
+                        .ToList();
+
+                    ViewBag.Keyword = keyword;
+                }
+
+                ViewBag.Tong = subjects.Count;
+
+                return View(subjects);
+            }
+            catch
+            {
+                TempData["Error"] = "Lỗi kết nối API!";
+                return View(new List<MonHocViewModel>());
+            }
+        }
+
+        //Trang chi tiết môn học
+        public async Task<IActionResult> SubjectDetails(int id)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                var response = await client.GetAsync($"api/monhocchitiet/{id}");
+                var body = await response.Content.ReadAsStringAsync();
+
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                if (root.GetProperty("result").GetBoolean() == false)
+                {
+                    TempData["Error"] = root.GetProperty("message").GetString();
+                    return RedirectToAction("SubjectManager");
+                }
+
+                var dataJson = root.GetProperty("data").GetRawText();
+
+                var detail = JsonSerializer.Deserialize<SubjectDetailViewModel>(
+                    dataJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+
+                return View(detail);
+            }
+            catch
+            {
+                TempData["Error"] = "Không thể kết nối API!";
+                return RedirectToAction("SubjectManager");
+            }
+        }
+
+
+
+        //Trang thêm môn học
+        [HttpGet]
+        public IActionResult AddSubject()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AddSubject(MonHocCreate model)
+        {
+            if (!ModelState.IsValid)
+            {
+                TempData["Error"] = "Dữ liệu không hợp lệ!";
+                return View(model);
+            }
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                var json = JsonSerializer.Serialize(model);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await client.PostAsync("api/taomonhoc", content);
+                var body = await response.Content.ReadAsStringAsync();
+
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                bool result = root.GetProperty("result").GetBoolean();
+                string message = root.GetProperty("message").GetString();
+
+                if (!result)
+                {
+                    TempData["Error"] = message;
+                    return View(model);
+                }
+
+                TempData["Success"] = "Thêm môn học thành công!";
+                return RedirectToAction("SubjectManager");
+            }
+            catch
+            {
+                TempData["Error"] = "Không thể kết nối API!";
+                return View(model);
+            }
+        }
+
+        //Xóa môn học 
+        [HttpPost]
+        public async Task<IActionResult> DeleteSubject(int id)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                var response = await client.DeleteAsync($"api/xoamonhoc/{id}");
+                var body = await response.Content.ReadAsStringAsync();
+
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                bool result = root.GetProperty("result").GetBoolean();
+                string message = root.GetProperty("message").GetString();
+
+                if (!result)
+                {
+                    TempData["Error"] = message;
+                    return RedirectToAction("SubjectManager");
+                }
+
+                TempData["Success"] = "Xóa môn học thành công!";
+                return RedirectToAction("SubjectManager");
+            }
+            catch
+            {
+                TempData["Error"] = "Không thể kết nối API!";
+                return RedirectToAction("SubjectManager");
+            }
+        }
+
+        //Trang sửa môn
+        [HttpGet]
+        public async Task<IActionResult> EditSubject(int id)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                // Gọi API lấy thông tin môn học
+                var response = await client.GetAsync($"api/monhoc/{id}");
+                var body = await response.Content.ReadAsStringAsync();
+
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                if (!root.GetProperty("result").GetBoolean())
+                {
+                    TempData["Error"] = "Không tìm thấy môn học!";
+                    return RedirectToAction("SubjectManager");
+                }
+
+                var jsonData = root.GetProperty("data").GetRawText();
+
+                var model = JsonSerializer.Deserialize<MonHocUpdate>(
+                    jsonData,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+
+                return View(model);
+            }
+            catch
+            {
+                TempData["Error"] = "Không thể kết nối API!";
+                return RedirectToAction("SubjectManager");
+            }
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> EditSubject(int id, MonHocUpdate model)
+        {
+            if (!ModelState.IsValid)
+            {
+                TempData["Error"] = "Dữ liệu không hợp lệ!";
+                return View(model);
+            }
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                var json = JsonSerializer.Serialize(model);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await client.PutAsync($"api/suamonhoc/{id}", content);
+                var body = await response.Content.ReadAsStringAsync();
+
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                bool result = root.GetProperty("result").GetBoolean();
+                string message = root.GetProperty("message").GetString();
+
+                if (!result)
+                {
+                    TempData["Error"] = message;
+                    return View(model);
+                }
+
+                TempData["Success"] = "Cập nhật môn học thành công!";
+                return RedirectToAction("SubjectDetails", new { id = id });
+            }
+            catch
+            {
+                TempData["Error"] = "Không thể kết nối API!";
+                return View(model);
+            }
+        }
+
+        //Gán môn học cho ngành
+        [HttpGet]
+        public async Task<IActionResult> AssignNganh(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // Lấy thông tin môn học (để biết ngành nào đang áp dụng)
+            var responseSubject = await client.GetAsync($"api/monhocchitiet/{id}");
+            var jsonSubject = await responseSubject.Content.ReadAsStringAsync();
+
+            var subjectData = JsonDocument.Parse(jsonSubject)
+                .RootElement.GetProperty("data").GetRawText();
+
+            var subject = JsonSerializer.Deserialize<SubjectDetailViewModel>(subjectData,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            // Lấy toàn bộ ngành
+            var responseNganh = await client.GetAsync("api/laydanhsachnganhhoc");
+            var jsonNganh = await responseNganh.Content.ReadAsStringAsync();
+            var dataNganh = JsonDocument.Parse(jsonNganh)
+                .RootElement.GetProperty("data").GetRawText();
+
+            var nganhList = JsonSerializer.Deserialize<List<NganhHoc>>(dataNganh,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            ViewBag.AllNganhs = nganhList;
+            return View(subject);
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> AssignNganh(int id, int[] selectedNganhs)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var body = JsonSerializer.Serialize(new { NganhIds = selectedNganhs });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+
+            var response = await client.PutAsync($"api/gannhommonghoc/{id}", content);
+            var json = await response.Content.ReadAsStringAsync();
+
+            var root = JsonDocument.Parse(json).RootElement;
+
+            if (!root.GetProperty("result").GetBoolean())
+            {
+                TempData["Error"] = root.GetProperty("message").GetString();
+                return RedirectToAction("AssignNganh", new { id });
+            }
+
+            TempData["Success"] = "Gán ngành cho môn thành công!";
+            return RedirectToAction("SubjectDetails", new { id });
+        }
+
+        //Phân công GV dạy môn
+        [HttpGet]
+        public async Task<IActionResult> AssignGiangVien(int id, string search)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var subjectResponse = await client.GetAsync($"api/monhocchitiet/{id}");
+            if (!subjectResponse.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Không thể tải dữ liệu môn học!";
+                return RedirectToAction("SubjectManager");
+            }
+
+            var subjectJson = await subjectResponse.Content.ReadAsStringAsync();
+            var subjectData = JsonDocument.Parse(subjectJson).RootElement.GetProperty("data");
+
+            var subject = JsonSerializer.Deserialize<SubjectDetailViewModel>(
+                subjectData.GetRawText(),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
+
+            // Gọi API giảng viên
+            var gvResponse = await client.GetAsync("api/laydanhsachgiangvien");
+            if (!gvResponse.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Không thể tải danh sách giảng viên!";
+                return RedirectToAction("SubjectDetails", new { id });
+            }
+
+            var gvJson = await gvResponse.Content.ReadAsStringAsync();
+            var gvs = JsonSerializer.Deserialize<List<GiangVien>>(
+                JsonDocument.Parse(gvJson).RootElement.GetProperty("data").GetRawText(),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
+
+            // 🔍 Lọc nếu có từ khóa
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                search = search.ToLower();
+                gvs = gvs.Where(gv =>
+                    ($"{gv.HoVaTenDem} {gv.Ten}").ToLower().Contains(search) ||
+                    gv.MaGiangVien.ToLower().Contains(search)
+                ).ToList();
+            }
+
+            ViewBag.AllGiangVien = gvs;
+            return View(subject);
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> AssignGiangVien(int id, List<int> selectedGVs)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.PostAsJsonAsync(
+                $"api/gan-giang-vien-mon/{id}", selectedGVs);
+
+            if (response.IsSuccessStatusCode)
+            {
+                TempData["Success"] = "Cập nhật giảng viên thành công!";
+                return RedirectToAction("SubjectDetails", new { id });
+            }
+
+            TempData["Error"] = "Gán giảng viên thất bại!";
+            return RedirectToAction("AssignGiangVien", new { id });
+        }
+
+
     }
 }
