@@ -869,69 +869,6 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
-
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student)]
-        [HttpPost("diemdanh/checkin")]
-        public async Task<IActionResult> CheckinDiemDanh([FromBody] CheckinDiemDanhRequest model)
-        {
-            var userId = User.FindFirst("userId")?.Value;
-            var sinhVien = await _context.SinhViens.FirstOrDefaultAsync(x => x.UserId == userId);
-            if (sinhVien == null)
-                return NotFound(new { result = false, message = "Không tìm thấy thông tin sinh viên" });
-
-            var trangThaiCoMatId = await _context.TrangThais
-                .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Có mặt")
-                .Select(t => t.Id)
-                .FirstOrDefaultAsync();
-
-            var trangThaiBuoiDiemDanhId = await _context.TrangThais
-                .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
-                .Select(t => t.Id)
-                .FirstOrDefaultAsync();
-
-            // Buổi hợp lệ + đúng code + còn hạn + đang mở
-            var buoi = await _context.DiemDanhs.FirstOrDefaultAsync(x =>
-                x.Id == model.DiemDanhId &&
-                x.Code == model.Code &&
-                x.ExpireAt > DateTime.Now &&
-                x.TrangThaiId == trangThaiBuoiDiemDanhId
-            );
-            if (buoi == null)
-                return BadRequest(new { result = false, message = "Mã điểm danh không hợp lệ hoặc đã hết hạn" });
-
-            // Tìm dòng đã seed cho SV trong buổi này
-            var ct = await _context.ChiTietDiemDanhs
-                .FirstOrDefaultAsync(x => x.DiemDanhId == buoi.Id && x.SinhVienId == sinhVien.Id);
-
-            // Nếu chưa seed (fallback), tạo mới; nếu đã seed thì update
-            if (ct == null)
-            {
-                ct = new ChiTietDiemDanh
-                {
-                    DiemDanhId = buoi.Id,
-                    SinhVienId = sinhVien.Id,
-                };
-                _context.ChiTietDiemDanhs.Add(ct);
-            }
-            else
-            {
-                // Idempotent: nếu đã có mặt rồi thì không cho điểm danh lại
-                var coMatId = trangThaiCoMatId;
-                if (ct.TrangThaiId == coMatId)
-                    return BadRequest(new { result = false, message = "Bạn đã điểm danh buổi này rồi" });
-            }
-
-            ct.TrangThaiId = trangThaiCoMatId;
-            ct.ThoiGian = DateTime.Now;
-            ct.Latitude = model.Latitude;
-            ct.Longitude = model.Longitude;
-            ct.DeviceId = model.DeviceId;
-
-            await _context.SaveChangesAsync();
-            return Ok(new { result = true, message = "Điểm danh thành công!" });
-        }
-
-
         // Điểm danh qua mã code
         [HttpPost("diemdanh/thuchien")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Student)]
@@ -948,7 +885,7 @@ namespace BlueSchoolSystem.APIControllers
 
             // Buổi còn hạn (nên check thêm 'Đang diễn ra' cho đồng nhất)
             var trangThaiBuoiDiemDanhId = await _context.TrangThais
-                .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+                .Where(t => t.LoaiTrangThai == "DiemDanh#" && t.TenTrangThai == "Đang diễn ra")
                 .Select(t => t.Id)
                 .FirstOrDefaultAsync();
 
@@ -971,6 +908,14 @@ namespace BlueSchoolSystem.APIControllers
                 .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Có mặt")
                 .Select(t => t.Id)
                 .FirstOrDefaultAsync();
+
+            var toadoGoc = await LayToaDoGoc(buoi.Id);
+      
+            if (toadoGoc == null)
+                return BadRequest(new { result = false, message = "Không tìm được tọa độ gốc của điểm danh." });
+
+            double distance = TinhKhoangCachHaiToaDo(request.Latitude.Value, request.Longitude.Value, toadoGoc.Value.Latitude, toadoGoc.Value.Longitude); if (distance > 200.0)
+                return BadRequest(new { result = false, message = $"Bạn đang ở quá xa so với lớp học. Vui lòng di chuyển đến lớp học để thực hiện quá trình điểm danh" });
 
             // Lấy dòng đã seed và update
             var ct = await _context.ChiTietDiemDanhs
@@ -1007,6 +952,47 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
+        //Hàm tính khoảng cách giữa hai tọa độ
+        private static double TinhKhoangCachHaiToaDo(double lat1, double lon1, double lat2, double lon2)
+        {
+            var R = 6371000.0; // bán kính Trái Đất (mét)
+            var dLat = (lat2 - lat1) * Math.PI / 180.0;
+            var dLon = (lon2 - lon1) * Math.PI / 180.0;
+
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+                  + Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0)
+                  * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            var distance = R * c;
+            return distance;
+        }
+
+
+        //Hàm lấy tọa độ gốc dựa vào Id buổi điểm danh
+        private async Task<(double Latitude, double Longitude)?> LayToaDoGoc(int diemDanhId)
+        {
+            var result = await (
+                from dd in _context.DiemDanhs
+                join lhp in _context.LopHocPhans on dd.LopHocPhanId equals lhp.Id
+                join lh in _context.LichHocs on dd.LopHocPhanId equals lh.LopHocPhanId
+                join ph in _context.PhongHocs on lh.PhongHocId equals ph.Id
+                join cs in _context.CoSos on ph.CoSoId equals cs.Id
+                where dd.Id == diemDanhId
+                   && dd.Ngay.Date == lh.Ngay.Date
+                select new
+                {
+                    Latitude = cs.Latitude,
+                    Longitude = cs.Longitude
+                }
+            ).FirstOrDefaultAsync();
+
+            if (result != null)
+                return (result.Latitude, result.Longitude);
+            return null;
+        }
+
+
 
         private async Task PushAttendanceToFirebase(
         int diemDanhId,
@@ -1028,7 +1014,7 @@ namespace BlueSchoolSystem.APIControllers
                 studentName = $"{(sv.HoVaTenDem ?? "").Trim()} {(sv.Ten ?? "").Trim()}".Trim(),
                 status = statusText,
                 statusId = trangThaiId,
-                timecheckedin = new[] { "Có mặt", "Đi trễ" }.Contains(statusText) ? thoiGian.ToString("HH:mm") : null,
+                timecheckedin = new[] { "Có mặt", "Đi trễ" }.Contains(statusText) ? thoiGian.ToString("HH:mm:ss"): null,
                 bluetoothID = request.DeviceId,
                 latitude = request.Latitude,
                 longitude = request.Longitude

@@ -543,6 +543,18 @@ namespace BlueSchoolSystem.APIControllers
                 return StatusCode(403, new { result = false, message = "Không có quyền truy cập lớp học phần này" });
 
 
+            // Kiểm tra lịch học đã khai báo cho ngày tạo buổi
+            var coLichDay = await _context.LichHocs
+                .AnyAsync(lh =>
+                    lh.LopHocPhanId == lopHocPhanId
+                    && lh.Ngay.Date == model.Ngay.Date
+                );
+
+            if (!coLichDay)
+            {
+                return BadRequest(new { result = false, message = "Bạn chỉ có thể tạo được buổi điểm danh vào ngày có lịch giảng dạy của môn này." });
+            }
+
             var danhSachSinhVien = await _context.ChiTietLopHocPhans
                 .Where(ct => ct.LopHocPhanId == lopHocPhanId)
                 .Select(ct => new
@@ -560,6 +572,7 @@ namespace BlueSchoolSystem.APIControllers
 
             if (!danhSachSinhVien.Any())
                 return BadRequest(new { result = false, message = "Lớp chưa có danh sách sinh viên, không thể tạo buổi điểm danh." });
+
 
 
             // Sinh mã code ngắn gọn
@@ -583,7 +596,7 @@ namespace BlueSchoolSystem.APIControllers
             }
 
             var trangThaiBuoiDiemDanhId = _context.TrangThais
-            .Where(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == "Đang diễn ra")
+            .Where(t => t.LoaiTrangThai == "DiemDanh#" && t.TenTrangThai == "Đang diễn ra")
             .Select(t => t.Id)
             .FirstOrDefault();
 
@@ -593,7 +606,7 @@ namespace BlueSchoolSystem.APIControllers
             .FirstOrDefaultAsync();
 
             if (trangThaiBuoiDiemDanhId == 0 || trangThaiChuaDiemDanhId == 0)
-                return BadRequest(new { result = false, message = "Thiếu cấu hình trạng thái điểm danh (Đang diễn ra/Chưa điểm danh)." });
+                return BadRequest(new { result = false, message = "Thiếu cấu hình trạng thái điểm danh" });
 
 
             var buoi = new DiemDanh
@@ -1111,5 +1124,73 @@ namespace BlueSchoolSystem.APIControllers
             await FcmService.SendNotificationAsync(fcmToken, title, body);
         }
 
+
+
+        public class UpdateStatusRequest
+        {
+            public int DiemDanhId { get; set; }
+            public int SinhVienId { get; set; }
+            public int TrangThaiId { get; set; }
+        }
+
+        // POST: api/buoidiemdanh/capnhat-trangthai
+        [HttpPost("buoidiemdanh/capnhat-trangthai")]
+        public async Task<IActionResult> UpdateStudentStatus([FromBody] UpdateStatusRequest req)
+        {
+            if (req == null)
+                return BadRequest("Invalid request");
+
+            // tìm chi tiết điểm danh theo buổi + sinh viên
+            var chitiet = await _context.ChiTietDiemDanhs
+                .FirstOrDefaultAsync(x =>
+                    x.DiemDanhId == req.DiemDanhId &&
+                    x.SinhVienId == req.SinhVienId);
+
+            if (chitiet == null)
+                return NotFound("Không tìm thấy bản ghi điểm danh");
+
+            chitiet.TrangThaiId = req.TrangThaiId;
+            chitiet.ThoiGian = DateTime.Now;
+            chitiet.GhiChu = "Giảng viên điểm danh";
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("buoidiemdanh/{id}/capnhattrangthaihetthoigian")]
+        public async Task<IActionResult> CapNhatTrangThaiKhiHetThoiGian(int id)
+        {
+            var buoi = await _context.DiemDanhs
+                .Include(b => b.LopHocPhan)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (buoi == null)
+                return NotFound(new { result = false, message = "Không tìm thấy buổi điểm danh" });
+
+            // Cập nhật trạng thái thành "Đã kết thúc"
+            var trangThaiDaKetThucId = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "DiemDanh#" && t.TenTrangThai == "Đã đóng")
+                .Select(t => t.Id)
+                .FirstOrDefaultAsync();
+
+            if (trangThaiDaKetThucId == 0)
+                return BadRequest(new { result = false, message = "Thiếu cấu hình trạng thái 'Đã kết thúc'" });
+
+            buoi.TrangThaiId = trangThaiDaKetThucId;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                result = true,
+                message = "Đã cập nhật trạng thái buổi điểm danh thành 'Đã đóng' "
+            });
+        }
+
+
     }
+
+
+
+
 }

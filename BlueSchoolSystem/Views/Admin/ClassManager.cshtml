@@ -4,7 +4,116 @@
     ViewData["Title"] = "ClassManager";
 }
 
-<h1>Quản lý lớp học</h1>
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+
+<form method="get" asp-action="ClassManager" class="row mb-4">
+    <!-- Từ khóa -->
+    <div class="col-md-3">
+        <input type="text" name="keyword" class="form-control"
+               value="@ViewBag.Keyword" placeholder="Tìm theo tên lớp hoặc mã lớp..." />
+    </div>
+
+    <!-- Lọc theo Khoa -->
+   <div class="col-md-3">
+    <select name="maKhoa" class="form-select" onchange="this.form.submit()">
+        <option value="">-- Tất cả các khoa --</option>
+        @foreach (var khoa in ViewBag.KhoaList)
+        {
+            var selected = (ViewBag.MaKhoa == khoa.MaKhoa) ? "selected" : "";
+            @:<option value="@khoa.MaKhoa" @selected>@khoa.TenKhoa</option>
+        }
+    </select>
+    </div>
+
+
+    <!-- Lọc theo Ngành -->
+    <div class="col-md-3">
+    <select name="maNganh" class="form-select">
+        <option value="">-- Tất cả các ngành --</option>
+        @foreach (var nganh in ViewBag.NganhList)
+        {
+            var selected = (ViewBag.MaNganh == nganh.MaNganh) ? "selected" : "";
+            @:<option value="@nganh.MaNganh" @selected>@nganh.TenNganh</option>
+        }
+    </select>
+    </div>
+
+
+    <!-- Lọc theo Khóa học -->
+    <div class="col-md-3">
+        <select name="khoaHoc" class="form-select">
+            <option value="">-- Tất cả các khóa --</option>
+            @foreach (var kh in ViewBag.KhoaHocList as List<string>)
+            {
+                var selected = (ViewBag.KhoaHoc == kh) ? "selected" : "";
+                @:<option value="@kh" @selected>@kh</option>
+            }
+        </select>
+    </div>
+
+    <div class="row">
+    <div class="col-12 d-flex justify-content-end mt-2">
+        <button type="submit" class="btn btn-info me-2">
+            <i class="fa-solid fa-magnifying-glass me-1"></i> Lọc
+        </button>
+        <a asp-action="ClassManager" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate-left me-1"></i> Xóa lọc
+        </a>
+    </div>
+    </div>
+
+   
+
+</form>
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <a href="@Url.Action("AddClass", "Admin")" class="btn btn-primary">
+        <i class="fa-solid fa-plus"></i> Thêm lớp học
+    </a>
+
+    <a asp-action="AutoCreateClass" class="btn btn-success">
+        <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Tạo lớp tự động
+    </a>
+
+    <div class="dropdown">
+        <button class="btn btn-warning dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown">
+            <i class="fa-solid fa-download me-2"></i> Xuất File
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+            <li>
+                <a class="dropdown-item" href="#" id="btnExportExcel">
+                    <i class="fa-solid fa-file-excel me-2 text-success"></i> Xuất Excel
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="#" id="btnExportCSV">
+                    <i class="fa-solid fa-file-csv me-2 text-info"></i> Xuất CSV
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- nút IN đẩy sát bên phải -->
+    <button type="button" class="btn btn-dark ms-auto" id="btnPrint">
+        <i class="fa-solid fa-print me-2"></i> In danh sách
+    </button>
+</div>
+
+
 
 <div class="mb-3"><b>Tổng số:</b> @Model.Count() bản ghi</div>
 <table class="table table-hover table-striped table-bordered">
@@ -21,22 +130,96 @@
     </thead>
     <tbody>
         @{
+            var index = 1;
             foreach (var item in Model)
             {
                 <tr style="cursor:pointer"
                     onclick="window.location='@Url.Action("ClassDetails", "Admin", new { maLop = item.MaLop })'">
-                    <td style="width: 60px;" class="text-center">@item.Id</td>
-                    <td style="width: 60px;" class="text-start">@item.MaLop</td>
-                    <td style="width: 150x;" class="text-start">@item.TenLop</td>
-                    <td style="width: 150x;" class="text-start">@item.Nganh</td>
-                    <td style="width: 150x;" class="text-start">@item.Khoa</td>
-                    <td style="width: 150px;" class="text-center">@item.SiSo</td>
+                    <td class="text-center">@index</td>
+                    <td>@item.MaLop</td>
+                    <td>@item.TenLop</td>
+                    <td>@item.Nganh</td>
+                    <td>@item.Khoa</td>
+                    <td class="text-center">@item.SiSo</td>
                 </tr>
+
+                index++;
             }
         }
     </tbody>
+
 </table>
 <p style="color:black"><i>*Nếu thông tin lớp học có sai sót thì liên hệ quản trị viên hệ thống</i></p>
 @section Scripts {
-    
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <script>
+        document.getElementById('btnExportExcel').addEventListener('click', function () {
+            var table = document.querySelector('table.table');
+            var wb = XLSX.utils.table_to_book(table, { sheet: "Danh sách lớp học" });
+            XLSX.writeFile(wb, 'DanhSachLopHoc.xlsx');
+        });
+
+        document.getElementById('btnExportCSV').addEventListener('click', function () {
+            var table = document.querySelector('table.table');
+            var ws = XLSX.utils.table_to_sheet(table);
+            var csv = XLSX.utils.sheet_to_csv(ws);
+
+            var blob = new Blob([csv], { type: 'text/csv' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'DanhSachLopHoc.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+
+        document.getElementById('btnPrint').addEventListener('click', function () {
+    var table = document.querySelector('table.table').cloneNode(true);
+
+    table.className = '';
+    table.querySelectorAll('tr, th, td, thead, tbody').forEach(function (el) {
+        el.className = '';
+        el.removeAttribute('style');
+    });
+
+    var printStyle = `
+        <style>
+            body { background:white !important; padding:0; margin:0; }
+            .print-header { text-align:center; margin:10px 0; }
+            .print-header h2 { margin:0; font-size:20px; }
+            table { width:95%; margin:auto; border-collapse:collapse; }
+            th, td { border:1px solid #000; padding:6px; text-align:center; }
+            th { background:#f3f3f3; font-weight:600; }
+        </style>
+    `;
+
+    var now = new Date();
+    var dateStr = now.toLocaleString("vi-VN");
+
+    document.body.innerHTML = `
+        <div class="print-header">
+            <h2>DANH SÁCH LỚP HỌC</h2>
+            <div>In lúc: ${dateStr}</div>
+        </div>
+        ${printStyle}
+        ${table.outerHTML}
+    `;
+
+    window.print();
+    location.reload();
+});
+
+
+        setTimeout(function () {
+            var alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function (alert) {
+                var bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+    </script>
 }
+
