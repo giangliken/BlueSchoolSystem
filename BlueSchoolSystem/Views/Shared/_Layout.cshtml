@@ -74,8 +74,20 @@
                     </li>
 
                     <li>
-                        <a href="/Admin/MajorManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/MajorManager") ? "active text-white bg-primary" : "text-white")">
-                            <i class="fa-solid fa-graduation-cap me-2"></i>Ngành học
+                        <a href="/Admin/SemesterManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/SemesterManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-calendar-day me-2"></i>Học kỳ
+                        </a>
+
+                    </li>
+                    <li>
+                        <a href="/Admin/RegistrationPeriods" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/RegistrationPeriods") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-registered me-2"></i>Đợt đăng ký lớp học phần
+                        </a>
+
+                    </li>
+                    <li>
+                        <a href="/Admin/CourseClassManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/CourseClassManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-graduation-cap me-2"></i>Lớp học phần
                         </a>
 
                     </li>

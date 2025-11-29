@@ -1,14 +1,21 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using Humanizer;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using OfficeOpenXml;
 using System.Diagnostics;
+using System.Dynamic;
+using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
@@ -25,8 +32,9 @@ namespace BlueSchoolSystem.Controllers
         private readonly string? _apiBaseUrl;
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IActivityLogService _activityLogService;
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration)
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
@@ -35,6 +43,7 @@ namespace BlueSchoolSystem.Controllers
             this.configuration = configuration;
 
             _apiBaseUrl = configuration["ApiSettings:BaseUrl"];
+            _activityLogService = activityLogService;
 
         }
 
@@ -1670,6 +1679,1433 @@ namespace BlueSchoolSystem.Controllers
 
             return logs ?? new List<ActivityLog>();
         }
+        //quản lý học kì
+        // lấy danh sách học kì
+        // GET: /Admin/SemesterManager
+        public async Task<IActionResult> SemesterManager(string searchName, int? year)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
+            var trangThaiList = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "HocKy")
+                .ToListAsync();
+            ViewBag.TrangThaiList = trangThaiList;
+
+            HttpResponseMessage response;
+            try { response = await client.GetAsync("api/hocky"); }
+            catch
+            {
+                TempData["Error"] = "Không thể kết nối đến API.";
+                return View(new List<HocKy>());
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Không thể lấy dữ liệu học kỳ từ API.";
+                return View(new List<HocKy>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var hockys = JsonConvert.DeserializeObject<List<HocKy>>(JObject.Parse(body)["data"].ToString());
+
+            // Lọc tên và năm
+            if (!string.IsNullOrEmpty(searchName))
+                hockys = hockys.Where(h => h.TenHocKy.Contains(searchName, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (year.HasValue)
+                hockys = hockys.Where(h => h.NgayBatDau.Year == year.Value).ToList();
+
+            ViewBag.SearchName = searchName;
+            ViewBag.Year = year;
+
+            return View(hockys);
+        }
+
+        // POST: /Admin/DeleteSemester
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteSemester(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+
+            var response = await client.DeleteAsync($"api/hocky/{id}");
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                TempData["Success"] = "Xóa học kỳ thành công!";
+            }
+            else if (response.StatusCode == HttpStatusCode.Unauthorized ||
+                     response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                TempData["Error"] = "Bạn không có quyền thực hiện thao tác này.";
+            }
+            else
+            {
+                try
+                {
+                    var errorObj = JObject.Parse(content);
+                    TempData["Error"] = (string)errorObj["message"] ?? "Không thể xóa học kỳ.";
+                }
+                catch
+                {
+                    TempData["Error"] = "Không thể xóa học kỳ.";
+                }
+            }
+
+            return RedirectToAction(nameof(SemesterManager));
+        }
+
+        // GET: /Admin/CreateSemester
+        public async Task<IActionResult> CreateSemester()
+        {
+            // Cần phải có DTO để chứa các field: TenHocKy, NgayBatDau, NgayKetThuc, NgayCongBoTKB
+            return View(new HocKyDTO { NgayBatDau = DateTime.Today.AddDays(1), NgayKetThuc = DateTime.Today.AddMonths(4), NgayCongBoTKB = DateTime.Today.AddMonths(1) });
+        }
+
+        // POST: /Admin/CreateSemester
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateSemester(HocKyDTO dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(dto);
+            }
+
+            // Logic kiểm tra ngày tháng
+            if (dto.NgayBatDau >= dto.NgayKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.NgayKetThuc), "Ngày kết thúc phải sau ngày bắt đầu.");
+                return View(dto);
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                // Chuẩn bị request body
+                var json = JsonConvert.SerializeObject(dto);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                // Gọi API tạo học kỳ
+                var response = await client.PostAsync("api/hocky", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    TempData["Success"] = $"Tạo Học kỳ **{dto.TenHocKy}** thành công.";
+                    return RedirectToAction(nameof(SemesterManager));
+                }
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    // Cố gắng parse lỗi từ API nếu có
+                    try
+                    {
+                        dynamic errObj = JsonConvert.DeserializeObject(apiError);
+                        ModelState.AddModelError("", errObj?.message ?? "Lỗi tạo học kỳ từ API.");
+                    }
+                    catch
+                    {
+                        ModelState.AddModelError("", "Lỗi không xác định khi tạo học kỳ.");
+                    }
+                    return View(dto);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối khi tạo học kỳ.");
+                ModelState.AddModelError("", $"Lỗi kết nối: {ex.Message}");
+                return View(dto);
+            }
+        }
+        // Phương thức này thường được gọi bằng Ajax/Fetch từ trang SemesterManager
+        [HttpPost]
+        public async Task<IActionResult> UpdateSemesterStatus(int hockyId, int trangThaiId)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            // Tạo DTO tương ứng với API yêu cầu
+            var dto = new UpdateTrangThaiDTO { HocKyId = hockyId, TrangThaiId = trangThaiId };
+            var json = JsonConvert.SerializeObject(dto);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            try
+            {
+                var response = await client.PutAsync("api/hocky/trangthai", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Parse response để lấy message thành công
+                    var body = await response.Content.ReadAsStringAsync();
+                    dynamic successObj = JsonConvert.DeserializeObject(body);
+                    return Json(new { success = true, message = successObj.message });
+                }
+                else
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    dynamic errObj = JsonConvert.DeserializeObject(apiError);
+                    return Json(new { success = false, message = errObj?.message ?? "Cập nhật trạng thái không thành công." });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối khi cập nhật trạng thái học kỳ.");
+                return Json(new { success = false, message = $"Lỗi kết nối: {ex.Message}" });
+            }
+        }
+        // Cập nhật thông tin Học kỳ
+        [Authorize(Roles = SD.Role_Admin, AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPut("hocky/{id}")]
+        public async Task<IActionResult> UpdateHocKy(int id, [FromBody] HocKyDTO dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { result = false, message = "Dữ liệu không hợp lệ." });
+
+            var hocky = await _context.HocKys.FindAsync(id);
+            if (hocky == null)
+                return NotFound(new { result = false, message = "Không tìm thấy Học kỳ." });
+
+            // Kiểm tra ngày tháng
+            if (dto.NgayBatDau >= dto.NgayKetThuc)
+                return BadRequest(new { result = false, message = "Ngày bắt đầu phải trước ngày kết thúc." });
+
+            string oldTenHocKy = hocky.TenHocKy;
+            DateTime oldNgayBatDau = hocky.NgayBatDau;
+            DateTime oldNgayKetThuc = hocky.NgayKetThuc;
+
+            // Cập nhật thông tin
+            hocky.TenHocKy = dto.TenHocKy;
+            hocky.NgayBatDau = dto.NgayBatDau;
+            hocky.NgayKetThuc = dto.NgayKetThuc;
+
+            try
+            {
+                _context.HocKys.Update(hocky);
+                await _context.SaveChangesAsync();
+
+                // Log hoạt động
+                var userId = User.FindFirst("userId")?.Value;
+                var userName = User.FindFirst("username")?.Value;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    await _activityLogService.LogAsync(
+                        userId: userId,
+                        userName: userName ?? "Unknown",
+                        device: Request.Headers["User-Agent"].ToString(),
+                        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                        actionType: "UPDATE",
+                        tableName: "HocKys",
+                        objectId: hocky.Id.ToString(),
+                        description: $"Cập nhật Học kỳ {oldTenHocKy} ({oldNgayBatDau:dd/MM/yyyy} - {oldNgayKetThuc:dd/MM/yyyy}) thành {hocky.TenHocKy} ({hocky.NgayBatDau:dd/MM/yyyy} - {hocky.NgayKetThuc:dd/MM/yyyy})"
+                    );
+                }
+
+                return Ok(new { result = true, code = 200, message = $"Học kỳ {hocky.TenHocKy} đã được cập nhật thành công." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật Học kỳ.");
+                return StatusCode(500, new { result = false, message = "Lỗi server khi cập nhật Học kỳ." });
+            }
+        }
+
+        //Quản lý đợt đăng ký
+        public async Task<IActionResult> RegistrationPeriods()
+        {
+            // Lấy danh sách Học kỳ từ API (để dropdown chọn)
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl ?? "https://localhost:5001/");
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                    client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+                var resp = await client.GetAsync("api/hocky");
+                if (!resp.IsSuccessStatusCode)
+                {
+                    TempData["Error"] = "Không thể lấy danh sách học kỳ từ API.";
+                    ViewBag.HocKyList = new SelectList(new List<HocKy>(), "Id", "TenHocKy");
+                    return View();
+                }
+
+                var body = await resp.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("data", out var dataEl))
+                {
+                    var hockys = System.Text.Json.JsonSerializer.Deserialize<List<HocKy>>(dataEl.GetRawText(),
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<HocKy>();
+
+                    // Lọc theo trạng thái
+                    var filteredHockys = hockys
+                        .Where(h => h.TrangThai != null &&
+                                    (h.TrangThai.TenTrangThai == "Hoạt động" || h.TrangThai.TenTrangThai == "Mới tạo"))
+                        .ToList();
+
+                    filteredHockys.Insert(0, new HocKy { Id = 0, TenHocKy = "Tất cả" });
+                    ViewBag.HocKyList = new SelectList(filteredHockys, "Id", "TenHocKy");
+                }
+                else
+                {
+                    ViewBag.HocKyList = new SelectList(new List<HocKy>(), "Id", "TenHocKy");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API lấy Học kỳ");
+                TempData["Error"] = "Không thể kết nối đến hệ thống API.";
+                ViewBag.HocKyList = new SelectList(new List<HocKy>(), "Id", "TenHocKy");
+            }
+
+
+            // Load tất cả đợt đăng ký **kèm HocKy**
+            var periods = await _context.DotDangKys
+                .Include(d => d.HocKy)  // <- Thêm Include này
+                .ToListAsync();
+
+            return View(periods ?? new List<DotDangKy>());
+        }
+
+        // --------------------------
+        // Partial table (AJAX)
+        // --------------------------
+        // GET: /Admin/GetRegistrationPeriodsTable?hocKyId=1
+        public async Task<IActionResult> GetRegistrationPeriodsTable(int hocKyId)
+        {
+            List<DotDangKy> list;
+            if (hocKyId == 0)
+            {
+                list = await _context.DotDangKys
+                    .Include(d => d.HocKy)
+                    .OrderBy(d => d.NgayBatDau)
+                    .ToListAsync();
+            }
+            else
+            {
+                list = await _context.DotDangKys
+                    .Where(d => d.HocKyId == hocKyId)
+                    .Include(d => d.HocKy)
+                    .OrderBy(d => d.NgayBatDau)
+                    .ToListAsync();
+            }
+
+            ViewBag.HocKyId = hocKyId;
+            return PartialView("_RegistrationPeriodsTable", list);
+        }
+
+        // --------------------------
+        // Create
+        // --------------------------
+        // GET: /Admin/CreateRegistrationPeriod?hocKyId=X
+        public async Task<IActionResult> CreateRegistrationPeriod(int? hocKyId)
+        {
+            if (!hocKyId.HasValue || hocKyId.Value == 0)
+            {
+                TempData["Error"] = "Vui lòng chọn Học kỳ trước khi tạo Đợt Đăng ký.";
+                return RedirectToAction(nameof(RegistrationPeriods));
+            }
+
+            var hocky = await _context.HocKys.FindAsync(hocKyId.Value);
+            if (hocky == null)
+            {
+                TempData["Error"] = "Học kỳ không tồn tại.";
+                return RedirectToAction(nameof(RegistrationPeriods));
+            }
+
+            await LoadViewBags(hocKyId.Value);
+
+            var defaultDto = new DotDangKyDTO
+            {
+                HocKyId = hocKyId.Value,
+                NgayBatDau = DateTime.Today.AddDays(1),
+                NgayKetThuc = DateTime.Today.AddDays(7),
+                LoaiThaoTac = "Đăng ký mới"
+            };
+
+            return View(defaultDto);
+        }
+
+        // POST: /Admin/CreateRegistrationPeriod
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateRegistrationPeriod(DotDangKyDTO dto)
+        {
+            await LoadViewBags(dto.HocKyId);
+
+            if (dto == null)
+            {
+                ModelState.AddModelError("", "Dữ liệu không hợp lệ.");
+                return View(dto);
+            }
+
+            if (dto.NgayBatDau >= dto.NgayKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.NgayKetThuc), "Ngày kết thúc phải sau ngày bắt đầu.");
+            }
+
+            if (dto.DoiTuongApDungs == null || !dto.DoiTuongApDungs.Any())
+            {
+                ModelState.AddModelError("", "Phải chọn ít nhất một đối tượng áp dụng.");
+            }
+            if (dto.HocKyId == 0 || !await _context.HocKys.AnyAsync(h => h.Id == dto.HocKyId))
+            {
+                ModelState.AddModelError(nameof(dto.HocKyId), "Học kỳ không hợp lệ.");
+                await LoadViewBags(dto.HocKyId);
+                return View(dto);
+            }
+            if (!ModelState.IsValid) return View(dto);
+
+            var newDots = new List<DotDangKy>();
+            foreach (var obj in dto.DoiTuongApDungs)
+            {
+                var entity = new DotDangKy
+                {
+                    HocKyId = dto.HocKyId,
+                    TenDot = dto.TenDot,
+                    NgayBatDau = dto.NgayBatDau,
+                    NgayKetThuc = dto.NgayKetThuc,
+                    LoaiThaoTac = dto.LoaiThaoTac,
+                    LoaiDoiTuong = obj.Loai,
+                    GiaTriDoiTuong = obj.GiaTri,
+                    IsActive = true
+                };
+                newDots.Add(entity);
+            }
+
+            await _context.DotDangKys.AddRangeAsync(newDots);
+            await _context.SaveChangesAsync();
+
+            // Log
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("userId")?.Value;
+                var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    await _activityLogService.LogAsync(
+                        userId: userId,
+                        userName: userName ?? "Unknown",
+                        device: Request.Headers["User-Agent"].ToString(),
+                        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                        actionType: "CREATE",
+                        tableName: "DotDangKys",
+                        objectId: newDots.FirstOrDefault()?.Id.ToString() ?? "0",
+                        description: $"Tạo đợt đăng ký '{dto.TenDot}' cho HK {dto.HocKyId}. Số đối tượng: {dto.DoiTuongApDungs.Count}"
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Ghi log thất bại sau khi tạo DotDangKy");
+            }
+
+            return RedirectToAction("RegistrationPeriods", new { hocKyId = dto.HocKyId });
+        }
+
+        // --------------------------
+        // Edit (group edit: sửa toàn bộ đợt dựa theo TenDot + LoaiThaoTac + HocKyId)
+        // --------------------------
+        // GET: /Admin/EditRegistrationPeriod/{id}
+        public async Task<IActionResult> EditRegistrationPeriod(int id)
+        {
+            var first = await _context.DotDangKys.FindAsync(id);
+            if (first == null)
+            {
+                TempData["Error"] = "Không tìm thấy đợt đăng ký.";
+                return RedirectToAction(nameof(RegistrationPeriods));
+            }
+
+            var group = await _context.DotDangKys
+                .Where(d => d.HocKyId == first.HocKyId &&
+                            d.TenDot == first.TenDot &&
+                            d.LoaiThaoTac == first.LoaiThaoTac)
+                .ToListAsync();
+
+            var dto = new DotDangKyDTO
+            {
+                HocKyId = first.HocKyId,
+                TenDot = first.TenDot,
+                NgayBatDau = first.NgayBatDau,
+                NgayKetThuc = first.NgayKetThuc,
+                LoaiThaoTac = first.LoaiThaoTac,
+                DoiTuongApDungs = group
+                    .Select(g => new DoiTuongApDungDTO
+                    {
+                        Loai = g.LoaiDoiTuong,
+                        GiaTri = g.GiaTriDoiTuong
+                    }).ToList()
+            };
+
+            // Nếu không có thì thêm 1 đối tượng mặc định
+            if (!dto.DoiTuongApDungs.Any())
+            {
+                dto.DoiTuongApDungs.Add(new DoiTuongApDungDTO
+                {
+                    Loai = "NIEN_KHOA",
+                    GiaTri = ""
+                });
+            }
+
+            await LoadViewBags(first.HocKyId);
+            return View(dto);
+        }
+
+        // POST: /Admin/EditRegistrationPeriod/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditRegistrationPeriod(int id, DotDangKyDTO dto)
+        {
+            if (dto == null)
+            {
+                ModelState.AddModelError("", "Dữ liệu không hợp lệ.");
+                await LoadViewBags(dto?.HocKyId ?? 0);
+                return View(dto);
+            }
+
+            if (dto.NgayBatDau >= dto.NgayKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.NgayKetThuc), "Ngày kết thúc phải sau ngày bắt đầu.");
+            }
+
+            if (dto.DoiTuongApDungs == null || !dto.DoiTuongApDungs.Any())
+            {
+                ModelState.AddModelError("", "Phải có ít nhất một đối tượng áp dụng.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                await LoadViewBags(dto.HocKyId);
+                return View(dto);
+            }
+
+            var existing = await _context.DotDangKys.FindAsync(id);
+            if (existing == null)
+            {
+                ModelState.AddModelError("", "Không tìm thấy đợt để cập nhật.");
+                await LoadViewBags(dto.HocKyId);
+                return View(dto);
+            }
+
+            // Xóa toàn bộ nhóm cũ
+            var groupToRemove = await _context.DotDangKys
+                .Where(d => d.HocKyId == existing.HocKyId &&
+                            d.TenDot == existing.TenDot &&
+                            d.LoaiThaoTac == existing.LoaiThaoTac)
+                .ToListAsync();
+
+            _context.DotDangKys.RemoveRange(groupToRemove);
+
+            // Tạo nhóm mới
+            var newDots = dto.DoiTuongApDungs.Select(obj => new DotDangKy
+            {
+                HocKyId = dto.HocKyId,
+                TenDot = dto.TenDot,
+                NgayBatDau = dto.NgayBatDau,
+                NgayKetThuc = dto.NgayKetThuc,
+                LoaiThaoTac = dto.LoaiThaoTac,
+                LoaiDoiTuong = obj.Loai,
+                GiaTriDoiTuong = obj.GiaTri,
+                IsActive = true
+            }).ToList();
+
+            await _context.DotDangKys.AddRangeAsync(newDots);
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction("RegistrationPeriods", new { hocKyId = dto.HocKyId });
+        }
+
+
+        // --------------------------
+        // Delete (xóa toàn bộ nhóm cùng TenDot + LoaiThaoTac + HocKyId)
+        // --------------------------
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteRegistrationPeriod(int id)
+        {
+            var first = await _context.DotDangKys.FindAsync(id);
+            if (first == null)
+            {
+                TempData["Error"] = "Không tìm thấy đợt đăng ký.";
+                return RedirectToAction(nameof(RegistrationPeriods));
+            }
+
+            var group = await _context.DotDangKys
+                .Where(d => d.HocKyId == first.HocKyId && d.TenDot == first.TenDot && d.LoaiThaoTac == first.LoaiThaoTac)
+                .ToListAsync();
+
+            _context.DotDangKys.RemoveRange(group);
+            await _context.SaveChangesAsync();
+
+            // Log
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("userId")?.Value;
+                var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    await _activityLogService.LogAsync(
+                        userId: userId,
+                        userName: userName ?? "Unknown",
+                        device: Request.Headers["User-Agent"].ToString(),
+                        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                        actionType: "DELETE",
+                        tableName: "DotDangKys",
+                        objectId: $"{first.HocKyId}_{first.TenDot}_{first.LoaiThaoTac}",
+                        description: $"Xóa đợt đăng ký '{first.TenDot}' cho HK {first.HocKyId}. Xóa {group.Count} bản ghi."
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Ghi log thất bại sau khi xóa DotDangKy");
+            }
+
+            return RedirectToAction("RegistrationPeriods", new { hocKyId = first.HocKyId });
+        }
+
+        // --------------------------
+        // Helpers
+        // --------------------------
+        private async Task LoadViewBags(int hocKyId)
+        {
+            // Lấy học kỳ hiện tại
+            ViewBag.HocKy = await _context.HocKys.FindAsync(hocKyId);
+
+            // Bổ sung danh sách tất cả học kỳ cho dropdown
+            var hockys = await _context.HocKys
+                .Include(h => h.TrangThai)
+                .Where(h => h.TrangThai.TenTrangThai == "Hoạt động" || h.TrangThai.TenTrangThai == "Mới tạo")
+                .OrderByDescending(h => h.NgayBatDau)
+                .ToListAsync();
+            ViewBag.HocKyList = new SelectList(hockys, "Id", "TenHocKy", hocKyId);
+
+
+            // Các ViewBag khác
+            ViewBag.NienKhoaList = await _context.SinhViens
+                .Select(s => s.NgayNhapHoc.Year.ToString())
+                .Distinct()
+                .OrderByDescending(x => x)
+                .ToListAsync();
+
+            ViewBag.KhoaList = await _context.Khoas.ToListAsync();
+
+            ViewBag.ThaoTacList = new List<string>
+    {
+        "DANGKY",
+        "HUY",
+        "RUT",
+        "DIEUCHINH",
+        "DANGKY_SOM"
+    };
+
+            ViewBag.LoaiDoiTuongList = new List<string>
+    {
+        "NIEN_KHOA",
+        "KHOA",
+        "NGANH",
+        "LOAIHINH"
+    };
+        }
+
+        // Quản lý lớp học phần
+        #region ======= Helper Methods =======
+
+        private async Task PopulateViewBags(LopHocPhanCreateDTO dto = null)
+        {
+            // Lấy ID của các trạng thái hợp lệ cho việc mở lớp học phần
+            var validStatusNames = new List<string> { "Mới tạo", "Đang diễn ra" };
+
+            // Tìm ID của các trạng thái này trong bảng TrangThai
+            var validStatusIds = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "HocKy" && validStatusNames.Contains(t.TenTrangThai))
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            // Lọc Học kỳ theo các trạng thái hợp lệ
+            var hocKys = await _context.HocKys
+                .Where(hk => validStatusIds.Contains(hk.TrangThaiId)) // Giả sử HocKy có TrangThaiId
+                .ToListAsync();
+
+            var monHocs = await _context.MonHocs.ToListAsync();
+            var phongHocs = await _context.PhongHocs.ToListAsync();
+
+            ViewBag.HocKyList = new SelectList(hocKys, "Id", "TenHocKy", dto?.HocKyId);
+            ViewBag.MonHocList = new SelectList(monHocs, "Id", "TenMonHoc", dto?.MonHocId);
+            ViewBag.PhongHocList = new SelectList(phongHocs, "Id", "MaPhongHoc", dto?.PhongHocId);
+            
+
+            if (dto?.MonHocId > 0)
+            {
+                var giangViens = await _context.GiangViens
+    // Lọc giảng viên: kiểm tra xem có bất kỳ bản ghi nào trong GiangVienMonHocs
+    // mà MonHocId khớp với MonHocId đã chọn hay không.
+    .Where(gv => gv.GiangVienMonHocs.Any(gvmh => gvmh.MonHocId == dto.MonHocId))
+    .Select(gv => new { gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten })
+    .ToListAsync();
+                ViewBag.GiangVienList = new SelectList(giangViens, "Id", "HoTen", dto.GiangVienId);
+            }
+            else
+            {
+                ViewBag.GiangVienList = new SelectList(new List<dynamic>(), "Id", "HoTen");
+            }
+
+            ViewBag.TrangThaiLHPList = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "LopHocPhan")
+                .ToListAsync();
+        }
+
+        private async Task<(bool success, JsonElement data, string error)> CallApiAsync(string url, HttpMethod method, object body = null)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri(_apiBaseUrl);
+
+                // Lấy token từ session và thiết lập Authorization Header (ĐÃ SỬA)
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    // Đặt header Authorization cho mọi request
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                HttpResponseMessage response;
+
+                // Xử lý request
+                if (method == HttpMethod.Get)
+                {
+                    response = await client.GetAsync(url);
+                }
+                else if (method == HttpMethod.Post)
+                {
+                    var json = JsonConvert.SerializeObject(body);
+                    response = await client.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
+                }
+                else if (method == HttpMethod.Put)
+                {
+                    var json = JsonConvert.SerializeObject(body);
+                    response = await client.PutAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
+                }
+                else
+                {
+                    throw new NotImplementedException("HTTP method chưa hỗ trợ.");
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    // Cố gắng phân tích lỗi từ API nếu có
+                    return (false, default, $"API error: {response.StatusCode}, {content}");
+
+                var doc = JsonDocument.Parse(content);
+                return (true, doc.RootElement, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi gọi API");
+                return (false, default, ex.Message);
+            }
+        }
+
+        private IActionResult RePopulateViewAndReturn(object dto, LopHocPhan lhp = null)
+        {
+            ViewBag.LHP = lhp;
+
+            // 1. PHÒNG HỌC: Đảm bảo SelectList được tạo lại từ context.
+            ViewBag.PhongHocList = new SelectList(_context.PhongHocs.ToList(), "Id", "MaPhongHoc");
+
+            // 2. DAYS OF WEEK: Đảm bảo List này luôn được tạo lại.
+            ViewBag.DaysOfWeek = new List<object>
+    {
+        new { Id = 2, Name = "Thứ Hai" },
+        new { Id = 3, Name = "Thứ Ba" },
+        new { Id = 4, Name = "Thứ Tư" },
+        new { Id = 5, Name = "Thứ Năm" },
+        new { Id = 6, Name = "Thứ Sáu" },
+        new { Id = 7, Name = "Thứ Bảy" },
+        new { Id = 8, Name = "Chủ Nhật" }
+    };
+            if (lhp != null && lhp.GiangVien != null)
+                ViewBag.GiangVien = $"{lhp.GiangVien.HoVaTenDem} {lhp.GiangVien.Ten} (Mã: {lhp.GiangVien.MaGiangVien})";
+            else
+                ViewBag.GiangVien = "Không rõ";
+
+            return View(dto);
+        }
+
+        private int ConvertDayOfWeekToCustomDay(DayOfWeek dayOfWeek) => dayOfWeek switch
+        {
+            DayOfWeek.Monday => 2,
+            DayOfWeek.Tuesday => 3,
+            DayOfWeek.Wednesday => 4,
+            DayOfWeek.Thursday => 5,
+            DayOfWeek.Friday => 6,
+            DayOfWeek.Saturday => 7,
+            DayOfWeek.Sunday => 8,
+            _ => 0
+        };
+
+        private async Task<string> GenerateAutoMaLHP(int hocKyId, int monHocId)
+        {
+            var hocKy = await _context.HocKys.FindAsync(hocKyId);
+            var monHoc = await _context.MonHocs.FindAsync(monHocId);
+
+            if (hocKy == null || monHoc == null) return null;
+
+            string hocKyShort = hocKy.TenHocKy.Contains(" ")
+                ? hocKy.TenHocKy.Substring(hocKy.TenHocKy.LastIndexOf(" ") + 1)
+                : hocKy.TenHocKy;
+
+            string maMon = monHoc.MaMonHoc.ToUpper();
+            int year = hocKy.NgayBatDau.Year;
+            int count = await _context.LopHocPhans
+                .Where(l => l.HocKyId == hocKyId && l.MonHocId == monHocId)
+                .CountAsync();
+
+            return $"{hocKyShort.ToUpper()}-{maMon}-{year}-{(count + 1):D3}";
+        }
+
+
+        private readonly Dictionary<int, string> TietStartMap = new Dictionary<int, string> {
+    {1,"06:45"},{2,"07:30"},{3,"08:15"}, {4,"09:20"},{5,"10:05"},{6,"10:50"},
+    {7,"12:30"},{8,"13:10"},{9,"14:00"}, {10,"15:05"},{11,"15:50"},{12,"16:35"},
+    {13,"18:00"},{14,"18:45"},{15,"19:30"}
+};
+
+        private readonly Dictionary<int, string> TietEndMap = new Dictionary<int, string> {
+    {1,"07:30"},{2,"08:15"},{3,"09:00"}, {4,"10:05"},{5,"10:50"},{6,"11:35"},
+    {7,"13:15"},{8,"13:55"},{9,"14:45"}, {10,"15:50"},{11,"16:35"},{12,"17:20"},
+    {13,"18:45"},{14,"19:30"},{15,"20:15"}
+};
+
+        // Hàm chuyển đổi Tiết sang TimeSpan
+        private (TimeSpan start, TimeSpan end) ConvertTietToTimeSpan(int startTiet, int endTiet)
+        {
+            var startTime = TimeSpan.Parse(TietStartMap[startTiet]);
+            var endTime = TimeSpan.Parse(TietEndMap[endTiet]);
+            return (startTime, endTime);
+        }
+
+        private async Task<List<LichHocDTO>> CheckLichTrungAsync(List<LichHocDTO> newSchedules, int giangVienId)
+        {
+            var lichTrung = new List<LichHocDTO>();
+
+            foreach (var newLich in newSchedules)
+            {
+                // Kiểm tra trùng phòng học
+                var trungPhong = await _context.LichHocs
+                    .Include(l => l.LopHocPhan)
+                    .Where(l => l.PhongHocId == newLich.PhongHocId &&
+                                l.Ngay == newLich.Ngay &&
+                                // Kiểm tra thời gian chồng lấn: (StartA < EndB) && (EndA > StartB)
+                                (newLich.GioBatDau < l.GioKetThuc) &&
+                                (newLich.GioKetThuc > l.GioBatDau))
+                    .AnyAsync();
+
+                // Kiểm tra trùng lịch giảng viên
+                var trungGiangVien = await _context.LichHocs
+                    .Include(l => l.LopHocPhan)
+                    .Where(l => l.LopHocPhan.GiangVienId == giangVienId &&
+                                l.Ngay == newLich.Ngay &&
+                                (newLich.GioBatDau < l.GioKetThuc) &&
+                                (newLich.GioKetThuc > l.GioBatDau))
+                    .AnyAsync();
+
+                if (trungPhong || trungGiangVien)
+                {
+                    // Thêm lịch bị trùng vào danh sách báo cáo lỗi
+                    lichTrung.Add(newLich);
+                }
+            }
+            return lichTrung;
+        }
+
+        private async Task<List<PhongHoc>> GetPhongHocList(MonHoc monHoc)
+        {
+            var query = _context.PhongHocs.AsQueryable();
+
+            if (monHoc != null && monHoc.MoTa != null && monHoc.MoTa.ToUpper().Contains("TH"))
+            {
+                // Yêu cầu: Nếu Mô tả môn học có "TH" (Thực Hành), chỉ lấy Phòng Thực Hành
+                // Giả sử tên/mã phòng thực hành có chứa chuỗi "Phòng Thực Hành" (hoặc "TH")
+                // Tôi sẽ dùng điều kiện mạnh hơn là MaPhongHoc chứa "TH" hoặc Mô tả Phòng học chứa "Thực Hành"
+
+                query = query.Where(ph => ph.MaPhongHoc.ToUpper().Contains("TH") || ph.TenPhongHoc.ToUpper().Contains("THỰC HÀNH"));
+            }
+            else
+            {
+                // Ngược lại, chỉ lấy các phòng không phải là Phòng Thực Hành (Phòng học lý thuyết)
+                query = query.Where(ph => !ph.MaPhongHoc.ToUpper().Contains("TH") && !ph.TenPhongHoc.ToUpper().Contains("THỰC HÀNH"));
+            }
+
+            return await query.ToListAsync();
+        }
+
+
+        #endregion
+
+        #region ======= Course Class Manager =======
+
+        public async Task<IActionResult> CourseClassManager()
+        {
+            var (success, data, error) = await CallApiAsync("api/lophocphans", HttpMethod.Get);
+            if (!success)
+            {
+                TempData["Error"] = error ?? "Không thể lấy danh sách Lớp Học Phần.";
+                return View(new List<object>());
+            }
+
+            var lhpList = JsonConvert.DeserializeObject<List<ExpandoObject>>(
+                data.GetProperty("data").GetRawText(),
+                new JsonSerializerSettings { Converters = { new ExpandoObjectConverter() } }
+            );
+
+            await PopulateViewBags();
+            return View(lhpList);
+        }
+
+        public async Task<IActionResult> CourseClassDetail(int id)
+        {
+            var lhp = await _context.LopHocPhans
+                .Include(l => l.MonHoc)
+                .Include(l => l.GiangVien)
+                .Include(l => l.TrangThai)
+                .Include(l => l.HocKy)
+                .FirstOrDefaultAsync(l => l.Id == id);
+
+            if (lhp == null)
+            {
+                TempData["Error"] = "Không tìm thấy lớp học phần.";
+                return RedirectToAction(nameof(CourseClassManager));
+            }
+
+            var lichHoc = await _context.LichHocs
+        .Include(l => l.PhongHoc) 
+        .Where(l => l.LopHocPhanId == id)
+        .Select(l => new
+        {
+            l.Id,
+            l.Ngay,
+            l.GioBatDau,
+            l.GioKetThuc,
+            Phong = l.PhongHoc.MaPhongHoc
+        })
+        .ToListAsync();
+
+            ViewBag.LichHoc = lichHoc;
+
+            return View(lhp);
+        }
+
+        #endregion
+
+        #region ======= Create Course Class =======
+
+        public async Task<IActionResult> CreateCourseClass()
+        {
+            await PopulateViewBags();
+
+            var dto = new LopHocPhanCreateDTO
+            {
+                NgayBatDauLHP = DateTime.Today,
+                NgayKetThucLHP = DateTime.Today.AddMonths(3)
+            };
+
+            return View(dto);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateCourseClass(LopHocPhanCreateDTO dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                await PopulateViewBags(dto);
+                return View(dto);
+            }
+
+            // Nếu chưa có mã LHP, tự sinh
+            if (string.IsNullOrWhiteSpace(dto.MaLopHocPhan))
+                dto.MaLopHocPhan = await GenerateAutoMaLHP(dto.HocKyId, dto.MonHocId);
+
+            var (success, data, error) = await CallApiAsync("api/lophocphan", HttpMethod.Post, dto);
+
+            if (success)
+            {
+                int newLhpId = data.GetProperty("lopHocPhanId").GetInt32();
+                TempData["Success"] = data.GetProperty("message").GetString() ?? $"Tạo Lớp Học Phần **{dto.MaLopHocPhan}** thành công!";
+                return RedirectToAction(nameof(CourseClassDetail), new { id = newLhpId });
+            }
+
+            ModelState.AddModelError("", error ?? "Lỗi tạo Lớp Học Phần từ API.");
+            await PopulateViewBags(dto);
+            return View(dto);
+        }
+
+        #endregion
+
+        #region ======= Add Schedule =======
+
+
+
+        public async Task<IActionResult> AddSchedule(int lhpId)
+        {
+            var lhp = await _context.LopHocPhans
+                .Include(l => l.MonHoc)
+                .Include(l => l.GiangVien)
+                .FirstOrDefaultAsync(l => l.Id == lhpId);
+
+            if (lhp == null)
+            {
+                TempData["Error"] = "Không tìm thấy Lớp Học Phần.";
+                return RedirectToAction(nameof(CourseClassManager));
+            }
+
+            // 1. Gán ViewBag cần thiết
+            ViewBag.LHP = lhp;
+            var phongHocs = await GetPhongHocList(lhp.MonHoc);
+            ViewBag.PhongHocList = new SelectList(phongHocs, "Id", "MaPhongHoc");
+
+            // Gán Map Tiết học
+            ViewBag.TietStartMap = TietStartMap;
+            ViewBag.TietEndMap = TietEndMap;
+
+            // Gán thông tin giảng viên
+            if (lhp.GiangVien != null)
+                ViewBag.GiangVien = $"{lhp.GiangVien.HoVaTenDem} {lhp.GiangVien.Ten} (Mã: {lhp.GiangVien.MaGiangVien})";
+            else
+                ViewBag.GiangVien = "Không rõ";
+
+            // 2. Tạo DTO và Return View
+            var model = new AddScheduleDTO // SỬ DỤNG DTO MỚI
+            {
+                LopHocPhanId = lhp.Id,
+                Ngay = DateTime.Now.Date,
+                TietBatDau = 2,
+                TietKetThuc = 6
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddSchedule(AddScheduleDTO dto)
+        {
+            var lhp = await _context.LopHocPhans
+                .Include(l => l.GiangVien)
+                .Include(l => l.MonHoc)
+                .FirstOrDefaultAsync(l => l.Id == dto.LopHocPhanId);
+
+            // GÁN MAP TIẾT HỌC CHO TRƯỜNG HỢP LỖI
+            ViewBag.TietStartMap = TietStartMap;
+            ViewBag.TietEndMap = TietEndMap;
+
+            // 1. Validation cơ bản
+            if (!ModelState.IsValid || lhp == null || dto.PhongHocId <= 0)
+            {
+                ModelState.AddModelError("", "Vui lòng điền đủ thông tin bắt buộc.");
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+            var validPhongHocs = await GetPhongHocList(lhp?.MonHoc);
+            ViewBag.PhongHocList = new SelectList(validPhongHocs, "Id", "MaPhongHoc");
+
+            // 3. Validation Phía Server: Kiểm tra Phòng đã chọn có hợp lệ không
+            if (!validPhongHocs.Any(ph => ph.Id == dto.PhongHocId))
+            {
+                ModelState.AddModelError(nameof(dto.PhongHocId), "Phòng học được chọn không phù hợp với loại môn học (Thực hành/Lý thuyết).");
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+            // 2. Validation Tiết học
+            if (dto.TietBatDau > dto.TietKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.TietKetThuc), "Tiết kết thúc phải lớn hơn hoặc bằng Tiết bắt đầu.");
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+
+            // 3. CHUYỂN ĐỔI TIẾT SANG TIMESPAN
+            var (startTime, endTime) = ConvertTietToTimeSpan(dto.TietBatDau, dto.TietKetThuc);
+
+            // 4. Chuẩn bị đối tượng LichHocDTO (đã có TimeSpan)
+            var scheduleToCreate = new LichHocDTO
+            {
+                LopHocPhanId = dto.LopHocPhanId,
+                Ngay = dto.Ngay, 
+                GioBatDau = startTime,
+                GioKetThuc = endTime,
+                PhongHocId = dto.PhongHocId
+            };
+
+            // 5. KIỂM TRA TRÙNG LỊCH
+            var giangVienId = lhp.GiangVienId.GetValueOrDefault();
+            var lichTrung = await CheckLichTrungAsync(new List<LichHocDTO> { scheduleToCreate }, giangVienId);
+
+            if (lichTrung.Any())
+            {
+                ModelState.AddModelError("", $"Lỗi trùng lịch học. Lịch này trùng lịch giảng viên hoặc phòng học.");
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+
+            // 6. GỌI API TẠO 1 LỊCH
+            var (success, data, error) = await CallApiAsync("api/lophocphan/lichhoc", HttpMethod.Post, scheduleToCreate);
+
+            if (success)
+            {
+                TempData["Success"] = $"Thêm lịch học thành công vào ngày {dto.Ngay.ToString("dd/MM/yyyy")}!";
+                return RedirectToAction(nameof(CourseClassDetail), new { id = dto.LopHocPhanId });
+            }
+
+            ModelState.AddModelError("", error ?? "Lỗi API khi tạo lịch học thủ công.");
+            return RePopulateViewAndReturn(dto, lhp);
+        }
+
+        #endregion
+
+
+
+        #region ======= Auto Add Schedule =======
+
+        public async Task<IActionResult> AutoAddSchedule(int lhpId)
+        {
+            var lhp = await _context.LopHocPhans
+        .Include(l => l.MonHoc)
+        .Include(l => l.GiangVien)
+        .FirstOrDefaultAsync(l => l.Id == lhpId);
+
+            if (lhp == null)
+            {
+                TempData["Error"] = "Không tìm thấy Lớp Học Phần.";
+                return RedirectToAction(nameof(CourseClassManager));
+            }
+
+            // 1. Gán tất cả ViewBag trước khi gọi View
+            ViewBag.LHP = lhp;
+            var phongHocs = await GetPhongHocList(lhp.MonHoc);
+            ViewBag.PhongHocList = new SelectList(phongHocs, "Id", "MaPhongHoc");
+            ViewBag.DaysOfWeek = new List<object>
+    {
+        new { Id = 2, Name = "Thứ Hai" }, new { Id = 3, Name = "Thứ Ba" }, new { Id = 4, Name = "Thứ Tư" },
+        new { Id = 5, Name = "Thứ Năm" }, new { Id = 6, Name = "Thứ Sáu" }, new { Id = 7, Name = "Thứ Bảy" },
+        new { Id = 8, Name = "Chủ Nhật" }
+    };
+            // Gán Map Tiết học (Đã có)
+            ViewBag.TietStartMap = TietStartMap;
+            ViewBag.TietEndMap = TietEndMap;
+
+            // Gán thông tin giảng viên cho ViewBag (Cần cho RePopulateViewAndReturn)
+            ViewBag.GiangVien = $"{lhp.GiangVien.HoVaTenDem} {lhp.GiangVien.Ten} (Mã: {lhp.GiangVien.MaGiangVien})";
+
+
+            // 2. Chỉ Return View một lần duy nhất
+            return View(new AutoAddScheduleDTO
+            {
+                LopHocPhanId = lhp.Id,
+                TietBatDau = 2,
+                TietKetThuc = 6
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AutoAddSchedule(AutoAddScheduleDTO dto)
+        {
+            var lhp = await _context.LopHocPhans
+        .Include(l => l.GiangVien)
+        .Include(l => l.MonHoc)
+        .Include(l => l.HocKy)
+        .FirstOrDefaultAsync(l => l.Id == dto.LopHocPhanId);
+
+            // 1. Validation cơ bản (Giữ nguyên)
+            if (!ModelState.IsValid || dto.CacNgayTrongTuan == null || !dto.CacNgayTrongTuan.Any() || lhp == null)
+            {
+                ModelState.AddModelError("", "Vui lòng chọn ít nhất một ngày và điền đủ thông tin.");
+                ViewBag.TietStartMap = TietStartMap;
+                ViewBag.TietEndMap = TietEndMap;
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+
+            // Thêm validation: Tiết kết thúc phải >= Tiết bắt đầu
+            if (dto.TietBatDau > dto.TietKetThuc)
+            {
+                ModelState.AddModelError(nameof(dto.TietKetThuc), "Tiết kết thúc phải lớn hơn hoặc bằng Tiết bắt đầu.");
+                ViewBag.TietStartMap = TietStartMap;
+                ViewBag.TietEndMap = TietEndMap;
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+            // 3. VALIDATION RÀNG BUỘC NGHIỆP VỤ: Kiểm tra Phòng học có hợp lệ với loại Môn học không
+            var validPhongHocs = await GetPhongHocList(lhp.MonHoc);
+
+            // TẢI LẠI PHÒNG HỌC ĐÃ LỌC TRONG REPOPULATEVIEWANDRETURN BỊ LỖI
+            // (Vì RePopulateViewAndReturn không có thông tin MonHoc, chúng ta phải gán lại ViewBag.PhongHocList nếu validation server-side thất bại)
+            ViewBag.PhongHocList = new SelectList(validPhongHocs, "Id", "MaPhongHoc");
+
+            if (!validPhongHocs.Any(ph => ph.Id == dto.PhongHocId))
+            {
+                ModelState.AddModelError(nameof(dto.PhongHocId), "Phòng học được chọn không phù hợp với loại môn học (Thực hành/Lý thuyết).");
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+            // 2. CHUYỂN ĐỔI TIẾT SANG TIMESPAN VÀO BIẾN CỤC BỘ
+            var (startTime, endTime) = ConvertTietToTimeSpan(dto.TietBatDau, dto.TietKetThuc);
+            // (Bây giờ startTime và endTime là TimeSpan, sẵn sàng để lưu)
+
+            // 3. Chuẩn bị danh sách lịch học
+            var schedulesToCreate = Enumerable.Range(0, (lhp.NgayKetThuc - lhp.NgayBatDau).Days + 1)
+                .Select(i => lhp.NgayBatDau.AddDays(i))
+                .Where(d => dto.CacNgayTrongTuan.Contains(ConvertDayOfWeekToCustomDay(d.DayOfWeek)))
+                .Select(d => new LichHocDTO
+                {
+                    LopHocPhanId = dto.LopHocPhanId,
+                    Ngay = d,
+                    // SỬ DỤNG TIMESPAN ĐÃ CHUYỂN ĐỔI TỪ BƯỚC 2 ĐỂ TẠO DTO
+                    GioBatDau = startTime,
+                    GioKetThuc = endTime,
+                    PhongHocId = dto.PhongHocId
+                }).ToList();
+
+            // 4. KIỂM TRA TRÙNG LỊCH (Logic CheckLichTrungAsync vẫn sử dụng LichHocDTO với TimeSpan)
+            var giangVienId = lhp.GiangVienId.GetValueOrDefault();
+            var lichTrung = await CheckLichTrungAsync(schedulesToCreate, giangVienId);
+            if (lichTrung.Any())
+            {
+                ModelState.AddModelError("", "Lỗi trùng lịch học. Vui lòng kiểm tra các ngày và phòng học sau:");
+                foreach (var lich in lichTrung)
+                {
+                    // Báo cáo lỗi vẫn dùng TimeSpan để hiển thị chi tiết
+                    ModelState.AddModelError("", $"- GV {lhp.GiangVien.MaGiangVien} trùng lịch vào {lich.Ngay.ToString("dd/MM/yyyy")} ({lich.GioBatDau} - {lich.GioKetThuc}) tại Phòng ID {lich.PhongHocId}");
+                }
+
+                ViewBag.TietStartMap = TietStartMap;
+                ViewBag.TietEndMap = TietEndMap;
+                return RePopulateViewAndReturn(dto, lhp);
+            }
+
+            // 5. GỌI API BATCH
+            // schedulesToCreate đã chứa TimeSpan (GioBatDau, GioKetThuc) nên việc lưu trữ là chính xác.
+            var (success, data, error) = await CallApiAsync("api/lophocphan/lichhoc/batch", HttpMethod.Post, schedulesToCreate);
+
+            if (success)
+            {
+                TempData["Success"] = $"Tạo **{schedulesToCreate.Count}** lịch học tự động thành công cho LHP **{lhp.MaLopHocPhan}**!";
+                return RedirectToAction(nameof(CourseClassDetail), new { id = dto.LopHocPhanId });
+            }
+
+            ModelState.AddModelError("", error ?? "Lỗi API khi tạo hàng loạt lịch học.");
+            ViewBag.TietStartMap = TietStartMap;
+            ViewBag.TietEndMap = TietEndMap;
+            return RePopulateViewAndReturn(dto, lhp);
+        }
+
+        #endregion
+
+        #region ======= Other Actions (Update/Delete) =======
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateCourseClassStatus(int lopHocPhanId, int trangThaiId, string lyDo = null)
+        {
+            var dto = new UpdateLopHocPhanStatusDTO { LopHocPhanId = lopHocPhanId, TrangThaiId = trangThaiId, LyDo = lyDo };
+            var (success, data, error) = await CallApiAsync("api/lophocphan/trangthai", HttpMethod.Put, dto);
+
+            // Khắc phục lỗi tại đây:
+            string message = error ?? "Cập nhật trạng thái không thành công.";
+
+            if (success)
+            {
+                // Kiểm tra xem thuộc tính 'message' có tồn tại không trước khi lấy giá trị
+                if (data.TryGetProperty("message", out var messageElement))
+                {
+                    message = messageElement.GetString() ?? message;
+                }
+                else
+                {
+                    message = "Cập nhật trạng thái thành công.";
+                }
+            }
+
+            // Trả về JSON với message đã được xử lý
+            return Json(new { success, message });
+        }
+
+        [HttpPost]
+        public IActionResult DeleteCourseClass(int lopHocPhanId)
+        {
+            try
+            {
+                var lhp = _context.LopHocPhans.Find(lopHocPhanId);
+                if (lhp == null) return Json(new { success = false, message = "Không tìm thấy lớp học phần." });
+
+                _context.LopHocPhans.Remove(lhp);
+                _context.SaveChanges();
+                return Json(new { success = true, message = "Xóa lớp học phần thành công." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        #endregion
+
+        #region ======= Get Giang Vien =======
+
+        [HttpGet]
+        public async Task<IActionResult> GetGiangVienTheoMon(int? monHocId, string search = "")
+        {
+            var query = _context.GiangViens.AsQueryable();
+
+            if (monHocId.HasValue && monHocId.Value > 0)
+                query = query.Where(gv => gv.GiangVienMonHocs.Any(gvmh => gvmh.MonHocId == monHocId.Value));
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(gv => (gv.HoVaTenDem + " " + gv.Ten).Contains(search));
+
+            var giangViens = await query
+                .Select(gv => new { Id = gv.Id, HoTen = gv.HoVaTenDem + " " + gv.Ten })
+                .ToListAsync();
+
+            return Json(giangViens);
+        }
+
+        #endregion
+        #region ======= Auto Dang Ky Bat Buoc =======
+
+
+        [HttpPost]
+        public async Task<IActionResult> RunAutoDangKyBatBuocFromAdmin(int hocKyId, int thuTuHocKy)
+        {
+            if (hocKyId <= 0 || thuTuHocKy <= 0)
+            {
+                TempData["Error"] = "Vui lòng chọn Học kỳ và Thứ tự học kỳ hợp lệ.";
+                return RedirectToAction(nameof(CourseClassManager));
+            }
+
+            // Gọi API POST để kích hoạt quy trình tự động trên Backend
+            var (success, data, error) = await CallApiAsync(
+                url: $"api/auto-dangky-batbuoc/{hocKyId}?thuTuHocKy={thuTuHocKy}",
+                method: HttpMethod.Post);
+
+            if (success)
+            {
+                string message = "Quá trình đăng ký tự động đã hoàn tất.";
+
+                // Cố gắng lấy thông báo chi tiết từ phản hồi API
+                if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("message", out var messageElement))
+                {
+                    message = messageElement.GetString() ?? message;
+                }
+
+                TempData["Success"] = message;
+            }
+            else
+            {
+                // Xử lý lỗi API
+                TempData["Error"] = error ?? "Chạy tự động đăng ký bắt buộc thất bại.";
+            }
+
+            // Luôn redirect trở lại trang quản lý lớp học phần để thấy kết quả
+            return RedirectToAction(nameof(CourseClassManager));
+        }
+
+        #endregion
+        #region ======= Auto Generate LHP Code and Name =======
+
+        /// <summary>
+        /// Sinh tự động Mã LHP và tên gợi ý khi chọn Học kỳ và Môn học.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GenerateLopHocPhanInfo(int hocKyId, int monHocId)
+        {
+            if (hocKyId <= 0 || monHocId <= 0)
+            {
+                return Json(new { success = false, message = "Thiếu Học kỳ hoặc Môn học ID." });
+            }
+
+            try
+            {
+                // 1. Sinh Mã LHP
+                var maLopHocPhan = await GenerateAutoMaLHP(hocKyId, monHocId);
+
+                // 2. Gợi ý Tên LHP (Thường là tên Môn học + Mã nhóm)
+                var monHoc = await _context.MonHocs.FindAsync(monHocId);
+
+                string tenGoiY = "";
+                if (monHoc != null)
+                {
+                    // Ví dụ: "Tên Môn Học (Tên Học Kỳ )" hoặc đơn giản là Tên Môn học
+                    tenGoiY = $"{monHoc.TenMonHoc} ";
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    maLopHocPhan = maLopHocPhan,
+                    tenLopHocPhan = tenGoiY
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi sinh thông tin LHP tự động");
+                return Json(new { success = false, message = "Lỗi server khi sinh mã." });
+            }
+        }
+
+        #endregion
+        #region ======= Get Hoc Ky Dates =======
+
+        /// <summary>
+        /// Lấy ngày bắt đầu và kết thúc của một Học kỳ cụ thể.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetHocKyDates(int hocKyId)
+        {
+            if (hocKyId <= 0)
+            {
+                return Json(new { success = false, message = "Thiếu Học kỳ ID." });
+            }
+
+            var hocKy = await _context.HocKys.FindAsync(hocKyId);
+
+            if (hocKy == null)
+            {
+                return Json(new { success = false, message = "Không tìm thấy Học kỳ." });
+            }
+
+            // Trả về ngày dưới dạng chuỗi format 'yyyy-MM-dd' để JavaScript/HTML input type='date' có thể đọc được
+            return Json(new
+            {
+                success = true,
+                ngayBatDau = hocKy.NgayBatDau.ToString("yyyy-MM-dd"),
+                ngayKetThuc = hocKy.NgayKetThuc.ToString("yyyy-MM-dd")
+            });
+        }
+
+        #endregion
     }
 }

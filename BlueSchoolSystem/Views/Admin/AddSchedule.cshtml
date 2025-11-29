@@ -1,0 +1,168 @@
+﻿@* File: Views/Admin/AddSchedule.cshtml *@
+@model BlueSchoolSystem.Models.ViewModel.AddScheduleDTO
+@{
+    ViewData["Title"] = "Thêm Lịch Học Thủ Công";
+    var lhp = ViewBag.LHP as BlueSchoolSystem.Models.LopHocPhan;
+
+    // Lấy Map Tiết học
+    var tietStartMap = ViewBag.TietStartMap as Dictionary<int, string>;
+    var tietEndMap = ViewBag.TietEndMap as Dictionary<int, string>;
+
+    // Kiểm tra điều kiện môn học thực hành (MoTa chứa "TH")
+    var isThucHanh = lhp?.MonHoc?.MoTa != null && lhp.MonHoc.MoTa.ToUpper().Contains("TH");
+}
+
+<div class="container mt-4">
+    <div class="card shadow-lg">
+        <div class="card-header bg-info bg-gradient text-dark py-3">
+            <div class="d-flex flex-column">
+                <h3 class="card-title mb-2">
+                    <i class="fa fa-calendar-plus me-2"></i> @ViewData["Title"]
+                </h3>
+
+                <div class="small">
+                    <div><strong>Mã lớp:</strong> @lhp?.MaLopHocPhan</div>
+                    <div><strong>Môn học:</strong> @lhp?.MonHoc?.TenMonHoc</div>
+                    <div><strong>Giảng viên:</strong> @ViewBag.GiangVien</div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form asp-action="AddSchedule" method="post">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                @* Trường ẩn ID LHP *@
+                <input type="hidden" asp-for="LopHocPhanId" value="@Model.LopHocPhanId" />
+
+                <div class="row">
+                    @* 1. Ngày học *@
+                    <div class="col-md-12 mb-4">
+                        <label asp-for="Ngay" class="form-label">Ngày học (<span class="text-danger">*</span>)</label>
+                        <input asp-for="Ngay" type="date" class="form-control form-control-lg"
+                               title="Ngày phải nằm trong khoảng thời gian của Lớp Học Phần"
+                               min="@lhp?.NgayBatDau.ToString("yyyy-MM-dd")"
+                               max="@lhp?.NgayKetThuc.ToString("yyyy-MM-dd")" />
+                        <span asp-validation-for="Ngay" class="text-danger"></span>
+
+                        <small class="form-text text-muted">
+                            Lịch phải nằm trong khoảng:
+                            <span class="fw-bold">@lhp?.NgayBatDau.ToString("dd/MM/yyyy")</span> đến
+                            <span class="fw-bold">@lhp?.NgayKetThuc.ToString("dd/MM/yyyy")</span>.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="row">
+                    @* 2. Tiết Bắt Đầu *@
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="TietBatDau" class="form-label">Tiết Bắt Đầu </label>
+                        <select asp-for="TietBatDau" class="form-select" id="TietBatDauSelect">
+                            @if (tietStartMap != null)
+                            {
+                                @foreach (var kvp in tietStartMap)
+                                {
+                                    <option value="@kvp.Key">Tiết @kvp.Key (@kvp.Value)</option>
+                                }
+                            }
+                        </select>
+                        <span asp-validation-for="TietBatDau" class="text-danger"></span>
+                    </div>
+
+                    @* 3. Tiết Kết Thúc *@
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="TietKetThuc" class="form-label">Tiết Kết Thúc </label>
+                        <select asp-for="TietKetThuc" class="form-select" id="TietKetThucSelect">
+                            @if (tietEndMap != null)
+                            {
+                                @foreach (var kvp in tietEndMap)
+                                {
+                                    <option value="@kvp.Key">Tiết @kvp.Key (@kvp.Value)</option>
+                                }
+                            }
+                        </select>
+                        <span asp-validation-for="TietKetThuc" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="row">
+                    @* 4. Phòng Học *@
+                    <div class="col-md-6 mb-3">
+
+                        @* --- THÔNG BÁO ĐIỀU KIỆN CHỌN PHÒNG --- *@
+                        @if (isThucHanh)
+                        {
+                            <div class="alert alert-warning py-1 mb-2 small fw-bold">
+                                <i class="fa fa-flask me-1"></i> Môn Thực Hành. Chỉ được chọn **Phòng Thực Hành**.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info py-1 mb-2 small">
+                                <i class="fa fa-book me-1"></i> Môn Lý Thuyết. Không được chọn Phòng Thực Hành.
+                            </div>
+                        }
+
+                        <label asp-for="PhongHocId" class="form-label">Phòng Học </label>
+                        <select asp-for="PhongHocId" asp-items="ViewBag.PhongHocList" class="form-select">
+                            <option value="">-- Chọn Phòng Học --</option>
+                        </select>
+                        <span asp-validation-for="PhongHocId" class="text-danger"></span>
+                    </div>
+
+                @*     5. Giảng viên (Hiển thị)
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Giảng Viên</label>
+                        <p class="form-control-plaintext fw-bold">@ViewBag.GiangVien</p>
+                    </div>
+                </div> *@
+
+                <div class="mt-4 pt-3 border-top">
+                    <button type="submit" class="btn btn-info btn-lg me-2 text-dark">
+                        <i class="fa fa-save"></i> Thêm Lịch
+                    </button>
+                    <a asp-action="CourseClassDetail" asp-route-id="@Model.LopHocPhanId" class="btn btn-secondary btn-lg">
+                        <i class="fa fa-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        $(function() {
+            var tietBatDauSelect = $('#TietBatDauSelect');
+            var tietKetThucSelect = $('#TietKetThucSelect');
+
+            // Hàm ràng buộc Tiết kết thúc >= Tiết bắt đầu (Client-side UX)
+            function enforceTietRange() {
+                var startTiet = parseInt(tietBatDauSelect.val());
+                var endTiet = parseInt(tietKetThucSelect.val());
+
+                if (isNaN(startTiet)) return; // Bỏ qua nếu Tiết bắt đầu chưa được chọn hoặc lỗi
+
+                if (endTiet < startTiet) {
+                    // Tự động điều chỉnh Tiết kết thúc bằng Tiết bắt đầu nếu nó nhỏ hơn
+                    tietKetThucSelect.val(startTiet);
+                }
+
+                // Vô hiệu hóa các Tiết kết thúc nhỏ hơn Tiết bắt đầu
+                tietKetThucSelect.find('option').each(function() {
+                    var currentTiet = parseInt($(this).val());
+                    $(this).prop('disabled', currentTiet < startTiet);
+                });
+            }
+
+            tietBatDauSelect.change(enforceTietRange);
+            tietKetThucSelect.change(enforceTietRange);
+
+            // Chạy lần đầu khi load trang (để xử lý giá trị mặc định 1-3)
+            enforceTietRange();
+        });
+    </script>
+}

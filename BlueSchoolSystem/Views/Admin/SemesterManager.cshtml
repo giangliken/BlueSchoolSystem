@@ -1,0 +1,184 @@
+﻿@model IEnumerable<BlueSchoolSystem.Models.HocKy>
+@using Newtonsoft.Json
+@{
+    var trangThaiList = ViewBag.TrangThaiList as List<BlueSchoolSystem.Models.TrangThai>;
+    // Fix for CS0120: Use Context accessor for session in Razor views
+    var accessToken = Context.Session.GetString("access_token");
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<a asp-action="CreateSemester" class="btn btn-success mb-3">Thêm Học Kỳ</a>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+<!-- Bộ lọc -->
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-4">
+        <input type="text" name="searchName" value="@ViewBag.SearchName" class="form-control" placeholder="Tìm theo tên học kỳ..." />
+    </div>
+    <div class="col-md-3">
+        @{
+            // Lấy các năm có trong danh sách học kỳ
+            var yearList = Model
+                .Select(h => h.NgayBatDau.Year)
+                .Distinct()
+                .OrderByDescending(y => y)
+                .ToList();
+            var selectedYear = ViewBag.Year != null ? ViewBag.Year.ToString() : "";
+        }
+
+        <select name="year" class="form-select">
+            <option value="">-- Chọn năm học kỳ --</option>
+
+            @foreach (var year in yearList)
+            {
+                var isSelected = selectedYear == year.ToString();
+                <option value="@year" selected="@(isSelected ? "selected" : null)">
+                    @year
+                </option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2 d-grid">
+        <button type="submit" class="btn btn-primary">Lọc</button>
+    </div>
+    <div class="col-md-2 d-grid">
+        <a asp-action="SemesterManager" class="btn btn-secondary">Reset</a>
+    </div>
+</form>
+
+<table class="table table-bordered table-hover text-center">
+    <thead>
+        <tr>
+            <th>STT</th>
+            <th>Tên Học Kỳ</th>
+            <th>Ngày Bắt Đầu</th>
+            <th>Ngày Kết Thúc</th>
+            <th>Trạng Thái</th>
+            <th>Hành Động</th>
+        </tr>
+    </thead>
+    <tbody>
+        @{
+            var stt = 1;
+        }
+        @foreach (var hk in Model)
+        {
+            <tr>
+                <td>@stt</td>
+                <td>@hk.TenHocKy</td>
+                <td>@hk.NgayBatDau.ToString("dd/MM/yyyy")</td>
+                <td>@hk.NgayKetThuc.ToString("dd/MM/yyyy")</td>
+                <td>
+                    @hk.TrangThai?.TenTrangThai
+                </td>
+                <td>
+                    <button class="btn btn-warning btn-sm btn-edit-hocky"
+                            data-hocky='@Html.Raw(JsonConvert.SerializeObject(hk))'>
+                        Sửa
+                    </button>
+
+
+                    <form asp-action="DeleteSemester" asp-route-id="@hk.Id" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc muốn xóa học kỳ này?');">
+                        <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
+                    </form>
+                </td>
+            </tr>
+            stt++;
+        }
+    </tbody>
+</table>
+
+<!-- Modal sửa học kỳ -->
+<div class="modal fade" id="editHocKyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form id="editHocKyForm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Sửa Học Kỳ</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editHocKyId" />
+                    <div class="mb-3">
+                        <label>Tên Học Kỳ</label>
+                        <input type="text" id="editTenHocKy" class="form-control" required />
+                    </div>
+                    <div class="mb-3">
+                        <label>Ngày Bắt Đầu</label>
+                        <input type="date" id="editNgayBatDau" class="form-control" required />
+                    </div>
+                    <div class="mb-3">
+                        <label>Ngày Kết Thúc</label>
+                        <input type="date" id="editNgayKetThuc" class="form-control" required />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Lưu thay đổi</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+
+            var accessToken = '@accessToken';
+
+            $('.btn-edit-hocky').on('click', function () {
+                var hk = $(this).data('hocky');
+
+                if (typeof hk === "string") hk = JSON.parse(hk);
+
+                $('#editHocKyId').val(hk.Id);
+                $('#editTenHocKy').val(hk.TenHocKy);
+                $('#editNgayBatDau').val(hk.NgayBatDau.split('T')[0]);
+                $('#editNgayKetThuc').val(hk.NgayKetThuc.split('T')[0]);
+
+                $('#editHocKyModal').modal('show');
+            });
+
+            $('#editHocKyForm').submit(function (e) {
+                e.preventDefault();
+                var id = $('#editHocKyId').val();
+
+                var dto = {
+                    tenHocKy: $('#editTenHocKy').val(),
+                    ngayBatDau: $('#editNgayBatDau').val(),
+                    ngayKetThuc: $('#editNgayKetThuc').val()
+                };
+
+                $.ajax({
+                    url: `/api/hocky/${id}`,
+                    method: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify(dto),
+                    headers: { 'Authorization': 'Bearer ' + accessToken },
+                    success: function (res) {
+                        alert(res.message);
+                        location.reload();
+                    },
+                    error: function () {
+                        alert("Có lỗi xảy ra");
+                    }
+                });
+            });
+
+        });
+    </script>
+}
+

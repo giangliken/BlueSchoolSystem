@@ -1,0 +1,106 @@
+﻿@model BlueSchoolSystem.Models.ViewModel.DotDangKyDTO
+@{
+    ViewData["Title"] = "Tạo Đợt Đăng Ký";
+    var hocKyList = ViewBag.HocKyList as SelectList;
+    var loaiDoiTuongList = ViewBag.LoaiDoiTuongList as List<string>;
+    var thaoTacList = ViewBag.ThaoTacList as List<string>;
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<form asp-action="CreateRegistrationPeriod" method="post">
+    <input type="hidden" asp-for="HocKyId" /> <!-- giữ HocKyId mặc định -->
+
+    <div class="mb-3">
+        <label class="form-label">Học Kỳ</label>
+        <select class="form-select" disabled>
+            @foreach (var hk in hocKyList)
+            {
+                var selected = hk.Value == Model.HocKyId.ToString();
+                <option value="@hk.Value" selected="@(selected ? "selected" : null)">@hk.Text</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Tên Đợt</label>
+        <input asp-for="TenDot" class="form-control" />
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Ngày Bắt Đầu</label>
+            <input asp-for="NgayBatDau" type="datetime-local" class="form-control" />
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Ngày Kết Thúc</label>
+            <input asp-for="NgayKetThuc" type="datetime-local" class="form-control" />
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Loại Thao Tác</label>
+        <select asp-for="LoaiThaoTac" class="form-select">
+            @foreach (var t in thaoTacList)
+            {
+                <option value="@t" selected="@(Model.LoaiThaoTac == t ? "selected" : null)">@t</option>
+            }
+        </select>
+    </div>
+
+    <hr />
+    <h5>Đối Tượng Áp Dụng</h5>
+    <div id="wrapper-doituong">
+        <div class="row mb-2 doituong-item">
+            <div class="col-md-4">
+                <select class="form-select" name="DoiTuongApDungs[0].Loai">
+                    @foreach (var l in loaiDoiTuongList)
+                    {
+                        <option value="@l">@l</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <input class="form-control" name="DoiTuongApDungs[0].GiaTri" placeholder="Giá trị (VD: CNTT, K2023...)" />
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-danger w-100 btn-remove">Xóa</button>
+            </div>
+        </div>
+    </div>
+
+    <button id="btn-add" type="button" class="btn btn-secondary mb-3">+ Thêm đối tượng</button>
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <a asp-action="RegistrationPeriods" class="btn btn-outline-secondary">Quay lại</a>
+</form>
+
+@section Scripts {
+    <script>
+        let index = 1;
+        $("#btn-add").click(function () {
+            let row = `
+            <div class="row mb-2 doituong-item">
+                <div class="col-md-4">
+                    <select class="form-select" name="DoiTuongApDungs[${index}].Loai">
+                        @foreach (var l in loaiDoiTuongList)
+                        {
+                                <option value="@l">@l</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <input class="form-control" name="DoiTuongApDungs[${index}].GiaTri" placeholder="Giá trị" />
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-danger w-100 btn-remove">Xóa</button>
+                </div>
+            </div>`;
+            $("#wrapper-doituong").append(row);
+            index++;
+        });
+
+        $(document).on("click", ".btn-remove", function () {
+            $(this).closest(".doituong-item").remove();
+        });
+    </script>
+}

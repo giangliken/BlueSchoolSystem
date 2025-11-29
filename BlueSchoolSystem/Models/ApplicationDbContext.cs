@@ -36,13 +36,15 @@ namespace BlueSchoolSystem.Models
         public DbSet<DangKyHocPhan> DangKyHocPhans { get; set; } // Bảng đăng ký học phần
         public DbSet<HocKy> HocKys { get; set; } // Bảng học kỳ
         public DbSet<ThongBao> ThongBaos { get; set; }
-
-
         public DbSet<UserFaceTemplate> UserFaceTemplates { get; set; }
         public DbSet<FaceVerifyLog> FaceVerifyLogs { get; set; }
-
-        //Table lưu trạng thái của hệ thống
         public DbSet<TrangThai> TrangThais { get; set; } // Bảng trạng thái của hệ thống
+        public DbSet<KhoaHoc> KhoaHocs { get; set; } // Bảng khóa học
+        public DbSet<ChuongTrinhDaoTao> ChuongTrinhDaoTaos { get; set; } // Bảng chương trình đào tạo
+        public DbSet<ChiTietChuongTrinhDaoTao> ChiTietChuongTrinhDaoTaos { get; set; } // Bảng chi tiết chương trình đào tạo
+        public DbSet<DotDangKy> DotDangKys { get; set; } // Bảng đợt đăng ký
+        public DbSet<GiangVienMonHoc> GiangVienMonHocs { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -105,6 +107,36 @@ namespace BlueSchoolSystem.Models
                    .HasForeignKey(l => l.TrangThaiId)
                    .OnDelete(DeleteBehavior.Restrict);
 
+            builder.Entity<LopHocPhan>()
+                .HasOne(l => l.TrangThai)
+                .WithMany()
+                .HasForeignKey(l => l.TrangThaiId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DangKyHocPhan>()
+                .HasOne(dk => dk.SinhVien)
+                .WithMany() 
+                .HasForeignKey(dk => dk.SinhVienId)
+                .OnDelete(DeleteBehavior.Restrict); 
+
+            builder.Entity<DangKyHocPhan>()
+                .HasOne(dk => dk.LopHocPhan)
+                .WithMany() 
+                .HasForeignKey(dk => dk.LopHocPhanId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<GiangVienMonHoc>()
+        .HasKey(x => new { x.GiangVienId, x.MonHocId });
+
+            builder.Entity<GiangVienMonHoc>()
+                .HasOne(x => x.GiangVien)
+                .WithMany(x => x.GiangVienMonHocs)
+                .HasForeignKey(x => x.GiangVienId);
+
+            builder.Entity<GiangVienMonHoc>()
+                .HasOne(x => x.MonHoc)
+                .WithMany(x => x.GiangVienMonHocs)
+                .HasForeignKey(x => x.MonHocId);
 
             builder.Entity<UserFaceTemplate>(e =>
             {
@@ -128,6 +160,7 @@ namespace BlueSchoolSystem.Models
                 e.Property(x => x.Score).HasColumnType("real"); // float32
                 e.ToTable("FaceVerifyLogs");
             });
+
 
         }
     }

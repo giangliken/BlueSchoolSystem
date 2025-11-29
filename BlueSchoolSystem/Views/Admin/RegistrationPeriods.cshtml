@@ -1,0 +1,61 @@
+﻿@model IEnumerable<BlueSchoolSystem.Models.DotDangKy>
+@{
+    ViewData["Title"] = "Danh Sách Đợt Đăng Ký";
+    var hocKyList = ViewBag.HocKyList as SelectList;
+    int selectedHocKyId = ViewBag.HocKyId ?? 0;
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="mb-3">
+    <label>Chọn Học kỳ:</label>
+    <select id="hocKySelect" class="form-select w-auto d-inline-block">
+        @foreach (var hk in hocKyList)
+        {
+            var isSelected = hk.Value == selectedHocKyId.ToString();
+            <option value="@hk.Value" selected="@(isSelected ? "selected" : null)">
+                @hk.Text
+            </option>
+        }
+    </select>
+
+    <button id="createDotBtn" class="btn btn-success ms-2">+ Tạo đợt mới</button>
+</div>
+<script>
+    const hocKySelect = document.getElementById('hocKySelect');
+    const createBtn = document.getElementById('createDotBtn');
+
+    function updateCreateBtn() {
+        createBtn.disabled = (hocKySelect.value == 0);
+    }
+
+    hocKySelect.onchange = function() {
+        var selectedHocKyId = this.value;
+        updateCreateBtn();
+
+        var url = '@Url.Action("GetRegistrationPeriodsTable")';
+        if (selectedHocKyId == 0) {
+            url += '?hocKyId=0';
+        } else {
+            url += '?hocKyId=' + selectedHocKyId;
+        }
+
+        fetch(url)
+            .then(resp => resp.text())
+            .then(html => {
+                document.getElementById('periodsTableWrapper').innerHTML = html;
+            });
+    };
+
+    // Khi click tạo đợt
+    createBtn.onclick = function() {
+        if (hocKySelect.value == 0) return; // tránh lỗi
+        window.location.href = '@Url.Action("CreateRegistrationPeriod")?hocKyId=' + hocKySelect.value;
+    }
+
+    // Khởi tạo trạng thái nút
+    updateCreateBtn();
+</script>
+<div id="periodsTableWrapper">
+    @await Html.PartialAsync("_RegistrationPeriodsTable", Model)
+</div>

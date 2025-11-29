@@ -1,0 +1,175 @@
+﻿@* File: Views/Admin/AutoAddSchedule.cshtml *@
+@model BlueSchoolSystem.Models.ViewModel.AutoAddScheduleDTO
+@{
+    ViewData["Title"] = "Tạo Lịch Học Tự Động";
+    var lhp = ViewBag.LHP as BlueSchoolSystem.Models.LopHocPhan;
+    var daysOfWeek = (List<object>)ViewBag.DaysOfWeek;
+    // Lấy Map Tiết học
+    var tietStartMap = ViewBag.TietStartMap as Dictionary<int, string>;
+    var tietEndMap = ViewBag.TietEndMap as Dictionary<int, string>;
+
+    // Kiểm tra điều kiện môn học thực hành (MoTa chứa "TH")
+    var isThucHanh = lhp?.MonHoc?.MoTa != null && lhp.MonHoc.MoTa.ToUpper().Contains("TH");
+}
+
+<div class="container mt-4">
+    <div class="card shadow-lg">
+        <div class="card-header bg-primary bg-gradient text-white py-3">
+            <div class="d-flex flex-column">
+                <h3 class="card-title mb-2">
+                    <i class="fa fa-clock me-2"></i> @ViewData["Title"]
+                </h3>
+
+                <div class="small">
+                    <div><strong>Mã lớp:</strong> @lhp?.MaLopHocPhan</div>
+                    <div><strong>Môn học:</strong> @lhp?.MonHoc?.TenMonHoc</div>
+                    <div><strong>Giảng viên:</strong> @ViewBag.GiangVien</div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form asp-action="AutoAddSchedule" method="post">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                @* Trường ẩn ID LHP *@
+                <input type="hidden" asp-for="LopHocPhanId" value="@Model.LopHocPhanId" />
+
+
+
+
+                <div class="row">
+                    @* 1. Tiết Bắt Đầu *@
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="TietBatDau" class="form-label">Tiết Bắt Đầu </label>
+                        <select asp-for="TietBatDau" class="form-select" id="TietBatDauSelect">
+                            @if (tietStartMap != null)
+                            {
+                                @foreach (var kvp in tietStartMap)
+                                {
+                                    <option value="@kvp.Key">Tiết @kvp.Key (@kvp.Value)</option>
+                                }
+                            }
+                        </select>
+                        <span asp-validation-for="TietBatDau" class="text-danger"></span>
+                    </div>
+
+                    @* 2. Tiết Kết Thúc *@
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="TietKetThuc" class="form-label">Tiết Kết Thúc </label>
+                        <select asp-for="TietKetThuc" class="form-select" id="TietKetThucSelect">
+                            @if (tietEndMap != null)
+                            {
+                                @foreach (var kvp in tietEndMap)
+                                {
+                                    <option value="@kvp.Key">Tiết @kvp.Key (@kvp.Value)</option>
+                                }
+                            }
+                        </select>
+                        <span asp-validation-for="TietKetThuc" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="row">
+                    @* 3. Phòng Học *@
+                    <div class="col-md-6 mb-3">
+
+                        @* --- THÔNG BÁO ĐIỀU KIỆN CHỌN PHÒNG --- *@
+                        @if (isThucHanh)
+                        {
+                            <div class="alert alert-warning py-1 mb-2 small fw-bold">
+                                <i class="fa fa-flask me-1"></i> Môn Thực Hành. Chỉ được chọn **Phòng Thực Hành**.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info py-1 mb-2 small">
+                                <i class="fa fa-book me-1"></i> Môn Lý Thuyết. Không được chọn Phòng Thực Hành.
+                            </div>
+                        }
+
+                        <label asp-for="PhongHocId" class="form-label">Phòng Học Mặc Định </label>
+                        <select asp-for="PhongHocId" asp-items="ViewBag.PhongHocList" class="form-select">
+                            <option value="">-- Chọn Phòng Học --</option>
+                        </select>
+                        <span asp-validation-for="PhongHocId" class="text-danger"></span>
+                    </div>
+                </div>
+
+                @* 4. Các Ngày Trong Tuần *@
+                @if (daysOfWeek != null)
+                {
+                    <div class="mb-3 p-3 border rounded">
+                        <label class="form-label fw-bold">Các Ngày Trong Tuần Lặp Lại </label>
+                        <div class="row">
+                            @foreach (dynamic day in daysOfWeek)
+                            {
+                                var dayId = (int)day.Id;
+                                var dayName = (string)day.Name;
+
+                                <div class="col-md-3 col-sm-4">
+                                    <div class="form-check">
+                                        <input type="checkbox" id="day_@dayId" name="CacNgayTrongTuan" value="@dayId"
+                                               class="form-check-input"
+                                               @(Model.CacNgayTrongTuan.Contains(dayId) ? "checked" : "") />
+                                        <label class="form-check-label" for="day_@dayId">@dayName</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <span asp-validation-for="CacNgayTrongTuan" class="text-danger d-block mt-2"></span>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-danger">Lỗi: Không thể tải danh sách các ngày trong tuần.</div>
+                }
+
+                <div class="mt-4 pt-3 border-top">
+                    <button type="submit" class="btn btn-primary btn-lg me-2">
+                        <i class="fa fa-magic"></i> Tự Động Tạo Lịch
+                    </button>
+                    <a asp-action="CourseClassDetail" asp-route-id="@Model.LopHocPhanId" class="btn btn-secondary btn-lg">
+                        <i class="fa fa-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        $(function() {
+            var tietBatDauSelect = $('#TietBatDauSelect');
+            var tietKetThucSelect = $('#TietKetThucSelect');
+
+            // Hàm ràng buộc Tiết kết thúc >= Tiết bắt đầu (Client-side UX)
+            function enforceTietRange() {
+                var startTiet = parseInt(tietBatDauSelect.val());
+                var endTiet = parseInt(tietKetThucSelect.val());
+
+                if (isNaN(startTiet)) return;
+
+                if (endTiet < startTiet) {
+                    tietKetThucSelect.val(startTiet);
+                }
+
+                // Vô hiệu hóa các Tiết kết thúc nhỏ hơn Tiết bắt đầu
+                tietKetThucSelect.find('option').each(function() {
+                    var currentTiet = parseInt($(this).val());
+                    $(this).prop('disabled', currentTiet < startTiet);
+                });
+            }
+
+            tietBatDauSelect.change(enforceTietRange);
+            tietKetThucSelect.change(enforceTietRange);
+
+            // Chạy lần đầu khi load trang
+            enforceTietRange();
+        });
+    </script>
+}
