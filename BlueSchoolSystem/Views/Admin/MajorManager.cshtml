@@ -4,6 +4,21 @@
     var khoas = ViewBag.Khoas as List<Khoa>;
 }
 
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
 <form method="get" asp-action="MajorManager" class="row g-2 mb-4">
     <div class="col-md-4">
         <input type="text" name="keyword" class="form-control" value="@ViewBag.Keyword" placeholder="Tìm theo mã ngành hoặc tên ngành..." />
@@ -79,6 +94,14 @@
                     <td class="text-center">
                         <a asp-action="EditMajor" asp-route-id="@item.Id" class="btn btn-sm btn-warning" title="Sửa ngành">
                             <i class="fa-solid fa-pen-to-square"></i>
+                        </a>
+                        <!-- Nút gán môn học -->
+                        <a asp-action="AssignMonHoc"
+                           asp-route-id="@item.Id"
+                           class="btn btn-sm btn-primary"
+                           title="Gán môn học"
+                           onclick="event.stopPropagation()">
+                            <i class="fa-solid fa-layer-group"></i>
                         </a>
                         <form asp-action="DeleteMajor" asp-route-id="@item.Id" method="post" class="d-inline"
                               onsubmit="return confirm('Xác nhận xóa ngành này?');">

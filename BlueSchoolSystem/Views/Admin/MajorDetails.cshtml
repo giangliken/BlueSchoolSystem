@@ -1,5 +1,19 @@
 ﻿@model BlueSchoolSystem.Models.NganhHoc
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
 
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
 <h2 class="mb-4 fw-bold" style="position: relative; padding-left: 16px;">
     <span style="position: absolute; left: 0; top: 0; bottom: 0;
                  width: 6px; background: var(--bs-primary); border-radius: 4px;"></span>
@@ -64,8 +78,19 @@
     }
 </div>
 
-<div class="mt-4">
+<div class="mt-4 mb-4 d-flex justify-content-between flex-wrap gap-2">
     <a asp-action="MajorManager" class="btn btn-secondary">
-        <i class="fa-solid fa-arrow-left me-2"></i> Quay lại danh sách ngành
+        <i class="fa-solid fa-arrow-left me-2"></i> Quay lại
     </a>
+
+    <div class="d-flex gap-2">
+        <a asp-action="AssignMonHoc" asp-route-id="@Model.Id" class="btn btn-info text-white">
+            <i class="fa-solid fa-layer-group me-2"></i> Gán môn học
+        </a>
+
+        <a asp-action="EditMajor" asp-route-id="@Model.Id" class="btn btn-warning text-white">
+            <i class="fa-solid fa-pen-to-square me-2"></i> Chỉnh sửa
+        </a>
+    </div>
 </div>
+
