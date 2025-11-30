@@ -4,35 +4,36 @@
     ViewData["Title"] = "Chi tiết giảng viên";
     var token = Context.Session.GetString("access_token");
 }
-@if (TempData["Success"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="fa-solid fa-circle-check me-2"></i>
-        @TempData["Success"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="fa-solid fa-circle-exclamation me-2"></i>
-        @TempData["Error"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-@if (TempData["Warning"] != null)
-{
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        <i class="fa-solid fa-triangle-exclamation me-2"></i>
-        @TempData["Warning"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
+
 
 <div class="container py-4">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm border-0">
+                @if (TempData["Success"] != null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="fa-solid fa-circle-check me-2"></i>
+                        @TempData["Success"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+                @if (TempData["Error"] != null)
+                {
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="fa-solid fa-circle-exclamation me-2"></i>
+                        @TempData["Error"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+                @if (TempData["Warning"] != null)
+                {
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                        @TempData["Warning"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0"><i class="bi bi-person-badge me-2"></i>Thông tin giảng viên</h4>
                 </div>
@@ -145,7 +146,7 @@
                             <strong>Ghi chú:</strong>
                             <span id="ghichu-val" class="d-inline-flex align-items-center ms-2">
                                 @Model.GhiChu
-                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;"
+                                <button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editGhiChu('@Model.MaGiangVien', '@Model.GhiChu')"
                                         onclick="editGhiChu('@Model.MaGiangVien', '@Model.GhiChu')">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
@@ -165,6 +166,51 @@
                         </li>
                     </ul>
                 </div>
+                @{
+                    var subjects = ViewBag.AssignedSubjects as List<MonHoc> ?? new List<MonHoc>();
+                }
+
+                @if (subjects.Any())
+                {
+                    <div class="card shadow-sm border-0 mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Môn phụ trách</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th class="text-center">STT</th>
+                                        <th>Mã môn</th>
+                                        <th>Tên môn</th>
+                                        <th class="text-center">Tín chỉ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{
+                                        int i = 1;
+                                        foreach (var mh in subjects)
+                                        {
+                                            <tr>
+                                                <td class="text-center">@i</td>
+                                                <td>@mh.MaMonHoc</td>
+                                                <td>@mh.TenMonHoc</td>
+                                                <td class="text-center">@mh.SoTinChi</td>
+                                            </tr>
+                                            ;
+                                            i++;
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">Giảng viên chưa phụ trách môn học nào.</div>
+                }
+
                 <div class="card-footer bg-light text-center">
                     <form asp-action="ResetPassword" asp-route-id="@Model.Id" asp-route-type="GiangVien" method="post" class="d-inline">
                         <button type="submit" class="btn btn-primary me-2">
@@ -172,6 +218,10 @@
                             Cấp lại mật khẩu
                         </button>
                     </form>
+                    <a asp-action="AssignSubjectsToTeacher" asp-route-id="@Model.MaGiangVien" class="btn btn-warning me-2">
+                        <i class="fa-solid fa-chalkboard-user me-1"></i> Gán môn phụ trách
+                    </a>
+
                     <a asp-action="TeacherManager" class="btn btn-secondary">
                         <i class="fa-solid fa-arrow-left me-2"></i>Quay lại
                     </a>
@@ -562,6 +612,53 @@
             document.getElementById('trangthai-val').innerHTML =
                 tenTrangThai + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editTrangThai('${maGiangVien}', '${trangThaiId}', '${tenTrangThai}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
         }
+
+                function editGhiChu(maGiangVien, ghiChu) {
+            let html = `
+                <input type="text" id="ghichu-input" value="${ghiChu ?? ''}" class="form-control form-control-sm" style="width:250px;display:inline-block;" maxlength="250" />
+                <button class="btn btn-sm btn-success ms-1" onclick="saveGhiChu('${maGiangVien}')">Lưu</button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="cancelGhiChu('${maGiangVien}', '${ghiChu ?? ''}')">Hủy</button>
+                <span id="ghichu-error" class="text-danger ms-2" style="font-size:0.95em;"></span>
+            `;
+            document.getElementById('ghichu-val').innerHTML = html;
+        }
+
+        function saveGhiChu(maGiangVien) {
+            const ghiChu = document.getElementById('ghichu-input').value.trim();
+            const errSpan = document.getElementById('ghichu-error');
+
+            if (ghiChu.length > 250) {
+                errSpan.innerText = "Ghi chú không được vượt quá 250 ký tự.";
+                return;
+            }
+
+            var token = window.__accessToken;
+            fetch(`/api/suathongtingiangvien/${maGiangVien}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    GhiChu: ghiChu
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result) {
+                        document.getElementById('ghichu-val').innerHTML = ghiChu +
+                            `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editGhiChu('${maGiangVien}', '${ghiChu}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+                    } else {
+                        errSpan.innerText = 'Lỗi: ' + data.message;
+                    }
+                });
+        }
+
+        function cancelGhiChu(maGiangVien, ghiChu) {
+            document.getElementById('ghichu-val').innerHTML =
+                ghiChu + `<button type="button" class="btn btn-link p-0 ms-1" style="font-size: 1.1em;" onclick="editGhiChu('${maGiangVien}', '${ghiChu}')"><i class="fa-solid fa-pen-to-square"></i></button>`;
+        }
+
     </script>
     <script>
 
@@ -572,4 +669,6 @@
             }
         ];
     </script>
+
+
 }

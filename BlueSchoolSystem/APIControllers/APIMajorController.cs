@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlueSchoolSystem.APIControllers
 {
@@ -103,6 +104,179 @@ namespace BlueSchoolSystem.APIControllers
                 data = major
             });
         }
+
+        [HttpGet("laychitietnganhhoc/{id}")]
+        public IActionResult GetMajorWithSubjects(int id)
+        {
+            var major = _context.NganhHocs
+                .Include(n => n.Khoa)
+                .Include(n => n.MonHocs)
+                .FirstOrDefault(n => n.Id == id);
+
+            if (major == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy ngành học với ID đã cho"
+                });
+            }
+
+            // Trả về dữ liệu DTO, không phải entity gốc
+            var result = new
+            {
+                major.Id,
+                major.MaNganh,
+                major.TenNganh,
+                major.KhoaId,
+                Khoa = new
+                {
+                    major.Khoa?.Id,
+                    major.Khoa?.TenKhoa,
+                    major.Khoa?.MaKhoa
+                },
+                MonHocs = major.MonHocs.Select(m => new
+                {
+                    m.Id,
+                    m.MaMonHoc,
+                    m.TenMonHoc,
+                    m.SoTinChi
+                })
+            };
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                data = result
+            });
+        }
+
+
+
+        //Thêm ngành học
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPost("them-nganhhoc")]
+        public IActionResult CreateMajor([FromBody] NganhHoc model)
+        {
+            if (model == null)
+            {
+                return BadRequest(new
+                {
+                    result = false,
+                    code = 400,
+                    message = "Dữ liệu ngành học không hợp lệ"
+                });
+            }
+
+            // Kiểm tra xem khoa tồn tại
+            var khoa = _context.Khoas.Find(model.KhoaId);
+            if (khoa == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy khoa với ID cung cấp"
+                });
+            }
+
+            _context.NganhHocs.Add(model);
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Thêm ngành học thành công",
+                data = model
+            });
+        }
+
+
+        //Sửa ngành học
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPut("sua-nganhhoc/{id}")]
+        public IActionResult UpdateMajor(int id, [FromBody] NganhHoc model)
+        {
+            var existing = _context.NganhHocs.Find(id);
+
+            if (existing == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy ngành học cần sửa"
+                });
+            }
+
+            // Kiểm tra khoa
+            var khoa = _context.Khoas.Find(model.KhoaId);
+            if (khoa == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy khoa với ID cung cấp"
+                });
+            }
+
+            // Cập nhật dữ liệu
+            existing.MaNganh = model.MaNganh;
+            existing.TenNganh = model.TenNganh;
+            existing.KhoaId = model.KhoaId;
+
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Cập nhật ngành học thành công",
+                data = existing
+            });
+        }
+
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpDelete("xoa-nganhhoc/{id}")]
+        public IActionResult DeleteMajor(int id)
+        {
+            var major = _context.NganhHocs
+                .Include(n => n.MonHocs)
+                .FirstOrDefault(n => n.Id == id);
+
+            if (major == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy ngành học cần xóa"
+                });
+            }
+
+            // Xóa quan hệ với môn học
+            if (major.MonHocs != null && major.MonHocs.Any())
+            {
+                major.MonHocs.Clear(); // EF Core sẽ xoá bản ghi trong bảng join
+            }
+
+            // Xóa ngành
+            _context.NganhHocs.Remove(major);
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Xóa ngành học thành công"
+            });
+        }
+
+
 
     }
 }

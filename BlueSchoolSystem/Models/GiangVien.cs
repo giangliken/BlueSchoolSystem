@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BlueSchoolSystem.Models
 {
@@ -41,7 +42,8 @@ namespace BlueSchoolSystem.Models
 
         public ICollection<GiangVienMonHoc> GiangVienMonHocs { get; set; } = new List<GiangVienMonHoc>(); // Các môn giảng dạy
         public ICollection<LopHocPhan>? LopHocPhans { get; set; } // Các lớp học phần
-
+        [NotMapped]
+        public List<MonHoc> MonHocs => GiangVienMonHocs?.Select(gm => gm.MonHoc).ToList() ?? new();
         public string? UserId { get; set; } // ID của người dùng liên kết với giảng viên
 
         public ApplicationUser? User { get; set; } // Liên kết với ApplicationUser để quản lý thông tin người dùng

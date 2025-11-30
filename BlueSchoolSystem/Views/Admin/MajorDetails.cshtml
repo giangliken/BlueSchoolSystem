@@ -1,0 +1,96 @@
+﻿@model BlueSchoolSystem.Models.NganhHoc
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+<h2 class="mb-4 fw-bold" style="position: relative; padding-left: 16px;">
+    <span style="position: absolute; left: 0; top: 0; bottom: 0;
+                 width: 6px; background: var(--bs-primary); border-radius: 4px;"></span>
+    Thông tin ngành học
+</h2>
+
+
+<div class="card shadow-sm p-4 mb-4">
+    <div class="d-flex flex-wrap align-items-center gap-4">
+        <div class="flex-grow-1">
+            <p class="mb-1 fw-bold">Tên ngành</p>
+            <div class="form-control bg-light">@Model.TenNganh</div>
+        </div>
+
+        <div class="flex-grow-1">
+            <p class="mb-1 fw-bold">Mã ngành</p>
+            <div class="form-control bg-light">@Model.MaNganh</div>
+        </div>
+
+        <div class="flex-grow-1">
+            <p class="mb-1 fw-bold">Khoa trực thuộc</p>
+            <div class="form-control bg-light">@Model.Khoa?.TenKhoa</div>
+        </div>
+    </div>
+</div>
+
+
+<div class="card shadow-sm p-4">
+    <h5 class="fw-bold mb-3">Danh sách môn học áp dụng</h5>
+
+    @if (Model.MonHocs != null && Model.MonHocs.Any())
+    {
+        <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th class="text-center">STT</th>
+                    <th class="text-center">Mã môn</th>
+                    <th class="text-center">Tên môn</th>
+                    <th class="text-center">Số tín chỉ</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var index = 1;
+                    foreach (var mh in Model.MonHocs)
+                    {
+                        <tr>
+                            <td class="text-center">@index</td>
+                            <td class="text-center">@mh.MaMonHoc</td>
+                            <td>@mh.TenMonHoc</td>
+                            <td class="text-center">@mh.SoTinChi</td>
+                        </tr>
+                        index++;
+                    }
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="text-muted fst-italic">Chưa có môn học nào áp dụng cho ngành này.</p>
+    }
+</div>
+
+<div class="mt-4 mb-4 d-flex justify-content-between flex-wrap gap-2">
+    <a asp-action="MajorManager" class="btn btn-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i> Quay lại
+    </a>
+
+    <div class="d-flex gap-2">
+        <a asp-action="AssignMonHoc" asp-route-id="@Model.Id" class="btn btn-info text-white">
+            <i class="fa-solid fa-layer-group me-2"></i> Gán môn học
+        </a>
+
+        <a asp-action="EditMajor" asp-route-id="@Model.Id" class="btn btn-warning text-white">
+            <i class="fa-solid fa-pen-to-square me-2"></i> Chỉnh sửa
+        </a>
+    </div>
+</div>
+

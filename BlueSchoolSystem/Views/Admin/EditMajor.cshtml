@@ -1,0 +1,52 @@
+﻿@model BlueSchoolSystem.Models.NganhHoc
+@{
+    var khoas = ViewBag.Khoas as List<Khoa> ?? new List<Khoa>();
+}
+
+<h2 class="mb-4 fw-bold" style="position: relative; padding-left: 16px;">
+    <span style="position: absolute; left: 0; top: 0; bottom: 0;
+                 width: 6px; background: var(--bs-warning); border-radius: 4px;"></span>
+    Chỉnh sửa ngành học
+</h2>
+
+<form asp-action="EditMajor" method="post" class="card shadow-sm p-4">
+    <input type="hidden" asp-for="Id" />
+
+    <div class="mb-3">
+        <label class="form-label">Mã ngành(*)</label>
+        <input asp-for="MaNganh" class="form-control" />
+        <span asp-validation-for="MaNganh" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Tên ngành(*)</label>
+        <input asp-for="TenNganh" class="form-control" />
+        <span asp-validation-for="TenNganh" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Khoa/Viện(*)</label>
+        <select asp-for="KhoaId" class="form-select">
+            <option value="">-- Chọn khoa --</option>
+            @foreach (var khoa in khoas)
+            {
+                <option value="@khoa.Id">@khoa.TenKhoa</option>
+            }
+        </select>
+        <span asp-validation-for="KhoaId" class="text-danger"></span>
+    </div>
+
+    <div class="d-flex justify-content-between mt-4 mb-4">
+        <a asp-action="MajorManager" class="btn btn-secondary me-2">
+            <i class="fa-solid fa-arrow-left me-1"></i> Quay lại
+        </a>
+
+        <button type="submit" class="btn btn-warning text-white">
+            <i class="fa-solid fa-save me-1"></i> Lưu thay đổi
+        </button>
+    </div>
+</form>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
