@@ -847,6 +847,9 @@ namespace BlueSchoolSystem.Controllers
                 .Include(gv => gv.Khoa)
                 .Include(gv => gv.User)
                 .Include(gv => gv.TrangThai)
+                // include môn học qua bảng liên kết
+                .Include(gv => gv.GiangVienMonHocs)
+                    .ThenInclude(gvmh => gvmh.MonHoc)
                 .FirstOrDefaultAsync(g => g.MaGiangVien == maGiangVien);
 
             if (giangVien == null)
@@ -855,12 +858,20 @@ namespace BlueSchoolSystem.Controllers
                 return RedirectToAction("TeacherManager");
             }
 
+            // Lấy thêm danh sách môn học đã gán để view dễ render
+            var assignedSubjects = giangVien.GiangVienMonHocs
+                .Select(x => x.MonHoc)
+                .ToList();
+
+            ViewBag.AssignedSubjects = assignedSubjects;
+
             ViewBag.TrangThaiList = await _context.TrangThais
                 .Where(x => x.LoaiTrangThai == "GiangVien")
                 .ToListAsync();
 
             return View(giangVien);
         }
+
 
 
 
@@ -3671,6 +3682,230 @@ namespace BlueSchoolSystem.Controllers
             return View("MajorDetails", major);
         }
 
+        //Sửa ngành học
+        [HttpGet]
+        public IActionResult EditMajor(int id)
+        {
+            var major = _context.NganhHocs.Find(id);
+
+            if (major == null)
+            {
+                return NotFound();
+            }
+
+            // Lấy danh sách khoa để hiển thị dropdown
+            ViewBag.Khoas = _context.Khoas.ToList();
+
+            return View(major);
+        }
+
+        [HttpPost]
+        public IActionResult EditMajor(NganhHoc model)
+        {
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Khoas = _context.Khoas.ToList();
+                return View(model);
+            }
+
+            var existing = _context.NganhHocs.Find(model.Id);
+
+            if (existing == null)
+            {
+                return NotFound();
+            }
+
+            // Kiểm tra khoa có tồn tại không
+            var khoa = _context.Khoas.Find(model.KhoaId);
+            if (khoa == null)
+            {
+                ModelState.AddModelError("KhoaId", "Khoa không tồn tại!");
+                ViewBag.Khoas = _context.Khoas.ToList();
+                return View(model);
+            }
+
+            // Cập nhật dữ liệu
+            existing.MaNganh = model.MaNganh;
+            existing.TenNganh = model.TenNganh;
+            existing.KhoaId = model.KhoaId;
+
+            _context.SaveChanges();
+
+            TempData["Success"] = "Cập nhật ngành học thành công!";
+            return RedirectToAction("MajorDetails", new { id = model.Id }); // 🔁 Chuyển về trang chi tiết
+        }
+
+
+
+        //Xóa ngành học
+        [HttpPost]
+        public IActionResult DeleteMajor(int id)
+        {
+            var major = _context.NganhHocs
+                .Include(n => n.MonHocs) // load các môn học liên quan (nếu có)
+                .FirstOrDefault(n => n.Id == id);
+
+            if (major == null)
+            {
+                return NotFound();
+            }
+
+            // Xóa mối liên hệ giữa ngành và môn học nếu có
+            if (major.MonHocs != null && major.MonHocs.Any())
+            {
+                major.MonHocs.Clear(); // EF Core sẽ tự xóa ở bảng trung gian nếu dùng Many-to-Many
+            }
+
+            _context.NganhHocs.Remove(major);
+            _context.SaveChanges();
+
+            TempData["Success"] = "Xóa ngành học thành công!";
+            return RedirectToAction("MajorManager");
+        }
+
+        //Gán môn học cho ngành
+        [HttpGet]
+        public async Task<IActionResult> AssignMonHoc(int id, string keyword)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // Lấy chi tiết ngành
+            var resNganh = await client.GetAsync($"api/laychitietnganhhoc/{id}");
+            var jsonNganh = await resNganh.Content.ReadAsStringAsync();
+            var nganh = JsonSerializer.Deserialize<NganhHoc>(
+                JsonDocument.Parse(jsonNganh).RootElement.GetProperty("data").ToString(),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            // Lấy toàn bộ môn học
+            var resMon = await client.GetAsync("api/laydanhsachmonhoc");
+            var jsonMon = await resMon.Content.ReadAsStringAsync();
+            var allSubjects = JsonSerializer.Deserialize<List<MonHoc>>(
+                JsonDocument.Parse(jsonMon).RootElement.GetProperty("data").ToString(),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            // Lọc nếu có keyword
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                keyword = keyword.ToLower();
+                allSubjects = allSubjects
+                    .Where(m => m.TenMonHoc.ToLower().Contains(keyword) || m.MaMonHoc.ToLower().Contains(keyword))
+                    .ToList();
+            }
+
+            ViewBag.AllSubjects = allSubjects;
+            ViewBag.Keyword = keyword;
+            return View(nganh);
+        }
+
+
+
+        [HttpPost]
+        public async Task<IActionResult> AssignMonHoc(int id, int[] selectedSubjects)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var payload = JsonSerializer.Serialize(new { MonHocIds = selectedSubjects });
+            var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+            var response = await client.PutAsync($"api/ganmonchonganh/{id}", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Không thể cập nhật môn học cho ngành!";
+                return RedirectToAction("AssignMonHoc", new { id });
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var root = JsonDocument.Parse(responseJson).RootElement;
+
+            if (!root.GetProperty("result").GetBoolean())
+            {
+                TempData["Error"] = root.GetProperty("message").GetString();
+                return RedirectToAction("AssignMonHoc", new { id });
+            }
+
+            TempData["Success"] = "Gán môn học cho ngành thành công!";
+            return RedirectToAction("MajorDetails", new { id });
+        }
+
+        // Gán môn học cho giảng viên
+        [HttpGet]
+        public async Task<IActionResult> AssignSubjectsToTeacher(string id)
+        {
+            // id lúc này là MaGiangVien (string)
+
+            var giangVien = await _context.GiangViens
+                .Include(gv => gv.GiangVienMonHocs)
+                .FirstOrDefaultAsync(gv => gv.MaGiangVien == id);
+
+            if (giangVien == null)
+            {
+                TempData["Error"] = "Không tìm thấy giảng viên.";
+                return RedirectToAction("TeacherManager");
+            }
+
+            var monHocs = await _context.MonHocs.ToListAsync();
+
+            // Gán thủ công để hiển thị tên môn học trong view
+            foreach (var gvmh in giangVien.GiangVienMonHocs)
+            {
+                gvmh.MonHoc = monHocs.FirstOrDefault(m => m.Id == gvmh.MonHocId);
+            }
+
+            ViewBag.AllSubjects = monHocs;
+            return View(giangVien);
+        }
+
+
+
+        [HttpPost]
+        public async Task<IActionResult> AssignSubjectsToTeacher(string id, int[] selectedSubjects)
+        {
+            if (selectedSubjects == null)
+                selectedSubjects = new int[0];
+
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var content = new StringContent(
+                JsonSerializer.Serialize(selectedSubjects),
+                Encoding.UTF8, "application/json");
+
+            var response = await client.PutAsync($"api/gan-mon-giang-vien/{id}", content);
+            var json = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode || string.IsNullOrWhiteSpace(json))
+            {
+                TempData["Error"] = $"API không phản hồi hợp lệ. {(int)response.StatusCode} - {response.ReasonPhrase}";
+                return RedirectToAction("AssignSubjectsToTeacher", new { id });
+            }
+
+            var result = JsonDocument.Parse(json).RootElement;
+
+            if (!result.GetProperty("result").GetBoolean())
+            {
+                TempData["Error"] = result.GetProperty("message").GetString();
+                return RedirectToAction("TeacherDetails", new { maGiangVien = id });
+            }
+
+            TempData["Success"] = "Gán môn phụ trách thành công!";
+            return RedirectToAction("TeacherDetails", new { maGiangVien = id });
+        }
 
 
     }
