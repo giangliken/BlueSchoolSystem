@@ -264,6 +264,49 @@ namespace BlueSchoolSystem.APIControllers
         }
 
         [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPut("ganmonchonganh/{id}")]
+        public IActionResult AssignSubjectsToMajor(int id, [FromBody] AssignMonHocModel model)
+        {
+            var major = _context.NganhHocs
+                .Include(n => n.MonHocs)
+                .FirstOrDefault(n => n.Id == id);
+
+            if (major == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy ngành học"
+                });
+            }
+
+            // Lấy danh sách môn hợp lệ
+            var monHocList = _context.MonHocs
+                .Where(m => model.MonHocIds.Contains(m.Id))
+                .ToList();
+
+            // Reset danh sách môn cũ
+            major.MonHocs.Clear();
+
+            // Gán lại môn mới
+            foreach (var mh in monHocList)
+            {
+                major.MonHocs.Add(mh);
+            }
+
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Cập nhật danh sách môn học áp dụng cho ngành thành công!"
+            });
+        }
+
+
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPost("gan-giang-vien-mon/{id}")]
         public IActionResult AssignGiangVien(int id, [FromBody] List<int> selectedGVs)
         {
@@ -301,6 +344,48 @@ namespace BlueSchoolSystem.APIControllers
                 result = true,
                 code = 200,
                 message = "Gán giảng viên thành công"
+            });
+        }
+
+        // Gán môn phụ trách cho giảng viên
+        [Authorize(Roles = "Admin", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [HttpPut("gan-mon-giang-vien/{maGiangVien}")]
+        public IActionResult AssignMonChoGiangVien(string maGiangVien, [FromBody] List<int> selectedSubjects)
+        {
+            var giangVien = _context.GiangViens
+                .Include(gv => gv.GiangVienMonHocs)
+                .FirstOrDefault(gv => gv.MaGiangVien == maGiangVien);
+
+            if (giangVien == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy giảng viên"
+                });
+            }
+
+            // Xoá toàn bộ môn cũ
+            giangVien.GiangVienMonHocs.Clear();
+
+            // Gán lại danh sách môn mới
+            foreach (var monId in selectedSubjects)
+            {
+                giangVien.GiangVienMonHocs.Add(new GiangVienMonHoc
+                {
+                    MonHocId = monId,
+                    GiangVienId = giangVien.Id
+                });
+            }
+
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Gán môn phụ trách thành công"
             });
         }
 

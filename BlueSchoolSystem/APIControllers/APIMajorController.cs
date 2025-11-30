@@ -105,7 +105,6 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
-        //Lấy chi tiết ngành học
         [HttpGet("laychitietnganhhoc/{id}")]
         public IActionResult GetMajorWithSubjects(int id)
         {
@@ -124,13 +123,36 @@ namespace BlueSchoolSystem.APIControllers
                 });
             }
 
+            // Trả về dữ liệu DTO, không phải entity gốc
+            var result = new
+            {
+                major.Id,
+                major.MaNganh,
+                major.TenNganh,
+                major.KhoaId,
+                Khoa = new
+                {
+                    major.Khoa?.Id,
+                    major.Khoa?.TenKhoa,
+                    major.Khoa?.MaKhoa
+                },
+                MonHocs = major.MonHocs.Select(m => new
+                {
+                    m.Id,
+                    m.MaMonHoc,
+                    m.TenMonHoc,
+                    m.SoTinChi
+                })
+            };
+
             return Ok(new
             {
                 result = true,
                 code = 200,
-                data = major
+                data = result
             });
         }
+
 
 
         //Thêm ngành học
