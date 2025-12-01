@@ -3907,6 +3907,358 @@ namespace BlueSchoolSystem.Controllers
             return RedirectToAction("TeacherDetails", new { maGiangVien = id });
         }
 
+        // Quản lý Cơ sở (FacilityManager)
 
+        public async Task<IActionResult> FacilityManager(string keyword)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = HttpContext.Session.GetString("access_token");
+            ViewBag.AccessToken = token;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                HttpResponseMessage response = await client.GetAsync("api/laydanhsachcoso");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    ViewBag.Error = "Không thể lấy danh sách Cơ sở (API Error).";
+                    return View(new List<CoSo>());
+                }
+
+                var body = await response.Content.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(body);
+                var root = document.RootElement;
+
+                List<CoSo> listCoSoFull = new List<CoSo>();
+
+                if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var dataElement))
+                {
+                    listCoSoFull = JsonSerializer.Deserialize<List<CoSo>>(
+                        dataElement.ToString(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+                }
+                else
+                {
+                    try
+                    {
+                        listCoSoFull = JsonSerializer.Deserialize<List<CoSo>>(
+                            body,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                        );
+                    }
+                    catch { }
+                }
+                if (listCoSoFull == null)
+                    listCoSoFull = new List<CoSo>();
+
+                var query = listCoSoFull.AsQueryable();
+
+                if (!string.IsNullOrEmpty(keyword))
+                {
+                    var kw = keyword.Trim().ToLower();
+                    query = query.Where(c =>
+                        c.TenCoSo.ToLower().Contains(kw) ||
+                        c.DiaChi.ToLower().Contains(kw)
+                    );
+
+                    ViewData["CurrentFilter"] = keyword;
+                }
+
+                return View(query.ToList());
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = "Lỗi kết nối: " + ex.Message;
+                return View(new List<CoSo>());
+            }
+        }
+        private string GetAccessToken()
+        {
+            return HttpContext.Session.GetString("access_token") ?? "";
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> FacilityDetails(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = GetAccessToken();
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            ViewBag.AccessToken = token;
+
+            try
+            {
+                var response = await client.GetAsync($"api/laychitietcoso?id={id}");
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["Error"] = "Không lấy được chi tiết cơ sở.";
+                    return RedirectToAction(nameof(FacilityManager));
+                }
+
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                CoSo coSo = null;
+
+                if (root.TryGetProperty("data", out var dataElement))
+                {
+                    coSo = JsonSerializer.Deserialize<CoSo>(dataElement.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+
+                if (coSo == null)
+                {
+                    TempData["Error"] = "Không tìm thấy cơ sở.";
+                    return RedirectToAction(nameof(FacilityManager));
+                }
+
+                return View(coSo);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi kết nối API: " + ex.Message;
+                return RedirectToAction(nameof(FacilityManager));
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditFacility(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+
+            var token = GetAccessToken();
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            ViewBag.AccessToken = token;
+
+            var response = await client.GetAsync($"api/laychitietcoso?id={id}");
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Không tìm thấy Cơ sở cần sửa.";
+                return RedirectToAction(nameof(FacilityManager));
+            }
+
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            var data = root.GetProperty("data").GetRawText();
+
+            var model = System.Text.Json.JsonSerializer.Deserialize<CoSo>(data, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditFacility(int id, CoSo model)
+        {
+            if (!ModelState.IsValid)
+            {
+                TempData["Error"] = "Dữ liệu không hợp lệ!";
+                return View(model);
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            model.Id = id;
+            var json = System.Text.Json.JsonSerializer.Serialize(model);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await client.PutAsync($"api/capnhat-coso/{id}", content);
+            var body = await response.Content.ReadAsStringAsync();
+
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            bool result = root.GetProperty("result").GetBoolean();
+            string message = root.GetProperty("message").GetString();
+
+            if (!result)
+            {
+                TempData["Error"] = message;
+                return View(model);
+            }
+
+            TempData["Success"] = "Cập nhật cơ sở thành công!";
+            return RedirectToAction(nameof(FacilityDetails), new { id = model.Id });
+        }
+        private HttpClient CreateHttpClientWithAuth()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+            return client;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> AddRoom(int coSoId)
+        {
+            var coSo = await _context.CoSos.FindAsync(coSoId);
+            if (coSo == null)
+            {
+                TempData["Error"] = "Không tìm thấy cơ sở để thêm phòng học.";
+                return RedirectToAction(nameof(FacilityManager));
+            }
+
+            var model = new PhongHoc { CoSoId = coSoId };
+            ViewBag.CoSo = coSo;
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddRoom(PhongHoc model)
+        {
+            var coSo = await _context.CoSos.FindAsync(model.CoSoId);
+            if (coSo == null)
+            {
+                TempData["Error"] = "Không tìm thấy cơ sở.";
+                return RedirectToAction(nameof(FacilityManager));
+            }
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.CoSo = coSo;
+                return View(model);
+            }
+
+            try
+            {
+                var client = CreateHttpClientWithAuth();
+                var response = await client.PostAsJsonAsync("api/taomoi-phonghoc", model);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    TempData["Success"] = "Thêm phòng học thành công!";
+                    return RedirectToAction(nameof(FacilityDetails), new { id = model.CoSoId });
+                }
+
+                var errMsg = await response.Content.ReadAsStringAsync();
+                TempData["Error"] = $"Lỗi API khi thêm phòng học: {errMsg}";
+                ViewBag.CoSo = coSo;
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi hệ thống: " + ex.Message;
+                ViewBag.CoSo = coSo;
+                return View(model);
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditRoom(int id)
+        {
+            var phongHoc = await _context.PhongHocs.Include(p => p.CoSo)
+                                                   .FirstOrDefaultAsync(p => p.Id == id);
+            if (phongHoc == null)
+            {
+                TempData["Error"] = "Không tìm thấy phòng học.";
+                return RedirectToAction(nameof(FacilityManager));
+            }
+
+            ViewBag.CoSo = phongHoc.CoSo;
+            return View(phongHoc);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditRoom(int id, PhongHoc model)
+        {
+            var coSo = await _context.CoSos.FindAsync(model.CoSoId);
+            if (coSo == null)
+            {
+                TempData["Error"] = "Không tìm thấy cơ sở.";
+                return RedirectToAction(nameof(FacilityManager));
+            }
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.CoSo = coSo;
+                return View(model);
+            }
+
+            try
+            {
+                var client = CreateHttpClientWithAuth();
+                var response = await client.PutAsJsonAsync($"api/suaphonghoc/{id}", model);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    TempData["Success"] = "Cập nhật phòng học thành công!";
+                    return RedirectToAction(nameof(FacilityDetails), new { id = model.CoSoId });
+                }
+
+                var errMsg = await response.Content.ReadAsStringAsync();
+                TempData["Error"] = $"Lỗi API khi cập nhật phòng học: {errMsg}";
+                ViewBag.CoSo = coSo;
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi hệ thống: " + ex.Message;
+                ViewBag.CoSo = coSo;
+                return View(model);
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("xoaphonghoc/{id}")]
+
+        public async Task<IActionResult> DeleteRoom(int id)
+        {
+            var phongHoc = await _context.PhongHocs.FindAsync(id);
+            if (phongHoc == null)
+            {
+                return NotFound(new { result = false, message = "Không tìm thấy phòng học." });
+            }
+
+            var inUse = await _context.LichHocs.AnyAsync(lh => lh.PhongHocId == id);
+            if (inUse)
+            {
+                return BadRequest(new { result = false, message = "Phòng học đang được sử dụng trong lịch học." });
+            }
+            try
+            {
+                _context.PhongHocs.Remove(phongHoc);
+                await _context.SaveChangesAsync();
+                return Ok(new { result = true, message = "Xóa phòng học thành công." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { result = false, message = "Lỗi hệ thống: " + ex.Message });
+            }
+
+        }
     }
 }
