@@ -22,5 +22,8 @@
         //Học kì
         public int HocKyId { get; set; } // Mã học kỳ liên kết
         public HocKy? HocKy { get; set; } // Học kỳ liên kết
+
+        // Add this property to fix CS1061
+        public ICollection<LichHoc> LichHocs { get; set; }
     }
 }

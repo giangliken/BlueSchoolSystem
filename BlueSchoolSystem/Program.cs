@@ -2,6 +2,7 @@ using BlueSchoolSystem;
 using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
 using BlueSchoolSystem.Repository;
+using BlueSchoolSystem.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -25,6 +26,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlSer
 
 builder.Services.AddScoped<IActivityLogService, EFActivityLogService>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
+
+builder.Services.AddScoped<LopHocPhanService>();
+
 
 
 // 1. Đăng ký dịch vụ localization

@@ -10,6 +10,8 @@
 
     // Kiểm tra điều kiện môn học thực hành (MoTa chứa "TH")
     var isThucHanh = lhp?.MonHoc?.MoTa != null && lhp.MonHoc.MoTa.ToUpper().Contains("TH");
+    var requiredSessions = isThucHanh ? 6 : 9;
+    var monHocType = isThucHanh ? "Thực Hành" : "Lý Thuyết";
 }
 
 <div class="container mt-4">
@@ -33,7 +35,6 @@
 
                 @* Trường ẩn ID LHP *@
                 <input type="hidden" asp-for="LopHocPhanId" value="@Model.LopHocPhanId" />
-
 
 
 
