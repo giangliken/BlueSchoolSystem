@@ -239,32 +239,34 @@ namespace BlueSchoolSystem.Services
         }
 
         // --- HELPER MỚI: Random Lịch học (Tiết 2-6 hoặc 7-11, Ngày 2-7) ---
-        private (int tietBatDau, int tietKetThuc, int dayOfWeek) GetRandomScheduleSettings()
+        public (int tietBatDau, int tietKetThuc, int dayOfWeek) GetRandomScheduleSettings()
         {
-            // Random Ca học: 0 = Sáng (Tiết 2-6), 1 = Chiều (Tiết 7-11)
             bool isMorning = _random.Next(2) == 0;
 
-            int tietBatDau = isMorning ? 2 : 7;
-            int tietKetThuc = isMorning ? 6 : 11;
+            int tietBatDau = isMorning ? _random.Next(2, 4) : _random.Next(7, 10);
+            int tietKetThuc = isMorning ? _random.Next(4, 7) : _random.Next(10, 13);
 
-            // Random Ngày: Thứ 2 (2) đến Thứ 7 (7)
-            int dayOfWeek = _random.Next(2, 8);
+            // Đảm bảo kết thúc không trước bắt đầu và nằm trong ca.
+            if (tietKetThuc <= tietBatDau)
+            {
+                tietKetThuc = isMorning ? 6 : 12;
+                if (tietBatDau == tietKetThuc) tietBatDau = isMorning ? 2 : 7;
+            }
+
+            int dayOfWeek = _random.Next(2, 8); // Thứ 2 (2) đến Thứ 7 (7)
 
             return (tietBatDau, tietKetThuc, dayOfWeek);
         }
 
         // --- HELPER MỚI: Tạo danh sách các buổi học ---
         private List<LichHocDTO> GenerateWeeklySchedule(DateTime ngayBatDau, DateTime ngayKetThuc,
-                                                        int dayOfWeekCustom, int startTiet, int endTiet, int phongHocId, bool isThucHanh)
+                                                     int dayOfWeekCustom, int startTiet, int endTiet, int phongHocId, bool isThucHanh)
         {
             var schedules = new List<LichHocDTO>();
             var (gioBatDau, gioKetThuc) = ConvertTietToTimeSpan(startTiet, endTiet);
-
-            // Chuyển đổi custom day (2=Thứ 2, 8=CN) sang DayOfWeek của C#
             DayOfWeek targetDay = dayOfWeekCustom == 8 ? DayOfWeek.Sunday : (DayOfWeek)(dayOfWeekCustom - 1);
 
             DateTime current = ngayBatDau;
-            // Tìm ngày học đầu tiên
             while (current.DayOfWeek != targetDay)
             {
                 current = current.AddDays(1);
@@ -273,20 +275,18 @@ namespace BlueSchoolSystem.Services
             int weekIndex = 0;
             while (current <= ngayKetThuc)
             {
-                // Logic Tuần chẵn/lẻ cho môn Thực hành (Giả định TH học cách tuần)
-                // Nếu không phải TH thì tuần nào cũng học
-                if (!isThucHanh || weekIndex % 2 == 0)
+                if (!isThucHanh || weekIndex % 2 == 0) // LT học mọi tuần; TH học tuần chẵn (index 0, 2, 4...)
                 {
                     schedules.Add(new LichHocDTO
                     {
-                        LopHocPhanId = 0, // Sẽ gán ID sau khi tạo LHP
+                        LopHocPhanId = 0,
                         Ngay = current.Date,
                         GioBatDau = gioBatDau,
                         GioKetThuc = gioKetThuc,
                         PhongHocId = phongHocId
                     });
                 }
-                current = current.AddDays(7); // Tuần tiếp theo
+                current = current.AddDays(7);
                 weekIndex++;
             }
             return schedules;
@@ -419,19 +419,21 @@ namespace BlueSchoolSystem.Services
             // 2. THIẾT LẬP CƠ BẢN
             const int MAX_LHP_SIZE = 120;
             const int MAX_STUDENTS_PER_CLASS_IN_LHP = 50;
-
             var trangThaiChoMoId = _context.TrangThais.FirstOrDefault(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Chờ mở")?.Id ?? 1;
             var hocKy = await _context.HocKys.FindAsync(dto.HocKyId);
 
             int successCount = 0;
             int classesCreated = 0;
             int schedulesCreatedTotal = 0;
-
-            // Cache các LHP đã tạo để phân bổ tiếp
             var createdLhpsBySubject = new Dictionary<string, List<LopHocPhan>>();
 
+            // Lấy tham số lịch học từ DTO (đã được Controller gán giá trị random/default)
+            int autoTietBatDau = dto.TietBatDau;
+            int autoTietKetThuc = dto.TietKetThuc;
+            int autoPhongHocId = dto.DefaultPhongHocId;
+            var availableDays = dto.CacNgayTrongTuan.ToList();
+
             // 3. VÒNG LẶP XỬ LÝ TỪNG MÔN HỌC
-            // LỖI ĐÃ KHẮC PHỤC: Dùng 'AutoEnrollmentApiPayload' nên đã có MandatorySubjectCodes
             foreach (var maMonHoc in dto.MandatorySubjectCodes)
             {
                 var monHoc = await _context.MonHocs.FirstOrDefaultAsync(m => m.MaMonHoc == maMonHoc);
@@ -443,22 +445,15 @@ namespace BlueSchoolSystem.Services
                 bool isThucHanh = monHoc.MoTa?.ToUpper().Contains("TH") ?? false;
                 int maxAllowedSessions = isThucHanh ? 6 : 9;
 
-                // 1. TÌM TÀI NGUYÊN VÀ THIẾT LẬP LỊCH TỰ ĐỘNG
+                // 1. TÌM GIẢNG VIÊN TỰ ĐỘNG KHẢ DỤNG CHO MÔN HỌC
                 var gvCandidates = await GetGiangVienByMonHocAsync(monHoc.Id);
                 int? autoGiangVienId = GetRandomGiangVienId(gvCandidates);
 
-                if (!autoGiangVienId.HasValue) continue; // Không tìm được GV
+                if (!autoGiangVienId.HasValue) continue;
 
-                // Lấy tham số lịch học từ DTO (Giờ đây chúng ta đang dùng AutoEnrollmentApiPayload nên các trường này có sẵn)
-                int autoTietBatDau = dto.TietBatDau;
-                int autoTietKetThuc = dto.TietKetThuc;
-                int autoPhongHocId = dto.DefaultPhongHocId;
-
-                // Random Ngày học TỪ DANH SÁCH ĐƯỢC CHỌN TRONG TUẦN
-                // Lấy ngày random từ list được gửi lên
+                // Lấy ngày random từ list đã được gửi lên
                 int randomIndex = _random.Next(dto.CacNgayTrongTuan.Count);
                 int autoDayOfWeek = dto.CacNgayTrongTuan[randomIndex];
-
 
                 // Khởi tạo list cache
                 if (!createdLhpsBySubject.ContainsKey(maMonHoc))
@@ -478,9 +473,40 @@ namespace BlueSchoolSystem.Services
 
                 if (!studentsToEnroll.Any()) continue;
 
+                // --- TÌM SLOT TRỐNG VỚI GV VÀ PHÒNG CỐ ĐỊNH (LOGIC MỚI) ---
+                int finalDayOfWeek = 0;
+                bool foundValidSlot = false;
+
+                // tìm slot mới mỗi lần chuẩn bị tạo lớp
+                var daysToSearch = availableDays.OrderBy(x => Guid.NewGuid()).ToList();
+                foreach (var day in daysToSearch)
+                {
+                    var schedulesToTest = GenerateWeeklySchedule(
+                        hocKy.NgayBatDau, hocKy.NgayKetThuc,
+                        day, autoTietBatDau, autoTietKetThuc,
+                        autoPhongHocId, isThucHanh
+                    ).Take(maxAllowedSessions).ToList();
+
+                    var conflicts = await CheckLichTrungAsync(schedulesToTest, autoGiangVienId.Value, 0);
+
+                    if (!conflicts.Any())
+                    {
+                        finalDayOfWeek = day;
+                        foundValidSlot = true;
+                        break;
+                    }
+                }
+
+                if (!foundValidSlot)
+                {
+                    _logger.LogWarning($"Không thể tạo lớp mới cho môn {maMonHoc} vì hết slot.");
+                    continue;
+                }
                 // Lặp qua tất cả sinh viên cần đăng ký, cố gắng phân bổ
                 foreach (var sv in studentsToEnroll)
                 {
+                    LopHocPhan selectedLhp = null;
+
                     // Kiểm tra Tiên Quyết
                     if (chiTietCtdt != null && !string.IsNullOrWhiteSpace(chiTietCtdt.MaMonHocTienQuyet))
                     {
@@ -489,7 +515,7 @@ namespace BlueSchoolSystem.Services
                         if (!canEnroll) continue;
                     }
 
-                    LopHocPhan selectedLhp = null;
+
 
                     // A. Tìm LHP đã có còn chỗ (Ưu tiên cùng lớp hành chính)
                     foreach (var existingLhp in createdLhpsBySubject[maMonHoc])
@@ -519,7 +545,7 @@ namespace BlueSchoolSystem.Services
                             GiangVienId = autoGiangVienId,
                             TrangThaiId = trangThaiChoMoId,
                             MaLopHocPhan = maLopHocPhan,
-                            TenLopHocPhan = $"{monHoc.TenMonHoc} ",
+                            TenLopHocPhan = $"{monHoc.TenMonHoc} (Thứ {autoDayOfWeek})", // Gán Thứ đã random
                             SiSo = MAX_LHP_SIZE,
                             NgayBatDau = hocKy.NgayBatDau,
                             NgayKetThuc = hocKy.NgayKetThuc
@@ -533,37 +559,30 @@ namespace BlueSchoolSystem.Services
                         // --- TẠO LỊCH HỌC TỰ ĐỘNG CHO LỚP MỚI ---
                         if (dto.ShouldAutoCreateSchedule)
                         {
-                            // Tạo danh sách các ngày dự kiến (chỉ dùng 1 ngày đã random ở trên)
-                            var potentialSchedules = GenerateWeeklySchedule(
+                            // [SỬA ĐỔI 3: DÙNG finalDayOfWeek ĐÃ TÌM ĐƯỢC CHO VIỆC TẠO LỊCH]
+                            var finalSchedules = GenerateWeeklySchedule(
                                 hocKy.NgayBatDau, hocKy.NgayKetThuc,
-                                autoDayOfWeek, autoTietBatDau, autoTietKetThuc, // Sử dụng các biến random/từ DTO
+                                finalDayOfWeek, autoTietBatDau, autoTietKetThuc,
                                 autoPhongHocId, isThucHanh);
 
-                            // Giới hạn số buổi (9 hoặc 6)
-                            var limitedSchedules = potentialSchedules.Take(maxAllowedSessions).ToList();
+                            var limitedSchedules = finalSchedules.Take(maxAllowedSessions).ToList();
 
-                            // Kiểm tra trùng lịch (GV và Phòng)
-                            var conflictedSchedules = await CheckLichTrungAsync(limitedSchedules, autoGiangVienId.Value, selectedLhp.Id);
+                            // KHÔNG cần kiểm tra trùng lịch (CheckLichTrungAsync) lần nữa, 
+                            // vì chúng ta đã đảm bảo slot đó trống ở bước trên!
 
-                            // Chỉ thêm những lịch KHÔNG bị trùng
                             foreach (var lich in limitedSchedules)
                             {
-                                if (!conflictedSchedules.Any(c => c.Ngay == lich.Ngay && c.GioBatDau == lich.GioBatDau))
+                                // [LỖI TRÙNG LẶP ĐÃ XẢY RA Ở ĐÂY TRƯỚC ĐÓ]
+                                // Logic đơn giản là thêm lịch vào DB
+                                _context.LichHocs.Add(new LichHoc
                                 {
-                                    _context.LichHocs.Add(new LichHoc
-                                    {
-                                        LopHocPhanId = selectedLhp.Id,
-                                        Ngay = lich.Ngay.Date,
-                                        GioBatDau = lich.GioBatDau,
-                                        GioKetThuc = lich.GioKetThuc,
-                                        PhongHocId = lich.PhongHocId
-                                    });
-                                    schedulesCreatedTotal++;
-                                }
-                                else
-                                {
-                                    _logger.LogWarning($"Bỏ qua lịch ngày {lich.Ngay:dd/MM} do trùng GV/Phòng.");
-                                }
+                                    LopHocPhanId = selectedLhp.Id,
+                                    Ngay = lich.Ngay.Date,
+                                    GioBatDau = lich.GioBatDau,
+                                    GioKetThuc = lich.GioKetThuc,
+                                    PhongHocId = lich.PhongHocId
+                                });
+                                schedulesCreatedTotal++;
                             }
                             await _context.SaveChangesAsync();
                         }

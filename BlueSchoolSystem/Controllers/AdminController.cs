@@ -2719,11 +2719,14 @@ namespace BlueSchoolSystem.Controllers
 
         #endregion
 
+
+
         #region ======= Tu dong tao lop va dang ky =======
 
-        // --- HELPER TRUY VẤN DB CỦA CONTROLLER ---
+
         private async Task<List<HocKy>> GetFilteredHocKyListFromDb()
         {
+
             var validStatusNames = new List<string> { "Mới tạo", "Đang diễn ra" };
             var validStatusIds = await _context.TrangThais
                 .Where(t => t.LoaiTrangThai == "HocKy" && validStatusNames.Contains(t.TenTrangThai))
@@ -2735,11 +2738,19 @@ namespace BlueSchoolSystem.Controllers
                 .OrderByDescending(hk => hk.NgayBatDau)
                 .ToListAsync();
         }
+        private async Task<int> GetRandomPhongHocId()
+        {
+            var phongList = await _lhpService.GetPhongHocListAsync(null);
+            if (!phongList.Any()) return 1; // Default to 1 if no rooms found
 
-        // --- HELPER TẢI VIEW BAGS (Cập nhật đầy đủ) ---
+            var random = new Random();
+            int index = random.Next(phongList.Count);
+            return phongList[index].Id;
+        }
+
         private async Task LoadAutoEnrollmentViewBags()
         {
-            // 1. Load Học kỳ, Ngành, Khóa nhập học (Giữ nguyên)
+
             var hocKys = await GetFilteredHocKyListFromDb();
             ViewBag.HocKyList = new SelectList(hocKys, "Id", "TenHocKy");
 
@@ -2751,47 +2762,30 @@ namespace BlueSchoolSystem.Controllers
             int currentYear = DateTime.Now.Year;
             ViewBag.KhoaNhapHocList = Enumerable.Range(currentYear - 5, 6).Reverse().ToList();
 
-            // 2. BỔ SUNG: Load Phòng, Tiết, Ngày cho giao diện Schedule
-            ViewBag.PhongHocList = new SelectList(
-                await _lhpService.GetPhongHocListAsync(null), // Lấy list phòng (không lọc theo môn)
-                "Id", "MaPhongHoc"
-            );
-            ViewBag.TietStartMap = _lhpService.GetTietStartMap();
-            ViewBag.TietEndMap = _lhpService.GetTietEndMap();
-            ViewBag.DaysOfWeek = new List<dynamic>
-    {
-        new { Id = 2, Name = "Thứ Hai" }, new { Id = 3, Name = "Thứ Ba" }, new { Id = 4, Name = "Thứ Tư" },
-        new { Id = 5, Name = "Thứ Năm" }, new { Id = 6, Name = "Thứ Sáu" }, new { Id = 7, Name = "Thứ Bảy" },
-        new { Id = 8, Name = "Chủ Nhật" }
-    };
+
         }
 
         [HttpGet]
         public async Task<IActionResult> AutoCreateClassAndEnroll()
         {
             await LoadAutoEnrollmentViewBags();
-            // Khắc phục xung đột: Trả về DTO View (WithScheduleDTO)
-            return View(new AutoEnrollmentRequestWithScheduleDTO
-            {
-                TietBatDau = 2,
-                TietKetThuc = 6,
-                ShouldAutoCreateSchedule = true
-            });
+
+            return View(new AutoEnrollmentRequestDTO());
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        // DTO đầu vào khớp với DTO View
-        public async Task<IActionResult> AutoCreateClassAndEnroll(AutoEnrollmentRequestWithScheduleDTO request)
+
+        public async Task<IActionResult> AutoCreateClassAndEnroll(AutoEnrollmentRequestDTO request)
         {
-            // B1: Validate dữ liệu từ Form
+
             if (!ModelState.IsValid)
             {
                 await LoadAutoEnrollmentViewBags();
                 return View(request);
             }
 
-            // B2: Lấy danh sách Môn học bắt buộc
+
             var mandatorySubjects = await _lhpService.GetMandatorySubjectsForAutoClassCreationAsync(
                 request.NganhId, request.KhoaNhapHoc, request.ThuTuHocKy);
 
@@ -2801,47 +2795,50 @@ namespace BlueSchoolSystem.Controllers
                 return RedirectToAction(nameof(CourseClassManager));
             }
 
-            // B3: Chuẩn bị Payload API (Map từ DTO View sang DTO API)
+
+
+
+            var (randomTietBatDau, randomTietKetThuc, randomDayOfWeek) = _lhpService.GetRandomScheduleSettings();
+
+
+            int randomPhongHocId = await GetRandomPhongHocId();
+
+
+            var randomDayList = new List<int> { randomDayOfWeek };
+
+
             var apiPayload = new AutoEnrollmentApiPayload
             {
-                // Map thông tin cơ bản
+
                 HocKyId = request.HocKyId,
                 NganhId = request.NganhId,
                 KhoaNhapHoc = request.KhoaNhapHoc,
                 ThuTuHocKy = request.ThuTuHocKy,
 
-                // Map thông tin Lịch học & Auto (đã có trong WithScheduleDTO)
-                ShouldAutoCreateSchedule = request.ShouldAutoCreateSchedule,
-                DefaultPhongHocId = request.DefaultPhongHocId,
-                TietBatDau = request.TietBatDau,
-                TietKetThuc = request.TietKetThuc,
-                CacNgayTrongTuan = request.CacNgayTrongTuan,
 
-                // Điền danh sách môn học đã tính toán được
+                ShouldAutoCreateSchedule = true,
+                DefaultPhongHocId = randomPhongHocId,
+                TietBatDau = randomTietBatDau,
+                TietKetThuc = randomTietKetThuc,
+                CacNgayTrongTuan = randomDayList, 
+
+
                 MandatorySubjectCodes = mandatorySubjects.Select(s => s.MaMonHoc).ToList()
             };
 
-            // B4: Gửi yêu cầu và xử lý kết quả
+          
             var (success, data, error) = await CallApiAsync("api/auto-create-enroll", HttpMethod.Post, apiPayload);
 
             if (!success)
             {
-                // Xử lý lỗi chi tiết
                 string errorMsg = error;
-                try
-                {
-                    if (error.Contains("API error:") && error.Contains("{"))
-                    {
-                        dynamic errObj = JsonConvert.DeserializeObject(error.Substring(error.IndexOf('{')));
-                        errorMsg = errObj?.message ?? error;
-                    }
-                }
-                catch { }
+
 
                 TempData["Error"] = errorMsg ?? "Lỗi không xác định khi chạy đăng ký tự động.";
 
-                // Cần load lại ViewBag khi có lỗi POST
+
                 await LoadAutoEnrollmentViewBags();
+
                 return View(request);
             }
             else

@@ -1,14 +1,10 @@
-﻿@* File: Views/Admin/AutoCreateClassAndEnroll.cshtml *@
-@model BlueSchoolSystem.Models.ViewModel.AutoEnrollmentRequestWithScheduleDTO
+﻿@* File: Views/Admin/AutoCreateClassAndEnroll.cshtml (Đã loại bỏ các trường schedule) *@
+@model BlueSchoolSystem.Models.ViewModel.AutoEnrollmentRequestDTO
 @using Microsoft.AspNetCore.Mvc.Rendering
-@using System.Collections.Generic 
+@using System.Collections.Generic
 
 @{
     ViewData["Title"] = "Tạo Lớp & Đăng Ký Tự Động (Theo CTĐT)";
-
-    // Khai báo các ViewBag cần thiết cho Schedule UI
-    var phongHocList = ViewBag.PhongHocList as SelectList;
-    var daysOfWeek = ViewBag.DaysOfWeek as List<dynamic>;
 }
 
 <div class="container mt-4">
@@ -18,122 +14,61 @@
         </div>
 
         <div class="card-body">
+
             <form asp-action="AutoCreateClassAndEnroll" method="post">
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
+                <h4>Thiết lập Chương trình Đào tạo (Tiêu chí lọc)</h4>
                 <hr />
 
+                <p class="alert alert-info">
+                    <i class="fa fa-info-circle me-1"></i> Hệ thống sẽ tự động tạo lớp, **chọn ngẫu nhiên Giảng viên, Phòng học, Tiết học và Ngày trong tuần** dựa trên cấu hình mặc định của hệ thống.
+                </p>
+
                 <div class="row">
-                    @* CỘT TRÁI: Tiêu chí CTĐT *@
-                    <div class="col-md-6 border-end">
-                        <div class="mb-3">
-                            <label asp-for="HocKyId" class="form-label">1. Học Kỳ Mục Tiêu <span class="text-danger">*</span></label>
-                            <select asp-for="HocKyId" asp-items="@(ViewBag.HocKyList as SelectList)" class="form-select select2">
-                                <option value="">-- Chọn Học Kỳ --</option>
-                            </select>
-                            <span asp-validation-for="HocKyId" class="text-danger"></span>
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="KhoaNhapHoc" class="form-label">2. Khóa Nhập Học <span class="text-danger">*</span></label>
-                            <select asp-for="KhoaNhapHoc" asp-items="@(new SelectList(ViewBag.KhoaNhapHocList))" class="form-select select2">
-                                <option value="">-- Chọn Khóa --</option>
-                            </select>
-                            <span asp-validation-for="KhoaNhapHoc" class="text-danger"></span>
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="NganhId" class="form-label">3. Ngành Học <span class="text-danger">*</span></label>
-                            <select asp-for="NganhId" asp-items="@(new SelectList(ViewBag.NganhList, "Id", "TenNganh"))" class="form-select select2">
-                                <option value="">-- Chọn Ngành --</option>
-                            </select>
-                            <span asp-validation-for="NganhId" class="text-danger"></span>
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="ThuTuHocKy" class="form-label">4. Thứ tự Học Kỳ trong CTĐT <span class="text-danger">*</span></label>
-                            <select asp-for="ThuTuHocKy" class="form-select select2">
-                                <option value="">-- Chọn Kỳ --</option>
-                                @for (int i = 1; i <= 18; i++)
-                                {
-                                    <option value="@i">Kỳ @i</option>
-                                }
-                            </select>
-                            <span asp-validation-for="ThuTuHocKy" class="text-danger"></span>
-                        </div>
+                    @* CỘT TRÁI: 4 TIÊU CHÍ CTĐT *@
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="HocKyId" class="form-label">1. Học Kỳ Mục Tiêu <span class="text-danger">*</span></label>
+                        <select asp-for="HocKyId" asp-items="@(ViewBag.HocKyList as SelectList)" class="form-select select2">
+                            <option value="">-- Chọn Học Kỳ --</option>
+                        </select>
+                        <span asp-validation-for="HocKyId" class="text-danger"></span>
                     </div>
 
-                    @* CỘT PHẢI: THIẾT LẬP LỊCH AUTO (Trường ẩn để gửi dữ liệu Schedule) *@
-                    <div class="col-md-6">
-                        <h4>5. Thiết lập Tham số Mặc định</h4>
-                        <hr />
-
-
-                        <div class="mb-3">
-                            <label asp-for="DefaultPhongHocId" class="form-label">Phòng học Mặc định <span class="text-danger">*</span></label>
-                            <select asp-for="DefaultPhongHocId" asp-items="@(phongHocList)" class="form-select select2">
-                                <option value="">-- Chọn Phòng --</option>
-                            </select>
-                            <span asp-validation-for="DefaultPhongHocId" class="text-danger"></span>
-                            <small class="d-block text-muted">Phòng này sẽ là ưu tiên 1 cho tất cả LHP.</small>
-                        </div>
-
-
-                        <div class="row">
-                            <div class="col-6 mb-3">
-                                <label asp-for="TietBatDau" class="form-label">Tiết Bắt đầu <span class="text-danger">*</span></label>
-                                <select asp-for="TietBatDau" class="form-select select2">
-                                    @if (ViewBag.TietStartMap != null)
-                                    {
-                                        @foreach (var item in ViewBag.TietStartMap)
-                                        {
-                                            <option value="@item.Key">Tiết @item.Key (@item.Value)</option>
-                                        }
-                                    }
-                                </select>
-                                <span asp-validation-for="TietBatDau" class="text-danger"></span>
-                            </div>
-                            <div class="col-6 mb-3">
-                                <label asp-for="TietKetThuc" class="form-label">Tiết Kết thúc <span class="text-danger">*</span></label>
-                                <select asp-for="TietKetThuc" class="form-select select2">
-                                    @if (ViewBag.TietEndMap != null)
-                                    {
-                                        @foreach (var item in ViewBag.TietEndMap)
-                                        {
-                                            <option value="@item.Key">Tiết @item.Key (@item.Value)</option>
-                                        }
-                                    }
-                                </select>
-                                <span asp-validation-for="TietKetThuc" class="text-danger"></span>
-                            </div>
-                        </div>
-
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">7. Các Ngày trong tuần <span class="text-danger">*</span></label>
-                            <small class="d-block text-muted">Chọn tất cả các ngày mà lớp học phần có thể diễn ra. Hệ thống sẽ **random** chọn một ngày trong danh sách này để xếp lịch.</small>
-                            <div class="row pt-2">
-                                @if (daysOfWeek != null)
-                                {
-                                    @foreach (var day in daysOfWeek)
-                                    {
-                                        <div class="col-4 form-check">
-                                            <input type="checkbox" name="CacNgayTrongTuan" value="@day.Id" class="form-check-input" id="day_@day.Id"
-                                                   @(Model.CacNgayTrongTuan != null && Model.CacNgayTrongTuan.Contains((int)day.Id) ? "checked" : null) />
-                                            <label class="form-check-label" for="day_@day.Id">@day.Name</label>
-                                        </div>
-                                    }
-                                }
-                            </div>
-                            <span asp-validation-for="CacNgayTrongTuan" class="text-danger"></span>
-                        </div>
-
-                        <input type="hidden" asp-for="ShouldAutoCreateSchedule" value="true" />
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="KhoaNhapHoc" class="form-label">2. Khóa Nhập Học <span class="text-danger">*</span></label>
+                        <select asp-for="KhoaNhapHoc" asp-items="@(new SelectList(ViewBag.KhoaNhapHocList))" class="form-select select2">
+                            <option value="">-- Chọn Khóa --</option>
+                        </select>
+                        <span asp-validation-for="KhoaNhapHoc" class="text-danger"></span>
                     </div>
                 </div>
 
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="NganhId" class="form-label">3. Ngành Học <span class="text-danger">*</span></label>
+                        <select asp-for="NganhId" asp-items="@(new SelectList(ViewBag.NganhList, "Id", "TenNganh"))" class="form-select select2">
+                            <option value="">-- Chọn Ngành --</option>
+                        </select>
+                        <span asp-validation-for="NganhId" class="text-danger"></span>
+                    </div>
 
-                <div class="mt-4 pt-3 border-top d-flex justify-content-between align-items-center">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="ThuTuHocKy" class="form-label">4. Thứ tự Học Kỳ trong CTĐT <span class="text-danger">*</span></label>
+                        <select asp-for="ThuTuHocKy" class="form-select select2">
+                            <option value="">-- Chọn Kỳ --</option>
+                            @for (int i = 1; i <= 18; i++)
+                            {
+                                <option value="@i">Kỳ @i</option>
+                            }
+                        </select>
+                        <span asp-validation-for="ThuTuHocKy" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <hr />
+
+                <div class="mt-4 pt-3 d-flex justify-content-between align-items-center">
                     <button type="submit" class="btn btn-success btn-lg">
                         <i class="fa fa-magic"></i> Kích hoạt Tự động Đăng ký
                     </button>
@@ -160,38 +95,8 @@
                 allowClear: true
             });
 
-            // Logic gán giá trị mặc định cho Tiết học (ví dụ: Tiết 2-6) nếu trống
-            if (!$('#TietBatDau').val()) {
-                $('#TietBatDau').val(2).trigger('change');
-            }
-            if (!$('#TietKetThuc').val()) {
-                $('#TietKetThuc').val(6).trigger('change');
-            }
-
-            // Logic để đảm bảo Tiết Kết thúc >= Tiết Bắt đầu khi submit (client-side validation helper)
-            $('form').on('submit', function(e) {
-                var start = parseInt($('#TietBatDau').val());
-                var end = parseInt($('#TietKetThuc').val());
-
-                // --- Kiểm tra Tiết học
-                if (start > end) {
-                    alert('Lỗi: Tiết kết thúc phải lớn hơn hoặc bằng Tiết bắt đầu.');
-                    e.preventDefault();
-                    return false;
-                }
-
-                // --- Kiểm tra Ngày trong tuần
-                if ($('input[name="CacNgayTrongTuan"]:checked').length === 0) {
-                    alert('Lỗi: Vui lòng chọn ít nhất một Ngày trong tuần.');
-                    e.preventDefault();
-                    return false;
-                }
-
-                return true;
-            });
-
-            // Fix: Form không submit do lỗi binding
-            // Đảm bảo nút submit không bị chặn bởi bất kỳ script nào khác nếu các trường Required bị lỗi.
+            // Logic on submit: Khi không có các trường Schedule trên UI, không cần kiểm tra JS
+            // Controller sẽ tự gán các giá trị Random/Default.
         });
     </script>
 }
