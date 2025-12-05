@@ -243,52 +243,59 @@ namespace BlueSchoolSystem.Services
         {
             bool isMorning = _random.Next(2) == 0;
 
-            int tietBatDau = isMorning ? _random.Next(2, 4) : _random.Next(7, 10);
-            int tietKetThuc = isMorning ? _random.Next(4, 7) : _random.Next(10, 13);
+            int tietBatDau = isMorning ? 2 : 7;
+            int tietKetThuc = isMorning ? 6 : 11;
 
-            // Đảm bảo kết thúc không trước bắt đầu và nằm trong ca.
-            if (tietKetThuc <= tietBatDau)
-            {
-                tietKetThuc = isMorning ? 6 : 12;
-                if (tietBatDau == tietKetThuc) tietBatDau = isMorning ? 2 : 7;
-            }
-
-            int dayOfWeek = _random.Next(2, 8); // Thứ 2 (2) đến Thứ 7 (7)
+            int dayOfWeek = _random.Next(2, 8); // Thứ 2 -> Thứ 7
 
             return (tietBatDau, tietKetThuc, dayOfWeek);
         }
 
         // --- HELPER MỚI: Tạo danh sách các buổi học ---
-        private List<LichHocDTO> GenerateWeeklySchedule(DateTime ngayBatDau, DateTime ngayKetThuc,
-                                                     int dayOfWeekCustom, int startTiet, int endTiet, int phongHocId, bool isThucHanh)
+        private List<LichHocDTO> GenerateWeeklySchedule(
+     DateTime ngayBatDau,
+     DateTime ngayKetThuc,
+     int dayOfWeekCustom,
+     int startTiet,
+     int endTiet,
+     int phongHocId,
+     bool isThucHanh)
         {
             var schedules = new List<LichHocDTO>();
             var (gioBatDau, gioKetThuc) = ConvertTietToTimeSpan(startTiet, endTiet);
+
+            // Chuyển 2..8 → Monday..Sunday
             DayOfWeek targetDay = dayOfWeekCustom == 8 ? DayOfWeek.Sunday : (DayOfWeek)(dayOfWeekCustom - 1);
 
+            // Nếu là thực hành → bắt đầu sau LT đúng 2 tuần
+            if (isThucHanh)
+                ngayBatDau = ngayBatDau.AddDays(14);
+
+            // Tìm ngày bắt đầu đầu tiên khớp thứ
             DateTime current = ngayBatDau;
             while (current.DayOfWeek != targetDay)
-            {
                 current = current.AddDays(1);
+
+            // Xác định số buổi theo LT/TH
+            int totalSessions = isThucHanh ? 6 : 9;
+
+            for (int i = 0; i < totalSessions; i++)
+            {
+                if (current > ngayKetThuc)
+                    break;
+
+                schedules.Add(new LichHocDTO
+                {
+                    LopHocPhanId = 0,
+                    Ngay = current.Date,
+                    GioBatDau = gioBatDau,
+                    GioKetThuc = gioKetThuc,
+                    PhongHocId = phongHocId
+                });
+
+                current = current.AddDays(7); // tuần kế tiếp
             }
 
-            int weekIndex = 0;
-            while (current <= ngayKetThuc)
-            {
-                if (!isThucHanh || weekIndex % 2 == 0) // LT học mọi tuần; TH học tuần chẵn (index 0, 2, 4...)
-                {
-                    schedules.Add(new LichHocDTO
-                    {
-                        LopHocPhanId = 0,
-                        Ngay = current.Date,
-                        GioBatDau = gioBatDau,
-                        GioKetThuc = gioKetThuc,
-                        PhongHocId = phongHocId
-                    });
-                }
-                current = current.AddDays(7);
-                weekIndex++;
-            }
             return schedules;
         }
 
@@ -364,45 +371,89 @@ namespace BlueSchoolSystem.Services
                                 (bd.DiemCuoiKy.HasValue || bd.DiemChuyenCan.HasValue));
         }
 
-        // PHƯƠNG THỨC MỚI: Kiểm tra môn tiên quyết dựa trên ĐĂNG KÝ (cho kỳ hiện tại)
-        private async Task<bool> CanStudentEnrollBasedOnPrerequisiteAsync(
-            int sinhVienId, int hocKyId, string maMonHocTienQuyet)
+        //// PHƯƠNG THỨC MỚI: Kiểm tra môn tiên quyết dựa trên ĐĂNG KÝ (cho kỳ hiện tại)
+        //private async Task<bool> CanStudentEnrollBasedOnPrerequisiteAsync(
+        //    int sinhVienId, int hocKyId, string maMonHocTienQuyet)
+        //{
+        //    if (string.IsNullOrWhiteSpace(maMonHocTienQuyet))
+        //    {
+        //        return true; // Không có môn tiên quyết
+        //    }
+
+        //    // B1: KIỂM TRA ĐÃ HOÀN THÀNH TỪ CÁC KỲ TRƯỚC (Dùng Bảng Điểm)
+        //    var completed = await HasStudentCompletedSubjectAsync(sinhVienId, maMonHocTienQuyet);
+        //    if (completed)
+        //    {
+        //        return true;
+        //    }
+
+        //    // B2: KIỂM TRA ĐÃ ĐĂNG KÝ TRONG KỲ HIỆN TẠI (Dùng DangKyHocPhan)
+        //    // Đây là bước xử lý trường hợp môn lý thuyết và thực hành đi kèm nhau
+        //    var isRegisteredInCurrentSemester = await _context.DangKyHocPhans
+        //        .Include(dk => dk.LopHocPhan)
+        //            .ThenInclude(lhp => lhp.MonHoc)
+        //        .AnyAsync(dk => dk.SinhVienId == sinhVienId &&
+        //                        dk.LopHocPhan.HocKyId == hocKyId &&
+        //                        dk.LopHocPhan.MonHoc.MaMonHoc == maMonHocTienQuyet);
+
+        //    if (isRegisteredInCurrentSemester)
+        //    {
+        //        return true;
+        //    }
+
+        //    // Nếu không hoàn thành ở kỳ trước, cũng không đăng ký trong kỳ này
+        //    return false;
+        //}
+
+        private async Task<bool> CheckDieuKienTienQuyetAsync(int sinhVienId, int hocKyId, string? maMonTienQuyet)
         {
-            if (string.IsNullOrWhiteSpace(maMonHocTienQuyet))
-            {
-                return true; // Không có môn tiên quyết
-            }
+            // Nếu không có môn tiên quyết (null hoặc rỗng) -> Cho phép
+            if (string.IsNullOrEmpty(maMonTienQuyet)) return true;
 
-            // B1: KIỂM TRA ĐÃ HOÀN THÀNH TỪ CÁC KỲ TRƯỚC (Dùng Bảng Điểm)
-            var completed = await HasStudentCompletedSubjectAsync(sinhVienId, maMonHocTienQuyet);
-            if (completed)
-            {
-                return true;
-            }
+            // 1. Kiểm tra ĐÃ HỌC (Trong Bảng Điểm)
+            // Điều kiện: Có bản ghi trong bảng điểm cho môn đó (bất kể kỳ nào trước đó)
+            // Bạn có thể thêm điều kiện Điểm >= 4 nếu cần kiểm tra đậu/rớt
+            bool daHoc = await _context.BangDiems
+                .Include(bd => bd.LopHocPhan).ThenInclude(l => l.MonHoc)
+                .AnyAsync(bd => bd.SinhVienId == sinhVienId
+                             && bd.LopHocPhan.MonHoc.MaMonHoc == maMonTienQuyet);
 
-            // B2: KIỂM TRA ĐÃ ĐĂNG KÝ TRONG KỲ HIỆN TẠI (Dùng DangKyHocPhan)
-            // Đây là bước xử lý trường hợp môn lý thuyết và thực hành đi kèm nhau
-            var isRegisteredInCurrentSemester = await _context.DangKyHocPhans
-                .Include(dk => dk.LopHocPhan)
-                    .ThenInclude(lhp => lhp.MonHoc)
-                .AnyAsync(dk => dk.SinhVienId == sinhVienId &&
-                                dk.LopHocPhan.HocKyId == hocKyId &&
-                                dk.LopHocPhan.MonHoc.MaMonHoc == maMonHocTienQuyet);
+            if (daHoc) return true;
 
-            if (isRegisteredInCurrentSemester)
-            {
-                return true;
-            }
+            // 2. Kiểm tra ĐANG ĐĂNG KÝ (Song hành trong cùng kỳ hiện tại)
+            // Ví dụ: Đăng ký Lý thuyết rồi thì được đăng ký Thực hành
+            bool dangKyCungKy = await _context.DangKyHocPhans
+                .Include(dk => dk.LopHocPhan).ThenInclude(l => l.MonHoc)
+                .AnyAsync(dk => dk.SinhVienId == sinhVienId
+                             && dk.LopHocPhan.HocKyId == hocKyId // Cùng học kỳ hiện tại
+                             && dk.LopHocPhan.MonHoc.MaMonHoc == maMonTienQuyet);
 
-            // Nếu không hoàn thành ở kỳ trước, cũng không đăng ký trong kỳ này
-            return false;
+            // Lưu ý: Nếu bạn vừa Add vào context mà chưa SaveChanges trong cùng 1 vòng lặp, 
+            // truy vấn DB này có thể chưa thấy. 
+            // Tuy nhiên, nếu bạn sắp xếp thứ tự môn học hợp lý (Lý thuyết trước TH) 
+            // và có SaveChanges ở các bước trước đó thì ổn.
+
+            // Kiểm tra thêm trong Local (bộ nhớ đệm) để bắt các môn vừa được Add trong cùng Transaction
+            bool dangKyTrongBoNho = _context.DangKyHocPhans.Local
+                .Any(dk => dk.SinhVienId == sinhVienId
+                        && dk.LopHocPhan != null
+                        && dk.LopHocPhan.HocKyId == hocKyId
+                        && dk.LopHocPhan.MonHoc != null
+                        && dk.LopHocPhan.MonHoc.MaMonHoc == maMonTienQuyet);
+
+            return dangKyCungKy || dangKyTrongBoNho;
         }
 
+        private async Task<List<int>> GetAllPhongHocIdsAsync()
+        {
+            return await _context.PhongHocs.Select(p => p.Id).ToListAsync();
+        }
 
+        // Trong class LopHocPhanService
 
         public async Task<(int classesCreated, int successCount, int schedulesCreated)> RunAutoEnrollmentJobAsync(AutoEnrollmentApiPayload dto)
         {
-            // 1. XÁC ĐỊNH KHÓA HỌC VÀ SINH VIÊN MỤC TIÊU (Giữ nguyên)
+            // 1. XÁC ĐỊNH KHÓA HỌC VÀ SINH VIÊN MỤC TIÊU
             var khoaHoc = await _context.KhoaHocs.FirstOrDefaultAsync(kh => kh.NamHoc == dto.KhoaNhapHoc);
             if (khoaHoc == null) throw new InvalidOperationException($"Không tìm thấy Khóa học ({dto.KhoaNhapHoc}).");
 
@@ -422,15 +473,20 @@ namespace BlueSchoolSystem.Services
             var trangThaiChoMoId = _context.TrangThais.FirstOrDefault(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Chờ mở")?.Id ?? 1;
             var hocKy = await _context.HocKys.FindAsync(dto.HocKyId);
 
+            // Lấy danh sách TẤT CẢ Phòng học một lần để dùng cho Random
+            var allPhongIds = await GetAllPhongHocIdsAsync();
+            if (!allPhongIds.Any()) throw new Exception("Chưa có dữ liệu Phòng học.");
+
+            // Các biến đếm kết quả
             int successCount = 0;
             int classesCreated = 0;
             int schedulesCreatedTotal = 0;
             var createdLhpsBySubject = new Dictionary<string, List<LopHocPhan>>();
 
-            // Lấy tham số lịch học từ DTO (đã được Controller gán giá trị random/default)
-            int autoTietBatDau = dto.TietBatDau;
-            int autoTietKetThuc = dto.TietKetThuc;
-            int autoPhongHocId = dto.DefaultPhongHocId;
+            // Lấy tham số lịch học từ DTO
+            int inputTietBatDau = dto.TietBatDau;
+            int inputTietKetThuc = dto.TietKetThuc;
+            int inputPhongHocId = dto.DefaultPhongHocId;
             var availableDays = dto.CacNgayTrongTuan.ToList();
 
             // 3. VÒNG LẶP XỬ LÝ TỪNG MÔN HỌC
@@ -440,82 +496,41 @@ namespace BlueSchoolSystem.Services
                 if (monHoc == null) continue;
 
                 var chiTietCtdt = await GetChiTietCTDTAsync(maMonHoc, dto.NganhId, dto.KhoaNhapHoc, dto.ThuTuHocKy);
-
-                // Xác định loại môn học để giới hạn số buổi
                 bool isThucHanh = monHoc.MoTa?.ToUpper().Contains("TH") ?? false;
                 int maxAllowedSessions = isThucHanh ? 6 : 9;
+                string? maMonTienQuyet = chiTietCtdt?.MaMonHocTienQuyet;
 
-                // 1. TÌM GIẢNG VIÊN TỰ ĐỘNG KHẢ DỤNG CHO MÔN HỌC
+                // Tìm GV
                 var gvCandidates = await GetGiangVienByMonHocAsync(monHoc.Id);
-                int? autoGiangVienId = GetRandomGiangVienId(gvCandidates);
+                // (Chúng ta sẽ random GV lại ở bên dưới cho mỗi lớp, ở đây chỉ check tồn tại)
+                if (!gvCandidates.Any()) continue;
 
-                if (!autoGiangVienId.HasValue) continue;
+                if (!createdLhpsBySubject.ContainsKey(maMonHoc)) createdLhpsBySubject[maMonHoc] = new List<LopHocPhan>();
 
-                // Lấy ngày random từ list đã được gửi lên
-                int randomIndex = _random.Next(dto.CacNgayTrongTuan.Count);
-                int autoDayOfWeek = dto.CacNgayTrongTuan[randomIndex];
-
-                // Khởi tạo list cache
-                if (!createdLhpsBySubject.ContainsKey(maMonHoc))
-                {
-                    createdLhpsBySubject[maMonHoc] = new List<LopHocPhan>();
-                }
-
-                // Lọc sinh viên chưa học môn này
+                // Lọc sinh viên cần học
                 var studentsToEnroll = new List<SinhVien>();
                 foreach (var sv in targetStudents)
                 {
-                    if (!await HasStudentCompletedSubjectAsync(sv.Id, maMonHoc))
-                    {
-                        studentsToEnroll.Add(sv);
-                    }
+                    if (!await HasStudentCompletedSubjectAsync(sv.Id, maMonHoc)) studentsToEnroll.Add(sv);
                 }
 
                 if (!studentsToEnroll.Any()) continue;
 
-                // --- TÌM SLOT TRỐNG VỚI GV VÀ PHÒNG CỐ ĐỊNH (LOGIC MỚI) ---
-                int finalDayOfWeek = 0;
-                bool foundValidSlot = false;
+                // Xáo trộn danh sách ngày để đảm bảo random assignment mỗi lần tạo lớp mới
+                // Lưu ý: Việc xáo trộn này nên thực hiện mỗi khi cần tìm slot mới, nhưng để đơn giản ta làm ở đây
+                // Logic bên dưới sẽ xáo trộn lại mỗi khi cần tìm slot.
 
-                // tìm slot mới mỗi lần chuẩn bị tạo lớp
-                var daysToSearch = availableDays.OrderBy(x => Guid.NewGuid()).ToList();
-                foreach (var day in daysToSearch)
-                {
-                    var schedulesToTest = GenerateWeeklySchedule(
-                        hocKy.NgayBatDau, hocKy.NgayKetThuc,
-                        day, autoTietBatDau, autoTietKetThuc,
-                        autoPhongHocId, isThucHanh
-                    ).Take(maxAllowedSessions).ToList();
-
-                    var conflicts = await CheckLichTrungAsync(schedulesToTest, autoGiangVienId.Value, 0);
-
-                    if (!conflicts.Any())
-                    {
-                        finalDayOfWeek = day;
-                        foundValidSlot = true;
-                        break;
-                    }
-                }
-
-                if (!foundValidSlot)
-                {
-                    _logger.LogWarning($"Không thể tạo lớp mới cho môn {maMonHoc} vì hết slot.");
-                    continue;
-                }
                 // Lặp qua tất cả sinh viên cần đăng ký, cố gắng phân bổ
                 foreach (var sv in studentsToEnroll)
                 {
-                    LopHocPhan selectedLhp = null;
-
+                    bool duDieuKien = await CheckDieuKienTienQuyetAsync(sv.Id, dto.HocKyId, maMonTienQuyet);
                     // Kiểm tra Tiên Quyết
-                    if (chiTietCtdt != null && !string.IsNullOrWhiteSpace(chiTietCtdt.MaMonHocTienQuyet))
+                    if (!duDieuKien)
                     {
-                        var canEnroll = await CanStudentEnrollBasedOnPrerequisiteAsync(
-                            sv.Id, dto.HocKyId, chiTietCtdt.MaMonHocTienQuyet);
-                        if (!canEnroll) continue;
+                       continue;
                     }
 
-
+                    LopHocPhan selectedLhp = null;
 
                     // A. Tìm LHP đã có còn chỗ (Ưu tiên cùng lớp hành chính)
                     foreach (var existingLhp in createdLhpsBySubject[maMonHoc])
@@ -534,18 +549,79 @@ namespace BlueSchoolSystem.Services
                         }
                     }
 
-                    // B. Tạo LHP Mới nếu không tìm thấy
+                    // B. Tạo LHP Mới nếu không tìm thấy lớp trống
                     if (selectedLhp == null)
                     {
+                        int finalDayOfWeek = 0;
+                        int finalTietBd = 0;
+                        int finalTietKt = 0;
+                        int finalPhongId = 0;
+                        int? finalGiangVienId = null;
+                        bool foundValidSlot = false;
+
+                        // Xáo trộn danh sách ngày để thử ngẫu nhiên
+                        var daysToSearch = dto.CacNgayTrongTuan.OrderBy(x => Guid.NewGuid()).ToList();
+
+                        // --- VÒNG LẶP TÌM KIẾM SLOT ---
+                        // Thử từng ngày một
+                        foreach (var day in daysToSearch)
+                        {
+                            // TẠI MỖI NGÀY, THỬ RANDOM CẤU HÌNH (TIẾT/PHÒNG/GV) MỚI
+                            // Thử tối đa 10 lần random cho mỗi ngày để tìm slot trống
+                            for (int attempt = 0; attempt < 10; attempt++)
+                            {
+                                // 1. Random Tiết
+                                var sched = GetRandomScheduleSettings();
+                                int tryTietBd = sched.tietBatDau;
+                                int tryTietKt = sched.tietKetThuc;
+
+                                // 2. Random Phòng
+                                int tryPhongId = allPhongIds[_random.Next(allPhongIds.Count)];
+
+                                // 3. Random GV
+                                int? tryGvId = GetRandomGiangVienId(gvCandidates);
+                                if (tryGvId == null) break;
+
+                                // 4. Tạo lịch giả định
+                                var schedulesToTest = GenerateWeeklySchedule(
+                                    hocKy.NgayBatDau, hocKy.NgayKetThuc,
+                                    day, tryTietBd, tryTietKt,
+                                    tryPhongId, isThucHanh).Take(maxAllowedSessions).ToList();
+
+                                // 5. Kiểm tra trùng
+                                var conflicts = await CheckLichTrungAsync(schedulesToTest, tryGvId.Value, 0);
+
+                                if (!conflicts.Any())
+                                {
+                                    // TÌM THẤY! Lưu lại thông số
+                                    finalDayOfWeek = day;
+                                    finalTietBd = tryTietBd;
+                                    finalTietKt = tryTietKt;
+                                    finalPhongId = tryPhongId;
+                                    finalGiangVienId = tryGvId;
+                                    foundValidSlot = true;
+                                    break; // Thoát vòng lặp attempt
+                                }
+                            }
+                            if (foundValidSlot) break; // Thoát vòng lặp ngày
+                        }
+
+                        if (!foundValidSlot)
+                        {
+                            _logger.LogWarning($"[AUTO] Không tìm được lịch cho môn {maMonHoc} sau nhiều lần thử.");
+                            continue; // Bỏ qua SV này
+                        }
+
+                        // --- TẠO LỚP VỚI THÔNG SỐ ĐÃ TÌM ĐƯỢC ---
                         var maLopHocPhan = await GenerateAutoMaLHPAsync(dto.HocKyId, monHoc.Id);
                         selectedLhp = new LopHocPhan
                         {
                             HocKyId = dto.HocKyId,
                             MonHocId = monHoc.Id,
-                            GiangVienId = autoGiangVienId,
+                            GiangVienId = finalGiangVienId, // GV Random được chọn
                             TrangThaiId = trangThaiChoMoId,
                             MaLopHocPhan = maLopHocPhan,
-                            TenLopHocPhan = $"{monHoc.TenMonHoc} (Thứ {autoDayOfWeek})", // Gán Thứ đã random
+                            TenLopHocPhan = $"{monHoc.TenMonHoc}",
                             SiSo = MAX_LHP_SIZE,
                             NgayBatDau = hocKy.NgayBatDau,
                             NgayKetThuc = hocKy.NgayKetThuc
@@ -556,24 +632,16 @@ namespace BlueSchoolSystem.Services
                         createdLhpsBySubject[maMonHoc].Add(selectedLhp);
                         classesCreated++;
 
-                        // --- TẠO LỊCH HỌC TỰ ĐỘNG CHO LỚP MỚI ---
+                        // --- LƯU LỊCH HỌC ---
                         if (dto.ShouldAutoCreateSchedule)
                         {
-                            // [SỬA ĐỔI 3: DÙNG finalDayOfWeek ĐÃ TÌM ĐƯỢC CHO VIỆC TẠO LỊCH]
                             var finalSchedules = GenerateWeeklySchedule(
-                                hocKy.NgayBatDau, hocKy.NgayKetThuc,
-                                finalDayOfWeek, autoTietBatDau, autoTietKetThuc,
-                                autoPhongHocId, isThucHanh);
+                                    hocKy.NgayBatDau, hocKy.NgayKetThuc,
+                                    finalDayOfWeek, finalTietBd, finalTietKt,
+                                    finalPhongId, isThucHanh).Take(maxAllowedSessions).ToList();
 
-                            var limitedSchedules = finalSchedules.Take(maxAllowedSessions).ToList();
-
-                            // KHÔNG cần kiểm tra trùng lịch (CheckLichTrungAsync) lần nữa, 
-                            // vì chúng ta đã đảm bảo slot đó trống ở bước trên!
-
-                            foreach (var lich in limitedSchedules)
+                            foreach (var lich in finalSchedules)
                             {
-                                // [LỖI TRÙNG LẶP ĐÃ XẢY RA Ở ĐÂY TRƯỚC ĐÓ]
-                                // Logic đơn giản là thêm lịch vào DB
                                 _context.LichHocs.Add(new LichHoc
                                 {
                                     LopHocPhanId = selectedLhp.Id,
@@ -586,9 +654,10 @@ namespace BlueSchoolSystem.Services
                             }
                             await _context.SaveChangesAsync();
                         }
-                    }
+                    } // Kết thúc khối IF (selectedLhp == null)
 
                     // C. Đăng ký sinh viên vào LHP đã chọn/tạo
+                    // Logic này đảm bảo SV không bị đăng ký trùng môn trong cùng kỳ (dù khác LHP)
                     var alreadyRegistered = await _context.DangKyHocPhans
                         .Include(dk => dk.LopHocPhan)
                         .AnyAsync(dk => dk.SinhVienId == sv.Id
@@ -606,12 +675,13 @@ namespace BlueSchoolSystem.Services
                         });
                         successCount++;
                     }
-                }
-            }
+                } // Hết vòng lặp sinh viên
+            } // Hết vòng lặp môn học
 
             await _context.SaveChangesAsync();
             return (classesCreated, successCount, schedulesCreatedTotal);
         }
+
 
         public async Task<(bool success, string message)> CreateDotDangKyForSelectedLhpsAsync(
     QuanLyDangKyLHPRequestDTO dto,
