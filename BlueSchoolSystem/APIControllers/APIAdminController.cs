@@ -1102,13 +1102,13 @@ namespace BlueSchoolSystem.APIControllers
         {
             // 1. Lấy trạng thái "Đang mở"
             var trangThaiDangMoId = await _context.TrangThais
-                .Where(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Đang mở")
+                .Where(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Chờ mở")
                 .Select(t => t.Id)
                 .FirstOrDefaultAsync();
 
             if (trangThaiDangMoId == 0)
             {
-                return NotFound(new { result = false, message = "Lỗi cấu hình: Không tìm thấy trạng thái 'Đang mở' cho Lớp Học Phần." });
+                return NotFound(new { result = false, message = "Lỗi cấu hình: Không tìm thấy trạng thái 'Chờ mở' cho Lớp Học Phần." });
             }
 
             // 2. Lấy danh sách LHP: Đang mở VÀ Sĩ số thực tế < Sĩ số tối đa

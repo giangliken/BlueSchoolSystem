@@ -468,9 +468,9 @@ namespace BlueSchoolSystem.Services
             if (!targetStudents.Any()) throw new InvalidOperationException($"Không tìm thấy sinh viên mục tiêu để đăng ký.");
 
             // 2. THIẾT LẬP CƠ BẢN
-            const int MAX_LHP_SIZE = 120;
+            const int MAX_LHP_SIZE = 60;
             const int MAX_STUDENTS_PER_CLASS_IN_LHP = 50;
-            var trangThaiChoMoId = _context.TrangThais.FirstOrDefault(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Chờ mở")?.Id ?? 1;
+            var trangThaiChoMoId = _context.TrangThais.FirstOrDefault(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Đang mở")?.Id ?? 1;
             var hocKy = await _context.HocKys.FindAsync(dto.HocKyId);
 
             // Lấy danh sách TẤT CẢ Phòng học một lần để dùng cho Random
@@ -719,12 +719,11 @@ namespace BlueSchoolSystem.Services
                 return (false, $"Các Lớp Học Phần ID sau không hợp lệ/không thuộc Học kỳ {dto.HocKyId}: {string.Join(", ", missingIds)}.");
             }
 
-            // Kiểm tra LHP còn đủ điều kiện mở đăng ký (Đang mở và còn chỗ)
-            var trangThaiDangMo = selectedLhps.FirstOrDefault()?.TrangThai?.TenTrangThai ?? "N/A";
-            if (trangThaiDangMo != "Đang mở")
-            {
-                return (false, "Chỉ có thể mở đăng ký cho các Lớp Học Phần đang ở trạng thái 'Đang mở'.");
-            }
+            // Kiểm tra LHP còn đủ điều kiện mở đăng ký (Chờ mở và còn chỗ)
+            var trangThaiDangMo = await _context.TrangThais
+        .FirstOrDefaultAsync(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Đang mở");
+
+            if (trangThaiDangMo == null) return (false, "Lỗi hệ thống: Không tìm thấy trạng thái 'Đang mở'.");
 
             // 3. Chuẩn bị bản ghi Đợt Đăng ký
             var newDotDangKys = new List<DotDangKy>();
@@ -759,6 +758,11 @@ namespace BlueSchoolSystem.Services
                     IsActive = true
                 };
                 newDotDangKys.Add(dot);
+
+                lhp.TrangThaiId = trangThaiDangMo.Id;
+
+                // Đánh dấu object đã bị sửa đổi (để EF Core biết cần Update)
+                _context.Entry(lhp).State = EntityState.Modified;
             }
 
             if (!newDotDangKys.Any())
