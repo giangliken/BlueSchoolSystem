@@ -174,7 +174,7 @@ namespace BlueSchoolSystem.APIControllers
             try
             {
                 await _context.SaveChangesAsync();
-                return Ok(new 
+                return Ok(new
                 {
                     result = true,
                     code = 200,
@@ -501,7 +501,8 @@ namespace BlueSchoolSystem.APIControllers
             var buois = await _context.DiemDanhs
                 .Where(dd => dd.LopHocPhanId == lopHocPhanId)
                 .OrderByDescending(dd => dd.Ngay)
-                .Select(dd => new {
+                .Select(dd => new
+                {
                     dd.Id,
                     dd.Ngay,
                     dd.Code,
@@ -627,7 +628,7 @@ namespace BlueSchoolSystem.APIControllers
                 DiemDanhId = buoi.Id,
                 SinhVienId = (int)x.SinhVienId,
                 TrangThaiId = trangThaiChuaDiemDanhId,
-                ThoiGian = DateTime.MinValue 
+                ThoiGian = DateTime.MinValue
             });
 
             _context.ChiTietDiemDanhs.AddRange(details);
@@ -687,8 +688,8 @@ namespace BlueSchoolSystem.APIControllers
                 {
                     studentId = sv.MSSV,
                     studentName = sv.HoTen,
-                    status = "Vắng mặt",               
-                    statusId = trangThaiVangId,    
+                    status = "Vắng mặt",
+                    statusId = trangThaiVangId,
                     timecheckedin = (string?)null,
                     bluetoothID = (string?)null
                 };
@@ -743,7 +744,7 @@ namespace BlueSchoolSystem.APIControllers
             {
                 buoi.Id,
                 buoi.Code,
-                buoi.Ngay,          
+                buoi.Ngay,
                 buoi.ExpireAt,
                 MaLopHocPhan = buoi.LopHocPhan.MaLopHocPhan,
                 SinhViens = sinhViens
@@ -774,7 +775,8 @@ namespace BlueSchoolSystem.APIControllers
             var buois = await _context.DiemDanhs
                 .Where(dd => dd.LopHocPhanId == lopHocPhan.Id)
                 .OrderByDescending(dd => dd.Ngay)
-                .Select(dd => new {
+                .Select(dd => new
+                {
                     dd.Id,
                     dd.Ngay,
                     dd.Code,
@@ -1061,7 +1063,7 @@ namespace BlueSchoolSystem.APIControllers
                 if (!string.IsNullOrEmpty(user?.FcmToken))
                 {
                     var fcmTitle = $"{tenLop} - Thông báo mới";
-                    var fcmBody = tb.Title; 
+                    var fcmBody = tb.Title;
                     await SendFcmPush(user.FcmToken, fcmTitle, fcmBody);
                 }
             }
@@ -1095,7 +1097,7 @@ namespace BlueSchoolSystem.APIControllers
                 .SingleOrDefaultAsync();
 
             var tenMonHoc = lopInfo?.TenMonHoc ?? "Không rõ tên môn học";
-            var maLhp = lopInfo?.MaLopHocPhan; 
+            var maLhp = lopInfo?.MaLopHocPhan;
 
 
             var data = new
@@ -1188,6 +1190,55 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("laydanhsachlopphutrach")]
+        public async Task<IActionResult> LayLopHocPhanPhuTrach()
+        {
+            try
+            {
+                // 1. Lấy UserId từ Token
+                var userId = User.FindFirst("userId")?.Value;
+
+                // 2. Tìm thông tin giảng viên
+                var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.UserId == userId);
+
+                if (giangVien == null)
+                {
+                    return NotFound(new { result = false, message = "Không tìm thấy thông tin giảng viên trong hệ thống." });
+                }
+
+                // 3. Truy vấn danh sách lớp phụ trách (Đã sửa lỗi logic tại đây)
+                var danhSachLop = await _context.ChiTietLopHocs
+                    .Include(ct => ct.LopHoc) // Kèm thông tin Lớp (để lấy Tên Lớp)
+                    .Where(ct => ct.GiangVienId == giangVien.Id) // QUAN TRỌNG: Chỉ lấy lớp của GV này
+                    .Select(ct => new
+                    {
+                        ct.Id,
+                        ct.LopHocId,
+                        MaLop = ct.LopHoc.MaLop, // Giả định bảng LopHocs có cột MaLop
+                        TenLop = ct.LopHoc.TenLop, // Giả định bảng LopHocs có cột TenLop
+                        ct.LopTruongId,
+                        ct.BiThuId,
+                        VaiTro = "Cố vấn học tập" // Mô tả thêm nếu cần
+                    })
+                    .ToListAsync();
+
+                // 4. Trả về kết quả
+                return Ok(new
+                {
+                    result = true,
+                    code = 200,
+                    message = "Lấy danh sách lớp phụ trách thành công",
+                    soluong = danhSachLop.Count,
+                    data = danhSachLop // Đã sửa tên biến cho khớp
+                });
+            }
+            catch (Exception ex)
+            {
+                // Xử lý lỗi hệ thống nếu có
+                return StatusCode(500, new { result = false, message = "Lỗi hệ thống: " + ex.Message });
+            }
+        }
     }
 
 
