@@ -1123,6 +1123,7 @@ namespace BlueSchoolSystem.APIControllers
                     l.MaLopHocPhan,
                     TenLop = l.TenLopHocPhan,
                     MonHoc = l.MonHoc.TenMonHoc,
+                    MaGiangVien = l.GiangVien.MaGiangVien,
                     GiangVien = (l.GiangVien.HoVaTenDem + " " + l.GiangVien.Ten) ?? "Chưa gán GV",
                     HocKyId = l.HocKyId,
                     TenHocKy = l.HocKy.TenHocKy,

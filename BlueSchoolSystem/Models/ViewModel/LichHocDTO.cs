@@ -13,16 +13,24 @@ namespace BlueSchoolSystem.Models.ViewModel
     // DTO để tạo mới Lớp Học Phần
     public class LopHocPhanCreateDTO
     {
+        [Display(Name = "Học kỳ")]
         public int HocKyId { get; set; }
+        [Display(Name = "Môn học")]
         public int MonHocId { get; set; }
+        [Display(Name = "Giảng viên")]
         public int GiangVienId { get; set; }
+        [Display(Name = "Mã lớp học phần")]
         public string MaLopHocPhan { get; set; } // Mã nhóm (vd: CTDLGT_01) [cite: 33]
+        [Display(Name = "Tên lớp học phần")]
         public string TenLopHocPhan { get; set; }
+        [Display(Name = "Sĩ số tối đa")]
         [Range(40, 120, ErrorMessage = "Sĩ số phải từ 40 đến 120.")]
         public int SiSoToiDa { get; set; }
         public int PhongHocId { get; set; }
         // Ngày bắt đầu/kết thúc LHP (có thể khác với HK)
+        [Display(Name = "Ngày bắt đầu")]
         public DateTime NgayBatDauLHP { get; set; }
+        [Display(Name = "Ngày kết thúc")]
         public DateTime NgayKetThucLHP { get; set; }
 
         //public List<LichHocDTO> LichHocs { get; set; } = new List<LichHocDTO>();

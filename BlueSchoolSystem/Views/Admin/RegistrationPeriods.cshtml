@@ -6,7 +6,7 @@
 @using System 
 
 @{
-    ViewData["Title"] = "Mở Đăng Ký Học Phần (Theo Lớp Cụ Thể)";
+    ViewData["Title"] = "Mở Cổng Đăng Ký Học Phần";
 
     // Lấy dữ liệu từ ViewBag
     var hocKyList = ViewBag.HocKyList as SelectList;
@@ -22,10 +22,15 @@
 <link href="https://cdn.datatables.net/v/bs5/dt-1.13.8/datatables.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
-<h2 class="mb-4">
-    <i class="fa fa-calendar-alt me-2"></i> @ViewData["Title"]
-</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">
+        <i class="fa fa-calendar-alt me-2"></i> @ViewData["Title"]
+    </h2>
 
+    <a asp-action="CourseClassManager" asp-controller="Admin" class="btn btn-outline-secondary">
+        <i class="fa fa-arrow-left me-1"></i> Quay lại
+    </a>
+</div>
 
 @* --- 1. CHỌN HỌC KỲ --- *@
 <div class="card mb-4 shadow-sm">
@@ -123,7 +128,7 @@
                                             <th><input type="checkbox" id="selectAllLhps" /></th>
                                             <th>Mã LHP</th>
                                             <th>Môn học</th>
-                                            <th>Giảng viên</th>
+                                            <th>Mã Giảng viên</th>
                                             <th>Sĩ số (TT/ĐK)</th>
                                         </tr>
                                     </thead>
@@ -142,7 +147,7 @@
                                                 </td>
                                                 <td>@lhp["maLopHocPhan"]</td>
                                                 <td>@lhp["monHoc"]</td>
-                                                <td>@lhp["giangVien"]</td>
+                                                <td>@lhp["maGiangVien"]</td>
                                                 <td>@lhp["siSoThucTe"] / @lhp["siSoToiDa"]</td>
                                             </tr>
                                         }
