@@ -2220,6 +2220,26 @@ namespace BlueSchoolSystem.Controllers
             return View(lhp);
         }
 
+        public async Task<IActionResult> StudentInCourseClass(int lhpId)
+        {
+            // 1. Lấy thông tin LHP để hiển thị tiêu đề
+            var lhp = await _lhpService.GetLopHocPhanDetailsAsync(lhpId);
+            if (lhp == null)
+            {
+                TempData["Error"] = "Lớp học phần không tồn tại.";
+                return RedirectToAction(nameof(CourseClassManager));
+            }
+
+            // 2. Lấy danh sách sinh viên từ Service
+            var students = await _lhpService.GetStudentsInClassAsync(lhpId);
+
+            // 3. Truyền dữ liệu sang View
+            ViewBag.LHP = lhp;
+            ViewBag.TotalStudents = students.Count;
+
+            return View(students);
+        }
+
         #endregion
 
         #region ======= Create Course Class =======

@@ -673,6 +673,13 @@ namespace BlueSchoolSystem.Services
                             NgayDangKy = DateTime.Now,
                             LoaiDangKy = "BatBuocAuto"
                         });
+
+                        _context.ChiTietLopHocPhans.Add(new ChiTietLopHocPhan
+                        {
+                            LopHocPhanId = selectedLhp.Id,
+                            SinhVienId = sv.Id
+                        });
+
                         successCount++;
                     }
                 } // Hết vòng lặp sinh viên
@@ -766,6 +773,24 @@ namespace BlueSchoolSystem.Services
            
 
             return (true, $"Đã mở đăng ký đợt '{dto.TenDotDangKy}' cho {selectedLhps.Count} Lớp Học Phần thành công.");
+        }
+
+        //
+        public async Task<List<SinhVien>> GetStudentsInClassAsync(int lhpId)
+        {
+            // Truy vấn từ bảng ChiTietLopHocPhan, kết nối sang SinhVien và các bảng liên quan
+            var students = await _context.ChiTietLopHocPhans
+                .Where(ct => ct.LopHocPhanId == lhpId)
+                .Include(ct => ct.SinhVien)
+                    .ThenInclude(sv => sv.Lop) // Lấy thông tin Lớp hành chính
+                .Include(ct => ct.SinhVien)
+                    .ThenInclude(sv => sv.User) // Lấy Email, SĐT từ User
+                .Select(ct => ct.SinhVien) // Chỉ lấy đối tượng SinhVien ra
+                .OrderBy(sv => sv.Ten) // Sắp xếp theo tên
+                .ThenBy(sv => sv.HoVaTenDem)
+                .ToListAsync();
+
+            return students;
         }
     }
 }
