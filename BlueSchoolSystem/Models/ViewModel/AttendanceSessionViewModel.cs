@@ -9,6 +9,14 @@
         public DateTime ExpireAt { get; set; }
         public string GhiChu { get; set; }
         public int TrangThaiId { get; set; }
+        public List<AttendanceDetailViewModel> DanhSachSinhVien { get; set; } = new();
+
+    }
+    // Class chi tiết điểm danh của 1 sinh viên
+    public class AttendanceDetailViewModel
+    {
+        public int SinhVienId { get; set; }
+        public string TrangThai { get; set; } 
     }
 
 }
