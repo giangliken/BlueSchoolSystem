@@ -2125,7 +2125,7 @@ namespace BlueSchoolSystem.Controllers
                 .Where(t => t.LoaiTrangThai == "LopHocPhan")
                 .ToListAsync();
         }
-
+        #endregion
         #region ======= Helper  =======
         private async Task<(bool success, JsonElement data, string error)> CallApiAsync(string url, HttpMethod method, object body = null)
         {
@@ -2840,13 +2840,119 @@ namespace BlueSchoolSystem.Controllers
 
 
         }
-
         [HttpGet]
         public async Task<IActionResult> AutoCreateClassAndEnroll()
         {
             await LoadAutoEnrollmentViewBags();
 
             return View(new AutoEnrollmentRequestDTO());
+        }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AutoCreateClassAndEnroll(AutoEnrollmentRequestDTO request)
+        {
+            // 1. Validate dữ liệu từ Form View (Chỉ chứa các trường CTĐT)
+            if (!ModelState.IsValid)
+            {
+                await LoadAutoEnrollmentViewBags();
+                return View(request);
+            }
+
+            // 2. Lấy danh sách Môn học bắt buộc
+            var mandatorySubjects = await _lhpService.GetMandatorySubjectsForAutoClassCreationAsync(
+                request.NganhId, request.KhoaNhapHoc, request.ThuTuHocKy);
+
+            if (!mandatorySubjects.Any())
+            {
+                TempData["Error"] = $"Không tìm thấy môn học bắt buộc nào trong CTĐT cho Ngành ID {request.NganhId}, Khóa {request.KhoaNhapHoc}, Kỳ {request.ThuTuHocKy}.";
+                return RedirectToAction(nameof(CourseClassManager));
+            }
+
+            // --- BƯỚC QUAN TRỌNG: SINH DỮ LIỆU LỊCH HỌC NGẪU NHIÊN TẠI ĐÂY ---
+            var (randomTietBatDau, randomTietKetThuc, _) = _lhpService.GetRandomScheduleSettings();
+            int randomPhongHocId = await GetRandomPhongHocId();
+
+            // 2. Gửi TOÀN BỘ ngày trong tuần để Service có thể chọn bất kỳ ngày nào
+            var fullWeekDays = new List<int> { 2, 3, 4, 5, 6, 7 };
+
+            var apiPayload = new AutoEnrollmentApiPayload
+            {
+                HocKyId = request.HocKyId,
+                NganhId = request.NganhId,
+                KhoaNhapHoc = request.KhoaNhapHoc,
+                ThuTuHocKy = request.ThuTuHocKy,
+
+                ShouldAutoCreateSchedule = true,
+
+                // Các giá trị này chỉ là "giá trị mồi" để qua mặt Validation.
+                // Service sẽ KHÔNG dùng cứng nhắc các giá trị này mà sẽ Random lại.
+                DefaultPhongHocId = randomPhongHocId,
+                TietBatDau = randomTietBatDau,
+                TietKetThuc = randomTietKetThuc,
+
+                // Quan trọng: Gửi full tuần
+                CacNgayTrongTuan = fullWeekDays,
+
+                MandatorySubjectCodes = mandatorySubjects.Select(s => s.MaMonHoc).ToList()
+            };
+
+            // 4. Gọi API
+            var (success, data, error) = await CallApiAsync("api/auto-create-enroll", HttpMethod.Post, apiPayload);
+
+            if (!success)
+            {
+                // Xử lý hiển thị lỗi chi tiết từ API
+                string errorMsg = error;
+                try
+                {
+                    if (error.Contains("API error:") && error.Contains("{"))
+                    {
+                        // Cắt chuỗi để lấy phần JSON
+                        var jsonPart = error.Substring(error.IndexOf('{'));
+                        dynamic errObj = JsonConvert.DeserializeObject(jsonPart);
+
+                        // Kiểm tra xem có property "errors" (Validation Error) không
+                        if (errObj?.errors != null)
+                        {
+                            errorMsg = "Lỗi dữ liệu: ";
+                            foreach (var err in errObj.errors)
+                            {
+                                errorMsg += $"{err.Name}: {err.Value[0]} ";
+                            }
+                        }
+                        else
+                        {
+                            errorMsg = errObj?.message ?? error;
+                        }
+                    }
+                }
+                catch { }
+
+                TempData["Error"] = errorMsg;
+
+                await LoadAutoEnrollmentViewBags();
+                return View(request);
+            }
+            else
+            {
+                string message = "Đăng ký tự động thành công.";
+                try
+                {
+                    if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("message", out var msgProp))
+                    {
+                        message = msgProp.GetString();
+                    }
+                }
+                catch { }
+
+                TempData["Success"] = message;
+            }
+
+            return RedirectToAction(nameof(CourseClassManager));
+        }
+        #endregion
+
+
         //Trang quản lý môn học
         public async Task<IActionResult> SubjectManager(string? keyword)
         {
@@ -2908,6 +3014,9 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<MonHocViewModel>());
             }
         }
+       
+
+       
 
         //Trang chi tiết môn học
         public async Task<IActionResult> SubjectDetails(int id)
@@ -3097,110 +3206,6 @@ namespace BlueSchoolSystem.Controllers
         }
 
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AutoCreateClassAndEnroll(AutoEnrollmentRequestDTO request)
-        {
-            // 1. Validate dữ liệu từ Form View (Chỉ chứa các trường CTĐT)
-            if (!ModelState.IsValid)
-            {
-                await LoadAutoEnrollmentViewBags();
-                return View(request);
-            }
-
-            // 2. Lấy danh sách Môn học bắt buộc
-            var mandatorySubjects = await _lhpService.GetMandatorySubjectsForAutoClassCreationAsync(
-                request.NganhId, request.KhoaNhapHoc, request.ThuTuHocKy);
-
-            if (!mandatorySubjects.Any())
-            {
-                TempData["Error"] = $"Không tìm thấy môn học bắt buộc nào trong CTĐT cho Ngành ID {request.NganhId}, Khóa {request.KhoaNhapHoc}, Kỳ {request.ThuTuHocKy}.";
-                return RedirectToAction(nameof(CourseClassManager));
-            }
-
-            // --- BƯỚC QUAN TRỌNG: SINH DỮ LIỆU LỊCH HỌC NGẪU NHIÊN TẠI ĐÂY ---
-            var (randomTietBatDau, randomTietKetThuc, _) = _lhpService.GetRandomScheduleSettings();
-            int randomPhongHocId = await GetRandomPhongHocId();
-
-            // 2. Gửi TOÀN BỘ ngày trong tuần để Service có thể chọn bất kỳ ngày nào
-            var fullWeekDays = new List<int> { 2, 3, 4, 5, 6, 7 };
-
-            var apiPayload = new AutoEnrollmentApiPayload
-            {
-                HocKyId = request.HocKyId,
-                NganhId = request.NganhId,
-                KhoaNhapHoc = request.KhoaNhapHoc,
-                ThuTuHocKy = request.ThuTuHocKy,
-
-                ShouldAutoCreateSchedule = true,
-
-                // Các giá trị này chỉ là "giá trị mồi" để qua mặt Validation.
-                // Service sẽ KHÔNG dùng cứng nhắc các giá trị này mà sẽ Random lại.
-                DefaultPhongHocId = randomPhongHocId,
-                TietBatDau = randomTietBatDau,
-                TietKetThuc = randomTietKetThuc,
-
-                // Quan trọng: Gửi full tuần
-                CacNgayTrongTuan = fullWeekDays,
-
-                MandatorySubjectCodes = mandatorySubjects.Select(s => s.MaMonHoc).ToList()
-            };
-
-            // 4. Gọi API
-            var (success, data, error) = await CallApiAsync("api/auto-create-enroll", HttpMethod.Post, apiPayload);
-
-            if (!success)
-            {
-                // Xử lý hiển thị lỗi chi tiết từ API
-                string errorMsg = error;
-                try
-                {
-                    if (error.Contains("API error:") && error.Contains("{"))
-                    {
-                        // Cắt chuỗi để lấy phần JSON
-                        var jsonPart = error.Substring(error.IndexOf('{'));
-                        dynamic errObj = JsonConvert.DeserializeObject(jsonPart);
-
-                        // Kiểm tra xem có property "errors" (Validation Error) không
-                        if (errObj?.errors != null)
-                        {
-                            errorMsg = "Lỗi dữ liệu: ";
-                            foreach (var err in errObj.errors)
-                            {
-                                errorMsg += $"{err.Name}: {err.Value[0]} ";
-                            }
-                        }
-                        else
-                        {
-                            errorMsg = errObj?.message ?? error;
-                        }
-                    }
-                }
-                catch { }
-
-                TempData["Error"] = errorMsg;
-
-                await LoadAutoEnrollmentViewBags();
-                return View(request);
-            }
-            else
-            {
-                string message = "Đăng ký tự động thành công.";
-                try
-                {
-                    if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("message", out var msgProp))
-                    {
-                        message = msgProp.GetString();
-                    }
-                }
-                catch { }
-
-                TempData["Success"] = message;
-            }
-
-            return RedirectToAction(nameof(CourseClassManager));
-        }
-        #endregion
 
         public async Task<IActionResult> EditSubject(int id, MonHocUpdate model)
         {
