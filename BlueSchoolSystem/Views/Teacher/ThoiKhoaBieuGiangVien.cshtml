@@ -1,0 +1,423 @@
+﻿@model IEnumerable<BlueSchoolSystem.Models.ViewModel.LichGiangDayViewModel>
+@{
+    // ... (Code khởi tạo tietStart, tietEnd, GetThu, monHocTheoThu giữ nguyên) ...
+    var tietStart = new Dictionary<int, string> {
+        {1,"06:45"},{2,"07:30"},{3,"08:15"}, {4,"09:20"},{5,"10:05"},{6,"10:50"},
+        {7,"12:30"},{8,"13:10"},{9,"14:00"}, {10,"15:05"},{11,"15:50"},{12,"16:35"},
+        {13,"18:00"},{14,"18:45"},{15,"19:30"}
+    };
+    var tietEnd = new Dictionary<int, string> {
+        {1,"07:30"},{2,"08:15"},{3,"09:00"}, {4,"10:05"},{5,"10:50"},{6,"11:35"},
+        {7,"13:15"},{8,"13:55"},{9,"14:45"}, {10,"15:50"},{11,"16:35"},{12,"17:20"},
+        {13,"18:45"},{14,"19:30"},{15,"20:15"}
+    };
+
+    int GetThu(DateTime ngayHoc)
+    {
+        return ngayHoc.DayOfWeek == DayOfWeek.Sunday ? 8 : (int)ngayHoc.DayOfWeek + 1;
+    }
+
+    var monHocTheoThu = Model.Select(x => new
+    {
+        x.MaMonHoc,
+        x.MaLopHocPhan,
+        x.TenMonHoc,
+        x.MaPhongHoc,
+        Thu = GetThu(x.Ngay),
+        StartTiet = x.TietBatDau,
+        EndTiet = x.TietBatDau + x.SoTiet - 1,
+        x.GioBatDau,
+        x.GioKetThuc,
+        x.NgayBatDau,
+        x.NgayKetThuc,
+        x.Ngay,
+    }).ToList();
+}
+<style>
+    /* CSS giữ nguyên */
+    table.tkb {
+        border-collapse: collapse;
+        width: 100%;
+        text-align: center;
+    }
+
+        table.tkb th, table.tkb td {
+            border: 1px solid #999;
+            width: 60px;
+            height: 30px;
+            padding: 0;
+            vertical-align: middle;
+            text-align: center;
+        }
+
+        table.tkb th {
+            background: #007bff;
+            color: #fff;
+        }
+
+            table.tkb th.tiet-col, table.tkb td.tiet-col {
+                background: #007bff;
+                color: #fff;
+                font-weight: bold;
+            }
+
+    .lop {
+        background: #dff0d8;
+        height: 100%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 13px;
+        font-weight: bold;
+        color: #007bff;
+        padding: 6px;
+        cursor: pointer;
+        position: relative;
+    }
+
+        .lop .tooltiptext {
+            visibility: hidden;
+            width: 220px;
+            background-color: #6c757d;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+            .lop .tooltiptext::after {
+                content: "";
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                margin-left: -5px;
+                border-width: 5px;
+                border-style: solid;
+                border-color: #6c757d transparent transparent transparent;
+            }
+
+        .lop:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+    #weekSelect, #monthSelect {
+        border-radius: 8px;
+        transition: all 0.2s ease-in-out;
+        min-width: 220px;
+        height: 42px;
+        font-size: 1rem;
+        color: #0d6efd;
+        font-weight: 500;
+        border: 1px solid #0d6efd;
+    }
+
+        #weekSelect:hover, #monthSelect:hover {
+            box-shadow: 0 0 6px rgba(13,110,253,.3);
+        }
+
+        #weekSelect option, #monthSelect option {
+            font-size: 1rem;
+            color: #0d6efd;
+            font-weight: 500;
+        }
+
+    .btn-group .btn, #weekSelect {
+        font-size: 13px;
+        padding: 4px 8px;
+    }
+
+    .btn-sm, #btnToggle, #btnCurrentWeek, #btnCurrentMonth {
+        border-radius: 8px !important;
+        height: 42px !important;
+        font-size: 1rem !important;
+        padding: 0 14px !important;
+        min-width: 100px;
+    }
+
+    .btn-outline-primary.btn-sm {
+        min-width: 100px !important;
+        padding: 0 !important;
+    }
+
+    .form-select {
+        border-radius: 8px;
+        transition: all 0.2s ease-in-out;
+        min-width: 300px;
+        height: 42px;
+        font-size: 1rem;
+    }
+
+        .form-select:hover {
+            box-shadow: 0 0 6px rgba(13,110,253,.3);
+        }
+
+</style>
+
+@{
+    var today = DateTime.Today;
+    var baseMon = today.AddDays(-(int)today.DayOfWeek + 1);
+    if (baseMon.DayOfWeek == DayOfWeek.Sunday) baseMon = baseMon.AddDays(-6);
+
+    // Lấy viewMode từ ViewBag. Controller đã truyền vào.
+    string viewMode = ViewBag.ViewMode as string ?? "week";
+    int curOffset = (int)(ViewBag.WeekOffset ?? 0);
+
+    var monday = baseMon.AddDays(7 * curOffset);
+    var weekDays = Enumerable.Range(0, 7).Select(i => monday.AddDays(i)).ToList();
+    var startOfWeek = weekDays.First().Date;
+    var endOfWeek = weekDays.Last().Date;
+
+    var monHocTrongTuan = monHocTheoThu
+        .Where(x => x.Ngay.Date >= startOfWeek && x.Ngay.Date <= endOfWeek)
+        .ToList();
+
+    int monthOffset = ViewBag.MonthOffset != null ? (int)ViewBag.MonthOffset : 0;
+    var monthDate = new DateTime(today.Year, today.Month, 1).AddMonths(monthOffset);
+    int month = monthDate.Month;
+    int year = monthDate.Year;
+    int daysInMonth = DateTime.DaysInMonth(year, month);
+
+    var monHocTrongThang = Model
+        .Where(x => x.Ngay.Month == month && x.Ngay.Year == year)
+        .ToList();
+
+    int selectedMonth = ViewBag.Thang != null ? (int)ViewBag.Thang : month;
+}
+
+<h6 class="mb-3">Trang chủ / Học vụ / Thời khóa biểu</h6>
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <button id="btnToggle" class="btn btn-secondary btn-sm" onclick="toggleView()">
+        @((viewMode == "week") ? "Xem lịch tháng" : "Xem lịch tuần")
+    </button>
+    <button class="btn btn-outline-primary btn-sm" onclick="navigate('prev')">←</button>
+
+    <select id="weekSelect" onchange="goToSelectedWeek(this.value)" class="form-select" style="width:220px; @(viewMode == "week" ? "display:inline-block;" : "display:none;")">
+        @for (int i = -4; i <= 4; i++)
+        {
+            int optOffset = curOffset + i;
+            var optMon = monday.AddDays(7 * i);
+            var optSun = optMon.AddDays(6);
+            bool isSel = optOffset == curOffset;
+            <option value="@optOffset" selected="@(isSel ? "selected" : null)">
+                Tuần : @optMon.ToString("dd/MM/yyyy") - @optSun.ToString("dd/MM/yyyy")
+            </option>
+        }
+    </select>
+
+    <select id="monthSelect" onchange="goToMonth(this.value)" class="form-select" style="width: 160px; @(viewMode == "month" ? "display:inline-block;" : "display:none;")">
+        @for (int m = 1; m <= 12; m++)
+        {
+            if (m == selectedMonth)
+            {
+                <option value="@m" selected>Tháng @m</option>
+            }
+            else
+            {
+                <option value="@m">Tháng @m</option>
+            }
+        }
+    </select>
+
+    <button class="btn btn-outline-primary btn-sm" onclick="navigate('next')">→</button>
+
+    <button id="btnCurrentWeek" class="btn btn-primary btn-sm" onclick="goToCurrentWeek()" style="@(viewMode == "week" ? "display:inline-block;" : "display:none;")">Tuần hiện tại</button>
+
+    <button id="btnCurrentMonth" class="btn btn-primary btn-sm" onclick="goToCurrentMonth()" style="@(viewMode == "month" ? "display:inline-block;" : "display:none;")">Tháng hiện tại</button>
+</div>
+
+<div id="lichTuan" style="@(viewMode == "week" ? "display:block;" : "display:none;")">
+    <table class="tkb">
+        <thead>
+            <tr>
+                <th class="tiet-col" style="width:60px; vertical-align: middle;" rowspan="2">Tiết</th>
+                @for (int i = 0; i < weekDays.Count; i++)
+                {
+                    <th>
+                        <div style="display:flex; flex-direction:column; align-items:center;">
+                            <span>@((i + 2 > 7) ? "Chủ nhật" : "Thứ " + (i + 2))</span>
+                            <span>@weekDays[i].ToString("dd/MM/yyyy")</span>
+                        </div>
+                    </th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @for (int tiet = 1; tiet <= 15; tiet++)
+            {
+                <tr>
+                    <td class="tiet-col" title="Tiết @tiet (từ @tietStart[tiet] đến @tietEnd[tiet])">Tiết @tiet</td>
+                    @for (int thu = 2; thu <= 8; thu++)
+                    {
+                        var ngayHoc = weekDays[thu - 2];
+                        var lop = monHocTrongTuan.FirstOrDefault(x =>
+                        x.Thu == thu &&
+                        x.StartTiet <= tiet &&
+                        x.EndTiet >= tiet &&
+                        x.Ngay.Date == ngayHoc.Date);
+
+                        if (lop != null && lop.StartTiet == tiet)
+                        {
+                            var soTiet = lop.EndTiet - lop.StartTiet + 1;
+                            <td rowspan="@soTiet">
+                                <div class="lop">
+                                    @lop.TenMonHoc<br>
+                                    Phòng: @lop.MaPhongHoc
+                                    <span class="tooltiptext">
+                                        <b>Mã lớp HP: </b> @lop.MaLopHocPhan <br />
+                                        <b>Mã môn:</b> @lop.MaMonHoc <br />
+                                        <b>Tên môn:</b> @lop.TenMonHoc <br />
+                                        <b>Phòng:</b> @lop.MaPhongHoc <br />
+                                        <b>Thứ:</b> @lop.Thu <br />
+                                        <b>Thời gian:</b> @lop.GioBatDau - @lop.GioKetThuc <br />
+                                    </span>
+                                </div>
+                            </td>
+                        }
+                        else if (lop == null)
+                        {
+                            var lopDangChiem = monHocTrongTuan.Any(x =>
+                            x.Thu == thu &&
+                            x.StartTiet < tiet &&
+                            x.EndTiet >= tiet &&
+                            x.Ngay.Date == ngayHoc.Date);
+
+                            if (!lopDangChiem)
+                            {
+                                <td></td>
+                            }
+                        }
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+
+<div id="lichThang" style="@(viewMode == "month" ? "display:block;" : "display:none;")">
+    <table class="tkb">
+        <thead>
+            <tr>
+                <th>Thứ 2</th>
+                <th>Thứ 3</th>
+                <th>Thứ 4</th>
+                <th>Thứ 5</th>
+                <th>Thứ 6</th>
+                <th>Thứ 7</th>
+                <th>CN</th>
+            </tr>
+        </thead>
+        <tbody>
+            @{
+                var firstDay = new DateTime(year, month, 1);
+                int diff = ((int)firstDay.DayOfWeek + 6) % 7;
+                var startOfMonthGrid = firstDay.AddDays(-diff);
+                int totalDays = diff + daysInMonth;
+                int totalWeeks = (int)Math.Ceiling(totalDays / 7.0);
+
+                for (int week = 0; week < totalWeeks; week++)
+                {
+                    <tr>
+                        @for (int day = 0; day < 7; day++)
+                        {
+                            var currentDay = startOfMonthGrid.AddDays(week * 7 + day);
+                            var isOtherMonth = currentDay.Month != month;
+                            <td style="height:100px; vertical-align:top; font-size:12px; @(isOtherMonth ? "background:#f8f9fa;" : "")">
+                                <div><b>@currentDay.Day</b></div>
+                                @foreach (var lop in monHocTrongThang)
+                                {
+                                    if (lop.Ngay.Date == currentDay.Date)
+                                    {
+                                        <div style="background:#dff0d8; margin:2px; padding:2px; border-radius:4px; font-size:11px;">
+                                            @lop.TenMonHoc <br />
+                                            P.@lop.MaPhongHoc
+                                        </div>
+                                    }
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // Lấy giá trị từ URL, đảm bảo viewMode được đồng bộ
+    const urlParams = new URLSearchParams(window.location.search);
+    // Lấy giá trị hiện tại từ URL (để sử dụng trong navigate)
+    let weekOffset = parseInt(urlParams.get("weekOffset") || 0);
+    let monthOffset = parseInt(urlParams.get("monthOffset") || 0);
+    // Lấy viewMode từ URL (hoặc mặc định là "week")
+    let viewMode = urlParams.get("viewMode") || "week";
+
+    // Hàm chuyển về tuần hiện tại
+    function goToCurrentWeek() {
+        // Giữ lại monthOffset (mặc dù không quan trọng khi viewMode=week)
+        window.location.href = `?weekOffset=0&monthOffset=${monthOffset}&viewMode=week`;
+    }
+
+    // Hàm chọn tuần từ dropdown
+    function goToSelectedWeek(selectedOffset) {
+        const newWeekOffset = parseInt(selectedOffset);
+        window.location.href = `?weekOffset=${newWeekOffset}&monthOffset=${monthOffset}&viewMode=week`;
+    }
+
+    // Lấy tháng hiện tại đang hiển thị từ C#
+    const currentDisplayedMonth = @month;
+
+    // Hàm chọn tháng từ dropdown
+    function goToMonth(selectedMonth) {
+        const m = parseInt(selectedMonth, 10);
+        // Tính delta monthOffset để chuyển đến tháng m của năm hiện tại trong view
+        const delta = m - currentDisplayedMonth;
+        const newMonthOffset = monthOffset + delta;
+        window.location.href = `?weekOffset=${weekOffset}&monthOffset=${newMonthOffset}&viewMode=month`;
+    }
+
+    // Hàm chuyển về tháng hiện tại
+    function goToCurrentMonth() {
+        window.location.href = `?weekOffset=${weekOffset}&monthOffset=0&viewMode=month`;
+    }
+
+    // Hàm chuyển đổi chế độ xem
+    function toggleView() {
+        // Chuyển viewMode: week -> month, hoặc month -> week
+        const newViewMode = viewMode === "week" ? "month" : "week";
+        // Chuyển hướng để Controller và Razor render lại giao diện đúng chế độ
+        window.location.href = `?weekOffset=${weekOffset}&monthOffset=${monthOffset}&viewMode=${newViewMode}`;
+    }
+
+    // Hàm điều hướng (trước/sau)
+    function navigate(action) {
+        if (viewMode === "week") {
+            if (action === "prev") weekOffset--;
+            if (action === "next") weekOffset++;
+        } else { // viewMode === "month"
+            if (action === "prev") monthOffset--;
+            if (action === "next") monthOffset++;
+        }
+        // Chuyển hướng với offset mới
+        window.location.href = `?weekOffset=${weekOffset}&monthOffset=${monthOffset}&viewMode=${viewMode}`;
+    }
+
+
+    // Giữ lại event listener cho dropdown tuần
+    document.getElementById('weekSelect').addEventListener('change', function(e) {
+        goToSelectedWeek(e.target.value);
+    });
+
+</script>

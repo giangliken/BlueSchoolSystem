@@ -31,10 +31,93 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Trang xem lịch giảng dạy
-        public async Task<IActionResult> LichGiangDay()
+        [Authorize(Roles = "Teacher")]
+        [HttpGet]
+        public async Task<IActionResult> LichGiangDay(
+            string maGV,
+            int weekOffset = 0,
+            int monthOffset = 0,
+            string viewMode = "week")
         {
-            return View();
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri("https://localhost:5001/");
+
+                // 🔥 Lấy token từ session
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+
+                // 🔥 Nếu maGV không truyền → lấy từ Claims
+                maGV ??= User.Identity?.Name;
+
+                if (string.IsNullOrEmpty(maGV))
+                {
+                    ViewBag.Error = "Không xác định được mã giảng viên.";
+                    return View(new List<LichGiangDayViewModel>());
+                }
+
+                // 🔥 Call API
+                var response = await client.GetAsync($"api/lichgiangday/{maGV}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    ViewBag.Error = $"Không thể lấy dữ liệu lịch giảng dạy. Mã lỗi: {response.StatusCode}";
+                    return View(new List<LichGiangDayViewModel>());
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                // Parse JSON gốc
+                using var doc = JsonDocument.Parse(json);
+
+                if (!doc.RootElement.TryGetProperty("data", out var dataEle))
+                {
+                    ViewBag.Error = "Phản hồi API không chứa trường 'data'.";
+                    return View(new List<LichGiangDayViewModel>());
+                }
+
+                // 🔥 Deserialize về model mới
+                var lich = System.Text.Json.JsonSerializer.Deserialize<List<LichGiangDayViewModel>>(
+                    dataEle.GetRawText(),
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                // ---------- Logic tính tuần & tháng ----------
+                var today = DateTime.Today;
+
+                // Lấy thứ 2 của tuần hiện tại
+                var monday = today.AddDays(-(int)today.DayOfWeek + 1);
+                if (monday.DayOfWeek == DayOfWeek.Sunday)
+                    monday = monday.AddDays(-6);
+
+                monday = monday.AddDays(7 * weekOffset);
+
+                var monthDate = new DateTime(today.Year, today.Month, 1)
+                    .AddMonths(monthOffset);
+
+                // Gửi xuống View
+                ViewBag.WeekStart = monday;
+                ViewBag.MonthStart = monthDate;
+                ViewBag.WeekOffset = weekOffset;
+                ViewBag.MonthOffset = monthOffset;
+                ViewBag.ViewMode = viewMode;
+                ViewBag.MaGV = maGV;
+
+                return View("ThoiKhoaBieuGiangVien", lich);
+            }
+            catch (Exception)
+            {
+                ViewBag.Error = "Đã xảy ra lỗi khi tải lịch giảng dạy.";
+                return View(new List<LichGiangDayViewModel>());
+            }
         }
+
+
 
         //Trang xem lớp phụ trách
         [Authorize(Roles = "Teacher")]
