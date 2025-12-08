@@ -465,6 +465,7 @@ namespace BlueSchoolSystem.APIControllers
                                                      where ct.LopHocPhanId == lhp.Id
                                                      select new
                                                      {
+                                                         sv.Id,
                                                          sv.MSSV,
                                                          sv.HoVaTenDem,
                                                          sv.Ten,
