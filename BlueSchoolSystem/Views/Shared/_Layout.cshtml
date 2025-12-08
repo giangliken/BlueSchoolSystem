@@ -143,7 +143,7 @@
                     </li>
                     <li>
                         <a href="/Teacher/LichGiangDay" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/LichGiangDay") ? "active text-white bg-primary" : "text-white")">
-                            <i class="fas fa-home me-2"></i> Lịch giảng dạy
+                            <i class="fa-solid fa-calendar-days me-2"></i> Lịch giảng dạy
                         </a>
                     </li>
                     <li>
@@ -156,21 +156,21 @@
                             <i class="fa-solid fa-users-rectangle me-2"></i>Lớp học phần
                         </a>
                     </li>
-                    <li>
+                    @* <li>
                         <a href="/Teacher/DiemDanh" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/DiemDanh") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-clipboard-user me-2"></i>Điểm danh
                         </a>
-                    </li>
+                    </li> *@
                     <li>
                         <a href="/Teacher/XemDiem" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/XemDiem") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-calendar-check me-2"></i>Nhập điểm
                         </a>
                     </li>
-                    <li>
+                    @* <li>
                         <a href="/Teacher/ActivityLogs" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/ActivityLogs") ? "active text-white bg-primary" : "text-white")">
                             <i class="fas fa-clipboard-list me-2"></i>Nhật ký giảng viên
                         </a>
-                    </li>
+                    </li> *@
                     <li>
                         <a href="/Identity/Account/Manage" class="nav-link @(Context.Request.Path.StartsWithSegments("/Identity/Account/Manage") ? "active text-white bg-primary" : "text-white")">
                             <i class="fas fa-user-gear me-2"></i>Hồ sơ cá nhân

@@ -31,6 +31,11 @@
     <button class="btn btn-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#modalGroupChat">
         <i class="fa-solid fa-comments me-2"></i> Chat nhóm
     </button>
+    <button type="button" class="btn btn-success fw-semibold me-2"
+            data-bs-toggle="modal" data-bs-target="#modalDiemQuaTrinh">
+        <i class="fa-solid fa-chart-line me-1"></i> Điểm quá trình
+    </button>
+
 </div>
 
 
@@ -53,6 +58,90 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalDiemQuaTrinh" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-chart-line me-2"></i> Điểm quá trình - @lhp?.TenMonHoc
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover mb-0 align-middle text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th>STT</th>
+                                <th>MSSV</th>
+                                <th>Họ và tên</th>
+
+                                @* Tạo cột B1, B2, B3,... *@
+                                @{
+                                    int soBuoi = attendanceList.Count;
+                                    for (int i = 1; i <= soBuoi; i++)
+                                    {
+                                        <th>Buổi @i</th>
+                                    }
+                                }
+
+                                <th class="bg-success text-white">Tổng điểm</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @for (int i = 0; i < sinhVienList.Count; i++)
+                            {
+                                var sv = sinhVienList[i];
+                                double diem = 10;
+
+                                <tr>
+                                    <td>@(i + 1)</td>
+                                    <td>@sv.MSSV</td>
+                                    <td>@(sv.HoVaTenDem + " " + sv.Ten)</td>
+
+                                    @* Vòng lặp theo từng buổi *@
+                                    @{
+                                        foreach (var buoi in attendanceList.OrderBy(x => x.Ngay))
+                                        {
+                                            var diemDanh = buoi.DanhSachSinhVien?.FirstOrDefault(x => x.SinhVienId == sv.Id);
+
+                                            // Mapping trạng thái thực tế sang hiển thị và trừ điểm
+                                            var status = diemDanh?.TrangThai ?? "Vắng mặt";
+                                            string display = "";
+                                            switch (status)
+                                            {
+                                                case "Có mặt":
+                                                    display = "<i class='fa-solid fa-check text-success'></i>";
+                                                    break;
+                                                case "Đi trễ":
+                                                    diem -= 0.5;
+                                                    display = "-0.5";
+                                                    break;
+                                                default:
+                                                    diem -= 1;
+                                                    display = "-1";
+                                                    break;
+                                            }
+
+                                            <td>@Html.Raw(display)</td>
+                                        }
+                                    }
+
+                                    <td class="fw-bold text-primary">@diem.ToString("0.0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
 
 @if (lhp == null)
 {
