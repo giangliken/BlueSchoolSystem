@@ -1,0 +1,67 @@
+﻿@model BlueSchoolSystem.Models.NganhHoc
+@{
+    var allSubjects = ViewBag.AllSubjects as List<MonHoc> ?? new List<MonHoc>();
+    string keyword = ViewBag.Keyword as string ?? "";
+    ViewData["Title"] = "Gán môn học cho ngành";
+}
+
+<h2 class="mb-4 fw-bold" style="position: relative; padding-left: 16px;">
+    <span style="position: absolute; left: 0; top: 0; bottom: 0;
+                 width: 6px; background: var(--bs-primary); border-radius: 4px;"></span>
+    Gán môn học cho ngành @Model.TenNganh - @Model.MaNganh
+</h2>
+
+<!-- Form lọc -->
+<form method="get" asp-action="AssignMonHoc" class="row g-2 mb-4">
+    <input type="hidden" name="id" value="@Model.Id" />
+    <div class="col-md-6 col-lg-4">
+        <input type="text" name="keyword" class="form-control" value="@keyword" placeholder="Tìm tên môn hoặc mã môn..." />
+    </div>
+    <div class="col-md-6 col-lg-4 d-flex gap-2">
+        <button type="submit" class="btn btn-info">
+            <i class="fa-solid fa-magnifying-glass me-1"></i> Lọc
+        </button>
+        <a asp-action="AssignMonHoc" asp-route-id="@Model.Id" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate-left me-1"></i> Xóa lọc
+        </a>
+    </div>
+</form>
+
+<form asp-action="AssignMonHoc" method="post">
+    <input type="hidden" name="id" value="@Model.Id" />
+
+    <div class="card p-4 shadow-sm mb-4">
+        <h5 class="fw-bold mb-3">Danh sách môn học</h5>
+
+        @foreach (var mh in allSubjects)
+        {
+            bool isChecked = Model.MonHocs.Any(x => x.Id == mh.Id);
+
+            <div class="form-check">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="selectedSubjects"
+                       value="@mh.Id"
+                       @(isChecked ? "checked" : "") />
+                <label class="form-check-label">
+                    @mh.TenMonHoc (@mh.MaMonHoc) - @mh.SoTinChi tín chỉ
+                </label>
+            </div>
+        }
+
+        @if (!allSubjects.Any())
+        {
+            <p class="text-muted fst-italic">Không tìm thấy môn học nào phù hợp.</p>
+        }
+    </div>
+
+    <div class="d-flex justify-content-between mt-4 mb-4">
+        <a asp-action="MajorDetails" asp-route-id="@Model.Id" class="btn btn-secondary">
+            <i class="fa-solid fa-arrow-left me-2"></i> Quay lại
+        </a>
+
+        <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-check me-2"></i> Lưu gán môn
+        </button>
+    </div>
+</form>

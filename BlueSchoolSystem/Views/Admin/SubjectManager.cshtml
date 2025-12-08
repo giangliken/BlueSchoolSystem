@@ -1,0 +1,166 @@
+﻿@model IEnumerable<BlueSchoolSystem.Models.ViewModel.MonHocViewModel>
+
+@{
+    ViewData["Title"] = "SubjectManager";
+}
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<form method="get" asp-action="SubjectManager" class="row g-2 mb-4">
+    <div class="col-md-6 col-lg-4">
+        <input type="text" name="keyword" class="form-control"
+               value="@ViewBag.Keyword" placeholder="Tìm mã môn hoặc tên môn..." />
+    </div>
+
+    <div class="col-md-6 col-lg-4 d-flex gap-2">
+        <button type="submit" class="btn btn-info">
+            <i class="fa-solid fa-magnifying-glass me-1"></i> Lọc
+        </button>
+
+        <a asp-action="SubjectManager" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate-left me-1"></i> Xóa lọc
+        </a>
+    </div>
+</form>
+
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <a href="@Url.Action("AddSubject", "Admin")" class="btn btn-primary">
+        <i class="fa-solid fa-plus"></i> Thêm môn học
+    </a>
+</div>
+
+<div class="mb-2"><b>Tổng số:</b> @ViewBag.Tong môn học</div>
+
+<table class="table table-hover table-striped table-bordered">
+    <thead class="table-dark">
+        <tr>
+            <th class="text-center">STT</th>
+            <th class="text-center">Mã môn</th>
+            <th class="text-center">Tên môn</th>
+            <th class="text-center">Số tín chỉ</th>
+            <th class="text-center" style="width: 150px;">Hành động</th>
+
+        </tr>
+    </thead>
+    <tbody>
+        @{
+            var i = 1;
+            foreach (var item in Model)
+            {
+                <tr onclick="window.location='@Url.Action("SubjectDetails", "Admin", new { id = item.Id })'"
+                    style="cursor:pointer">
+                    <td class="text-center">@i</td>
+                    <td>@item.MaMonHoc</td>
+                    <td>@item.TenMonHoc</td>
+                    <td class="text-center">@item.SoTinChi</td>
+                    <td class="text-center">
+
+                        <div class="d-flex justify-content-center align-items-center gap-2">
+
+                            <!-- Nút sửa -->
+                            <a href="@Url.Action("EditSubject", "Admin", new { id = item.Id })"
+                               class="btn btn-sm btn-warning"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="top"
+                               title="Sửa môn học"
+                               onclick="event.stopPropagation()">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </a>
+
+                            <!-- Nút xóa -->
+                            <form asp-action="DeleteSubject"
+                                  method="post"
+                                  class="d-inline"
+                                  onsubmit="event.stopPropagation(); return confirm('Bạn chắc chắn muốn xóa môn này?');">
+
+                                <input type="hidden" name="id" value="@item.Id" />
+
+                                <button type="submit"
+                                        class="btn btn-sm btn-danger"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Xóa môn học">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+
+                            <!-- Nút gán ngành -->
+                            <a href="@Url.Action("AssignNganh", "Admin", new { id = item.Id })"
+                               class="btn btn-sm btn-primary"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="top"
+                               title="Gán ngành"
+                               onclick="event.stopPropagation()">
+                                <i class="fa-solid fa-layer-group"></i>
+                            </a>
+
+                            <!--Nút gán giảng viên -->
+                            <a href="@Url.Action("AssignGiangVien", "Admin", new { id = item.Id })"
+                               class="btn btn-sm btn-info text-white"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="top"
+                               title="Gán giảng viên"
+                               onclick="event.stopPropagation()">
+                                <i class="fa-solid fa-person-chalkboard"></i>
+                            </a>
+                        </div>
+
+                    </td>
+
+
+
+                </tr>
+                i++;
+            }
+        }
+    </tbody>
+</table>
+
+<p><i>*Nếu thông tin môn học sai, vui lòng liên hệ quản trị viên.</i></p>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <script>
+        // Export Excel
+        document.getElementById('btnExportExcel').onclick = function () {
+            var wb = XLSX.utils.table_to_book(document.querySelector('table'));
+            XLSX.writeFile(wb, "DanhSachMonHoc.xlsx");
+        };
+
+        // Export CSV
+        document.getElementById('btnExportCSV').onclick = function () {
+            var ws = XLSX.utils.table_to_sheet(document.querySelector('table'));
+            var csv = XLSX.utils.sheet_to_csv(ws);
+            var blob = new Blob([csv], { type: 'text/csv' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = "DanhSachMonHoc.csv";
+            a.click();
+        };
+    </script>
+
+    <script>
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    </script>
+
+}

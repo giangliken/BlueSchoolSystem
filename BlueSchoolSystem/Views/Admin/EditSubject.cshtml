@@ -1,0 +1,48 @@
+﻿@model BlueSchoolSystem.Models.ViewModel.MonHocUpdate
+
+<h2 class="mb-4 fw-bold" style="position: relative; padding-left: 16px;">
+    <span style="position: absolute; left: 0; top: 0; bottom: 0;
+                 width: 6px; background: var(--bs-primary); border-radius: 4px;"></span>
+    Sửa môn học
+</h2>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<form asp-action="EditSubject" method="post" class="card p-4 shadow-sm">
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">Mã môn học</label>
+        <input asp-for="MaMonHoc" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">Tên môn học</label>
+        <input asp-for="TenMonHoc" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">Số tín chỉ</label>
+        <input asp-for="SoTinChi" type="number" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">Mô tả</label>
+        <textarea asp-for="MoTa" class="form-control" rows="3"></textarea>
+    </div>
+
+    <div class="d-flex justify-content-between">
+        <a class="btn btn-secondary" href="@Url.Action("SubjectDetails", "Admin", new { id = ViewContext.RouteData.Values["id"] })">
+            <i class="fa-solid fa-arrow-left me-2"></i> Quay lại
+        </a>
+
+        <button type="submit" class="btn btn-warning">
+            <i class="fa-solid fa-pen-to-square me-2"></i> Lưu thay đổi
+        </button>
+    </div>
+</form>

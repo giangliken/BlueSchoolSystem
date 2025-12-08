@@ -67,11 +67,23 @@
 
                     </li>
                     <li>
+                        <a href="/Admin/MajorManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/MajorManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-graduation-cap me-2"></i>Ngành học
+                        </a>
+
+                    </li>
+                    <li>
                         <a href="/Admin/FacultyManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/FacultyManager") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-building-columns me-2"></i>Khoa/Viện
                         </a>
 
                     </li>
+                    <li>
+                        <a href="/Admin/SubjectManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/SubjectManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-book me-2"></i>Môn học
+                        </a>
+                    </li>
+
 
                     <li>
                         <a href="/Admin/SemesterManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/SemesterManager") ? "active text-white bg-primary" : "text-white")">
@@ -91,13 +103,21 @@
                         </a>
 
                     </li>
+                    <li>
+                        <a href="/Admin/FacilityManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/FacilityManager") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-calendar-day me-2"></i>Cơ sở
+
+                        </a>
+
+                    </li>
+
                     @* <li>
                         <a href="/Admin/StudentManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/StudentManager") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-users me-2"></i>Tài khoản người dùng
                         </a>
 
                     </li> *@
-                    
+
                     <li>
                         <a href="/Admin/ActivityLogs" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/ActivityLogs") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-clock-rotate-left me-2"></i>Nhật ký hệ thống
@@ -119,6 +139,11 @@
                     <li>
                         <a href="/Teacher/index" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/index") ? "active text-white bg-primary" : "text-white")">
                             <i class="fas fa-home me-2"></i> Trang chủ
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Teacher/LichGiangDay" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/LichGiangDay") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fas fa-home me-2"></i> Lịch giảng dạy
                         </a>
                     </li>
                     <li>
@@ -153,7 +178,8 @@
                     </li>
                 </ul>
             </div>
-        } else if(User.Identity.IsAuthenticated && (User.IsInRole("Student")))
+        }
+        else if (User.Identity.IsAuthenticated && (User.IsInRole("Student")))
         {
             <div class="sidebar d-flex flex-column p-3 text-bg-dark" style="width: 300px;">
                 <a href="" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
@@ -228,7 +254,7 @@
                         </a>
 
                     </li>
-                    
+
                     <!-- Học phí -->
                     <li class="mb-1">
                         <a href="/Home/HocPhi" class="nav-link @(Context.Request.Path.StartsWithSegments("/Home/HocPhi") ? "active text-white bg-primary" : "text-white")">
@@ -253,8 +279,8 @@
                             <i class="fas fa-chevron-down small"></i>
                         </a> *@
                         <a class="nav-link text-white d-flex justify-content-between align-items-center"
-                           data-bs-toggle="collapse" 
-                           href="#bieumaunopdon" 
+                           data-bs-toggle="collapse"
+                           href="#bieumaunopdon"
                            role="button"
                            aria-expanded="@(isTroGiupActive.ToString().ToLower())"
                            aria-controls="bieumaunopdon">
@@ -284,8 +310,8 @@
                     }
                     <li>
                         <a class="nav-link text-white d-flex justify-content-between align-items-center"
-                           data-bs-toggle="collapse" 
-                           href="#hoidapMenu" 
+                           data-bs-toggle="collapse"
+                           href="#hoidapMenu"
                            role="button"
                            aria-expanded="@(isHoiDapActive.ToString().ToLower())"
                            aria-controls="hoidapMenu">
@@ -314,8 +340,8 @@
                     }
                     <li>
                         <a class="nav-link text-white d-flex justify-content-between align-items-center"
-                           data-bs-toggle="collapse" 
-                           href="#danhgiaMenu" 
+                           data-bs-toggle="collapse"
+                           href="#danhgiaMenu"
                            role="button"
                            aria-expanded="@(isDanhGiaActive.ToString().ToLower())"
                            aria-controls="danhgiaMenu">
@@ -359,7 +385,7 @@
                             </ul>
                         </div>
                     </li>
-                    
+
                     <!-- Khảo sát -->
                     <li>
                         <a class="nav-link text-white d-flex justify-content-between align-items-center"

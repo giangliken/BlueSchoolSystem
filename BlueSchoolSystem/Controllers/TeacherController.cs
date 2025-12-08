@@ -30,6 +30,85 @@ namespace BlueSchoolSystem.Controllers
             return View();
         }
 
+        //Trang xem lịch giảng dạy
+        public async Task<IActionResult> LichGiangDay()
+        {
+            return View();
+        }
+
+        //Trang xem lớp phụ trách
+        [Authorize(Roles = "Teacher")]
+        public async Task<IActionResult> LopPhuTrach()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // Gọi API lấy danh sách lớp phụ trách (API đã sửa ở bước trước)
+            var response = await client.GetAsync("api/laydanhsachlopphutrach");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không thể lấy danh sách lớp phụ trách.";
+                return View(new List<LopPhuTrachViewModel>());
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            dynamic result = JsonConvert.DeserializeObject(body);
+
+            // Deserialize dữ liệu JSON thành List ViewModel
+            var listLop = JsonConvert.DeserializeObject<List<LopPhuTrachViewModel>>(result.data.ToString());
+
+            return View(listLop);
+        }
+
+        // 2. Xem chi tiết danh sách sinh viên của một lớp phụ trách
+        [Authorize(Roles = "Teacher")]
+        public async Task<IActionResult> LopPhuTrachDetails(int lopHocId, string tenLop)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri("https://localhost:5001/");
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // Giả định bạn có API lấy DSSV theo LopHocId: api/lophoc/{id}/sinhvien
+            // Nếu chưa có, bạn cần viết thêm API này bên Backend
+            var response = await client.GetAsync($"api/lophoc/{lopHocId}/chitiet");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Không thể lấy danh sách sinh viên.";
+                return RedirectToAction(nameof(LopPhuTrach));
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            dynamic result = JsonConvert.DeserializeObject(body);
+
+            // Mapping dữ liệu
+            var model = new LopPhuTrachDetailViewModel
+            {
+                LopHocId = lopHocId,
+                TenLop = tenLop, // Lấy tạm từ tham số truyền vào hoặc parse từ API result
+                // Giả sử API trả về object có property 'sinhViens'
+                DanhSachSinhVien = JsonConvert.DeserializeObject<List<SinhVienViewModel>>(result.data.sinhViens.ToString())
+                                   ?? new List<SinhVienViewModel>()
+            };
+
+            // Nếu API trả về cả thông tin lớp trong data, hãy map lại cho chính xác:
+            if (result.data.info != null)
+            {
+                model.MaLop = result.data.info.maLop;
+                model.TenLop = result.data.info.tenLop;
+            }
+
+            return View(model);
+        }
+
         //Xem danh sách lớp học phần của giảng viên
         [Authorize(Roles = "Teacher")]
         public async Task<IActionResult> LopHocPhan(int? selectedHocKyId)
