@@ -6,12 +6,19 @@
 }
 
 <div class="container mt-4">
-
     <a asp-action="CourseClassManager" class="btn btn-secondary mb-3">
         <i class="fa fa-arrow-left"></i> Quay lại danh sách
     </a>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="fw-bold mb-0">Thông tin lớp học phần: @Model.MaLopHocPhan</h3>
 
-    <h3 class="fw-bold mb-3">Thông tin lớp học phần: @Model.MaLopHocPhan</h3>
+        <a asp-action="StudentInCourseClass" asp-route-lhpId="@Model.Id"
+           class="btn btn-success shadow-sm"
+           title="Xem danh sách sinh viên trong lớp">
+            <i class="fa fa-users"></i> Danh sách SV
+        </a>
+    </div>
+
     <hr />
 
     <div class="row">
@@ -77,10 +84,12 @@
 
         @* Nút 2: Thêm lịch học tự động *@
         <a asp-action="AutoAddSchedule" asp-route-lhpId="@Model.Id"
-           class="btn btn-primary shadow-sm"
+           class="btn btn-primary me-2 shadow-sm"
            title="Tự động tạo lịch học theo tuần">
             <i class="fa fa-clock"></i> Lịch tự động
         </a>
+
+
     </div>
     @* ======================================================= *@
 

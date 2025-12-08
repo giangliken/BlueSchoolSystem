@@ -1,61 +1,216 @@
-﻿@model IEnumerable<BlueSchoolSystem.Models.DotDangKy>
+﻿@model BlueSchoolSystem.Models.ViewModel.QuanLyDangKyLHPRequestDTO
+
+@using System.Dynamic
+@using System.Collections.Generic
+@using Microsoft.AspNetCore.Mvc.Rendering
+@using System 
+
 @{
-    ViewData["Title"] = "Danh Sách Đợt Đăng Ký";
+    ViewData["Title"] = "Mở Cổng Đăng Ký Học Phần";
+
+    // Lấy dữ liệu từ ViewBag
     var hocKyList = ViewBag.HocKyList as SelectList;
-    int selectedHocKyId = ViewBag.HocKyId ?? 0;
+    var selectedHocKyId = ViewBag.SelectedHocKyId ?? 0;
+    var lhpList = ViewBag.LhpList as List<ExpandoObject>;
+
+    // LẤY VÀ XỬ LÝ NGÀY MẶC ĐỊNH NGAY TẠI ĐÂY (SỬ DỤNG VIEW BAG ĐÃ CÓ CHUỖI ISO CHUẨN)
+    // Controller đã được sửa để gán chuỗi ISO vào ViewBag.DefaultNgayBatDau
+    string defaultStartISO = ViewBag.DefaultNgayBatDau as string ?? "";
+    string defaultEndISO = ViewBag.DefaultNgayKetThuc as string ?? "";
 }
 
-<h2>@ViewData["Title"]</h2>
+<link href="https://cdn.datatables.net/v/bs5/dt-1.13.8/datatables.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
-<div class="mb-3">
-    <label>Chọn Học kỳ:</label>
-    <select id="hocKySelect" class="form-select w-auto d-inline-block">
-        @foreach (var hk in hocKyList)
-        {
-            var isSelected = hk.Value == selectedHocKyId.ToString();
-            <option value="@hk.Value" selected="@(isSelected ? "selected" : null)">
-                @hk.Text
-            </option>
-        }
-    </select>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">
+        <i class="fa fa-calendar-alt me-2"></i> @ViewData["Title"]
+    </h2>
 
-    <button id="createDotBtn" class="btn btn-success ms-2">+ Tạo đợt mới</button>
+    <a asp-action="CourseClassManager" asp-controller="Admin" class="btn btn-outline-secondary">
+        <i class="fa fa-arrow-left me-1"></i> Quay lại
+    </a>
 </div>
-<script>
-    const hocKySelect = document.getElementById('hocKySelect');
-    const createBtn = document.getElementById('createDotBtn');
 
-    function updateCreateBtn() {
-        createBtn.disabled = (hocKySelect.value == 0);
+@* --- 1. CHỌN HỌC KỲ --- *@
+<div class="card mb-4 shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h5><i class="fa fa-bookmark me-2"></i> 1. Chọn Học Kỳ</h5>
+    </div>
+    <div class="card-body">
+        <label for="hocKySelect" class="form-label">Học Kỳ:</label>
+        <select id="hocKySelect"
+                class="form-select w-auto d-inline-block select-searchable"
+                onchange="window.location.href = '@Url.Action("RegistrationPeriods")?hocKyId=' + this.value;">
+            <option value="0">-- Chọn Học Kỳ --</option>
+            @foreach (var hk in hocKyList)
+            {
+                var isSelected = hk.Value == selectedHocKyId.ToString();
+                <option value="@hk.Value" selected="@(isSelected ? "selected" : null)">
+                    @hk.Text
+                </option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (selectedHocKyId > 0)
+{
+    // Hiển thị thông báo nếu không có LHP nào còn chỗ
+    if (lhpList == null || !lhpList.Any())
+    {
+        <div class="alert alert-warning shadow-sm">
+            Không tìm thấy Lớp Học Phần nào đang **Đang mở** và **còn chỗ** trong Học kỳ đã chọn (@selectedHocKyId).
+            Vui lòng tạo LHP mới hoặc mở LHP đã có.
+        </div>
     }
+    else
+    {
+        <form asp-action="CreateSelectedRegistrationPeriods" method="post">
+            @* Trường ẩn lưu HocKyId đã chọn *@
+            <input type="hidden" asp-for="HocKyId" value="@selectedHocKyId" />
 
-    hocKySelect.onchange = function() {
-        var selectedHocKyId = this.value;
-        updateCreateBtn();
+            <div class="row">
+                @* --- 2. THIẾT LẬP THỜI GIAN ĐĂNG KÝ --- *@
+                <div class="col-lg-5 mb-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-warning text-dark">
+                            <h5><i class="fa fa-clock me-2"></i> 2. Thiết lập Thời gian Đăng ký</h5>
+                        </div>
+                        <div class="card-body">
+                            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                            <div class="mb-3">
+                                <label asp-for="TenDotDangKy" class="form-label fw-bold">Tên Đợt Đăng Ký</label>
+                                <input asp-for="TenDotDangKy" class="form-control" required />
+                                <span asp-validation-for="TenDotDangKy" class="text-danger"></span>
+                            </div>
 
-        var url = '@Url.Action("GetRegistrationPeriodsTable")';
-        if (selectedHocKyId == 0) {
-            url += '?hocKyId=0';
-        } else {
-            url += '?hocKyId=' + selectedHocKyId;
-        }
+                            <div class="mb-3">
+                                <label asp-for="NgayBatDau" class="form-label fw-bold">Ngày Bắt Đầu Đăng Ký</label>
+                                <input asp-for="NgayBatDau"
+                                       type="datetime-local"
+                                       class="form-control"
+                                       value="@defaultStartISO"
+                                       required />
+                                <span asp-validation-for="NgayBatDau" class="text-danger"></span>
+                            </div>
 
-        fetch(url)
-            .then(resp => resp.text())
-            .then(html => {
-                document.getElementById('periodsTableWrapper').innerHTML = html;
+                            <div class="mb-3">
+                                <label asp-for="NgayKetThuc" class="form-label fw-bold">Ngày Kết Thúc Đăng Ký</label>
+                                <input asp-for="NgayKetThuc"
+                                       type="datetime-local"
+                                       class="form-control"
+                                       value="@defaultEndISO"
+                                       required />
+                                <span asp-validation-for="NgayKetThuc" class="text-danger"></span>
+                            </div>
+
+                            <div class="mt-4 pt-3 border-top">
+                                <button type="submit" class="btn btn-success btn-lg w-100">
+                                    <i class="fa fa-play-circle me-2"></i> 3. Kích hoạt Mở Đăng ký
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @* --- 3. DANH SÁCH LHP CÓ THỂ CHỌN --- *@
+                <div class="col-lg-7 mb-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-info text-white">
+                            <h5><i class="fa fa-check-square me-2"></i> 3. Chọn Lớp Học Phần (LHP) Mở Đăng ký</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="lhpTable" class="table table-striped table-bordered" style="width:100%">
+                                    <thead>
+                                        <tr>
+                                            <th><input type="checkbox" id="selectAllLhps" /></th>
+                                            <th>Mã LHP</th>
+                                            <th>Môn học</th>
+                                            <th>Mã Giảng viên</th>
+                                            <th>Sĩ số (TT/ĐK)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var lhpObj in lhpList)
+                                        {
+                                            // Ép kiểu ExpandoObject sang IDictionary để truy cập thuộc tính
+                                            IDictionary<string, object> lhp = lhpObj;
+
+                                            // KHẮC PHỤC LỖI: Sử dụng Convert.ToInt32 để chuyển đổi an toàn từ Int64
+                                            var lhpId = Convert.ToInt32(lhp["id"]);
+
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" name="LopHocPhanIds" value="@lhpId" class="lhp-checkbox" />
+                                                </td>
+                                                <td>@lhp["maLopHocPhan"]</td>
+                                                <td>@lhp["monHoc"]</td>
+                                                <td>@lhp["maGiangVien"]</td>
+                                                <td>@lhp["siSoThucTe"] / @lhp["siSoToiDa"]</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            @* Validation cho danh sách chọn *@
+                            <span asp-validation-for="LopHocPhanIds" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    }
+}
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/v/bs5/dt-1.13.8/datatables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            // 1. Khởi tạo Select2 cho Học kỳ
+            $('.select-searchable').select2();
+
+            // 2. Khởi tạo DataTable cho bảng LHP
+            $('#lhpTable').DataTable({
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.13.8/i18n/vi.json"
+                },
+                "paging": true,
+                "searching": true,
+                "info": true,
+                "order": [[2, 'asc']], // Sắp xếp theo cột Môn học
+                "columnDefs": [
+                    { "orderable": false, "targets": 0 } // Không cho sắp xếp cột Checkbox
+                ]
             });
-    };
 
-    // Khi click tạo đợt
-    createBtn.onclick = function() {
-        if (hocKySelect.value == 0) return; // tránh lỗi
-        window.location.href = '@Url.Action("CreateRegistrationPeriod")?hocKyId=' + hocKySelect.value;
-    }
+            // 3. Logic chọn tất cả (chỉ áp dụng cho các hàng đang hiển thị)
+            $('#selectAllLhps').on('click', function () {
+                var isChecked = this.checked;
+                // Chỉ chọn/bỏ chọn các checkbox đang hiển thị sau khi lọc/phân trang
+                $('#lhpTable').DataTable().rows({ page: 'current', search: 'applied' }).nodes().to$().find('.lhp-checkbox').prop('checked', isChecked);
+            });
 
-    // Khởi tạo trạng thái nút
-    updateCreateBtn();
-</script>
-<div id="periodsTableWrapper">
-    @await Html.PartialAsync("_RegistrationPeriodsTable", Model)
-</div>
+            // 4. Logic cập nhật ngày giờ mặc định (chỉ chạy khi trang tải lần đầu và trường trống)
+            // Lấy giá trị ISO từ Controller C#
+                    const defaultStartISO = '@Html.Raw(defaultStartISO)'; // Lấy giá trị ISO từ Controller
+        const defaultEndISO = '@Html.Raw(defaultEndISO)';     // Lấy giá trị ISO từ Controller
+
+        // Chỉ gán giá trị mặc định nếu server trả về và trường input hiện tại chưa có giá trị
+        if (defaultStartISO && !$('#NgayBatDau').val()) {
+            $('#NgayBatDau').val(defaultStartISO);
+        }
+
+            if (defaultEndISO && !$('#NgayKetThuc').val()) {
+                $('#NgayKetThuc').val(defaultEndISO);
+            }
+        });
+    </script>
+}

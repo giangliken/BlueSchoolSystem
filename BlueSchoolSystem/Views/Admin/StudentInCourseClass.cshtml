@@ -1,0 +1,100 @@
+﻿@model IEnumerable<BlueSchoolSystem.Models.SinhVien>
+
+@{
+    var lhp = ViewBag.LHP as BlueSchoolSystem.Models.LopHocPhan;
+    ViewData["Title"] = "Danh sách Sinh viên - " + lhp?.MaLopHocPhan;
+}
+
+<div class="container mt-4">
+
+    @* Nút quay lại *@
+    <a asp-action="CourseClassDetail" asp-route-id="@lhp?.Id" class="btn btn-secondary mb-3">
+        <i class="fa fa-arrow-left"></i> Quay lại chi tiết lớp
+    </a>
+
+    @* Thông tin lớp *@
+    <div class="card shadow-sm mb-4">
+        <div class="card-body bg-light">
+            <div class="row">
+                <div class="col-md-8">
+                    <h4 class="fw-bold text-primary mb-0">
+                        <i class="fa fa-users me-2"></i> Danh sách sinh viên
+                    </h4>
+                    <p class="text-muted mb-0 mt-1">
+                        Lớp: <strong>@lhp?.MaLopHocPhan</strong> - Môn: @lhp?.MonHoc?.TenMonHoc
+                    </p>
+                </div>
+                <div class="col-md-4 text-end align-self-center">
+                    <span class="badge bg-info text-dark fs-6">
+                        Sĩ số: @ViewBag.TotalStudents / @lhp?.SiSo
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Bảng danh sách sinh viên *@
+    <div class="card shadow">
+        <div class="card-body">
+            @if (!Model.Any())
+            {
+                <div class="alert alert-warning text-center">
+                    Chưa có sinh viên nào đăng ký vào lớp học phần này.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle" id="studentTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>STT</th>
+                                <th>MSSV</th>
+                                <th>Họ và Tên</th>
+                                <th>Ngày sinh</th>
+                                <th>Giới tính</th>
+                                <th>Lớp học</th>
+                                <th>Email</th>
+                                <th>Số điện thoại</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{
+                                int i = 1;
+                            }
+                            @foreach (var sv in Model)
+                            {
+                                <tr>
+                                    <td>@(i++)</td>
+                                    <td>@sv.MSSV</td>
+                                    <td>@sv.HoVaTenDem @sv.Ten</td>
+                                    <td>@sv.NgaySinh.ToString("dd/MM/yyyy")</td>
+                                    <td>@(sv.GioiTinh ? "Nam" : "Nữ")</td>
+                                    <td>@sv.Lop?.MaLop</td>
+                                    <td>@sv.User?.Email</td>
+                                    <td>@sv.User?.PhoneNumber</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @* Tích hợp DataTable để tìm kiếm/phân trang tiện lợi *@
+    <link href="https://cdn.datatables.net/v/bs5/dt-1.13.8/datatables.min.css" rel="stylesheet" />
+    <script src="https://cdn.datatables.net/v/bs5/dt-1.13.8/datatables.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#studentTable').DataTable({
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.13.8/i18n/vi.json"
+                },
+                "pageLength": 25
+            });
+        });
+    </script>
+}

@@ -11,9 +11,12 @@
             <a asp-action="CreateCourseClass" class="btn btn-primary me-2 shadow-sm">
                 <i class="fa fa-plus"></i> Mở lớp học phần
             </a>
-            <button type="button" class="btn btn-success shadow-sm" id="btnAutoDangKy">
-                <i class="fa fa-magic"></i> Mở đợt đăng ký HP tự động
-            </button>
+            <a asp-action="AutoCreateClassAndEnroll" class="btn btn-success shadow-sm" title="Tạo Lớp và Đăng Ký Bắt Buộc theo CTĐT">
+                <i class="fa fa-cogs"></i> Mở lớp tự động
+            </a>
+            <a asp-action="RegistrationPeriods" class="btn btn-warning me-2 shadow-sm" title="Chọn Lớp Học Phần để mở đợt đăng ký">
+                <i class="fa fa-calendar-alt"></i> Mở cổng đăng ký
+            </a>
         </div>
     </div>
 
@@ -216,28 +219,7 @@
                 }
             }
 
-            // --- Auto đăng ký modal ---
-            $('#btnAutoDangKy').click(function() {
-                var modal = new bootstrap.Modal(document.getElementById('autoDangKyModal'));
-                modal.show();
-            });
-
-            $('#btnConfirmAutoDangKy').click(function() {
-                var hocKyId = $('#modalHocKy').val();
-                var thuTuHocKy = $('#modalThuTuHocKy').val();
-                if (!hocKyId) { showResult(false, 'Vui lòng chọn học kỳ!'); return; }
-                if (!thuTuHocKy) { showResult(false, 'Vui lòng chọn thứ tự học kỳ!'); return; }
-
-                if (!confirm('Bạn có chắc chắn muốn chạy Auto đăng ký HP? Hành động này sẽ gây ra Redirect.')) return;
-
-                // TẠO FORM ẨN ĐỂ ĐẢM BẢO POST REQUEST cho Controller
-                var form = $('<form action="@Url.Action("RunAutoDangKyBatBuocFromAdmin", "Admin")" method="post">' +
-                    '<input type="hidden" name="hocKyId" value="' + hocKyId + '" />' +
-                    '<input type="hidden" name="thuTuHocKy" value="' + thuTuHocKy + '" />' +
-                    '</form>');
-                $('body').append(form);
-                form.submit();
-            });
+            
 
             // --- Cập nhật trạng thái (Sửa trạng thái) ---
             $('.btn-update-status').click(function() {
