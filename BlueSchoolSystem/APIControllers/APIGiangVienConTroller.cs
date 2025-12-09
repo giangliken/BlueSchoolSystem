@@ -304,6 +304,7 @@ namespace BlueSchoolSystem.APIControllers
                 orderby lh.Ngay, lh.GioBatDau
                 select new
                 {
+                    lh.Id,
                     lhp.MaLopHocPhan,
                     //lhp.TenLopHocPhan,
                     MaMonHoc = mh.MaMonHoc,
@@ -356,6 +357,7 @@ namespace BlueSchoolSystem.APIControllers
 
                 return new
                 {
+                    item.Id,
                     item.MaLopHocPhan,
                     item.MaMonHoc,
                     item.TenMonHoc,
@@ -1242,6 +1244,48 @@ namespace BlueSchoolSystem.APIControllers
                 return StatusCode(500, new { result = false, message = "Lỗi hệ thống: " + ex.Message });
             }
         }
+
+        //Lấy danh sách các lớp Học phần ở kỳ hiện tại
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("lophocphan/hientai")]
+        public async Task<IActionResult> LayLopHienTai()
+        {
+            var userId = User.FindFirst("userId")?.Value;
+            var giangVien = await _context.GiangViens
+                .FirstOrDefaultAsync(gv => gv.UserId == userId);
+
+            if (giangVien == null)
+                return NotFound(new { result = false, message = "Không tìm thấy thông tin giảng viên" });
+
+            var today = DateTime.Today;
+
+            var query =
+                from lhp in _context.LopHocPhans
+                join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                join hk in _context.HocKys on lhp.HocKyId equals hk.Id
+                where lhp.GiangVienId == giangVien.Id
+                      && hk.NgayBatDau <= today
+                      && hk.NgayKetThuc >= today
+                select new
+                {
+                    lhp.Id,
+                    lhp.MaLopHocPhan,
+                    lhp.TenLopHocPhan,
+                    mh.MaMonHoc,
+                    mh.TenMonHoc
+                };
+
+            var list = await query.ToListAsync();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                data = list
+            });
+        }
+
+
     }
 
 

@@ -1,0 +1,34 @@
+﻿@model BlueSchoolSystem.Models.XinVangDay
+@{
+    ViewData["Title"] = "Đơn xin vắng dạy thành công";
+}
+
+<div class="container mt-5">
+    <div class="card shadow-lg border-0">
+        <div class="card-body text-center">
+            <div class="mb-4">
+                <i class="fa fa-check-circle fa-5x text-success"></i>
+            </div>
+            <h2 class="text-success mb-3">Gửi đơn thành công!</h2>
+            <p class="lead mb-4">Đơn xin vắng dạy của bạn đã được gửi và đang chờ xử lý.</p>
+
+            <div class="card shadow-sm p-3 mb-4">
+                <h5 class="mb-3">Thông tin cơ bản</h5>
+                <div class="row text-start">
+                    <div class="col-md-6 mb-2"><strong>Mã đơn:</strong> #@Model.Id</div>
+                    <div class="col-md-6 mb-2"><strong>Ngày gửi:</strong> @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                    <div class="col-md-6 mb-2"><strong>Lớp học phần:</strong> @Model.LopHocPhan?.MaLopHocPhan - @Model.LopHocPhan?.MaLopHocPhan</div>
+                    <div class="col-md-6 mb-2"><strong>Buổi nghỉ:</strong> @Model.LichHocId</div>
+                    <div class="col-md-6 mb-2"><strong>Lý do:</strong> @Model.LyDo</div>
+                    <div class="col-md-6 mb-2"><strong>Ngày dạy bù:</strong> @Model.NgayDayBu?.ToString("dd/MM/yyyy")</div>
+                    <div class="col-md-6 mb-2"><strong>Ca dạy bù:</strong> @(Model.GioBatDauDayBu.HasValue && Model.GioKetThucDayBu.HasValue ? $"{Model.GioBatDauDayBu:hh\\:mm} - {Model.GioKetThucDayBu:hh\\:mm}" : "-")</div>
+                    <div class="col-md-6 mb-2"><strong>Trạng thái:</strong> @Model.TrangThai?.TenTrangThai</div>
+                </div>
+            </div>
+
+            <a asp-action="Index" class="btn btn-primary btn-lg">
+                <i class="fa fa-arrow-left me-2"></i> Quay lại danh sách đơn
+            </a>
+        </div>
+    </div>
+</div>

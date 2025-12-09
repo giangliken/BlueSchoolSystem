@@ -674,5 +674,148 @@ namespace BlueSchoolSystem.Controllers
             return RedirectToAction("LopHocPhanDetails", new { maLopHocPhan });
         }
 
+        //View Xin vắng dạy
+        [Authorize(Roles = "Teacher")]
+        public async Task<IActionResult> XinVangDay()
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri("https://localhost:5001/");
+
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await client.GetAsync("api/lophocphan/hientai");
+
+                List<LopHocPhanShortVM> danhSachLopHp = new();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    dynamic result = JsonConvert.DeserializeObject(body);
+
+                    danhSachLopHp = JsonConvert.DeserializeObject<List<LopHocPhanShortVM>>(result.data.ToString());
+                }
+
+                ViewBag.LopHocPhanList = danhSachLopHp;
+
+                return View(new XinVangDay());
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = "Lỗi: " + ex.Message;
+                ViewBag.LopHocPhanList = new List<LopHocPhanShortVM>(); // tránh null
+                return View(new XinVangDay());
+            }
+
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Teacher")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> XinVangDay(XinVangDay model)
+        {
+            if (!ModelState.IsValid)
+            {
+                // Lấy lại danh sách lớp học phần
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri("https://localhost:5001/");
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await client.GetAsync("api/lophocphan/hientai");
+                List<LopHocPhanShortVM> danhSachLopHp = new();
+                if (response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    dynamic result = JsonConvert.DeserializeObject(body);
+                    danhSachLopHp = JsonConvert.DeserializeObject<List<LopHocPhanShortVM>>(result.data.ToString());
+                }
+                ViewBag.LopHocPhanList = danhSachLopHp;
+
+                return View(model);
+            }
+
+            try
+            {
+                var token = HttpContext.Session.GetString("access_token");
+                if (string.IsNullOrEmpty(token))
+                {
+                    ViewBag.Error = "Không tìm thấy token trong session.";
+                    return View(model);
+                }
+
+                // Decode JWT
+                var payload = token.Split('.')[1];
+                payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+                var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+                var jwtData = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+
+                // Lấy userId từ JWT (string)
+                if (!jwtData.TryGetValue("userId", out var userIdStr))
+                {
+                    ViewBag.Error = "Token JWT không hợp lệ (không tìm thấy userId).";
+                    return View(model);
+                }
+
+                // Nếu gv.UserId là string, so sánh trực tiếp
+                var giangVien = await _context.GiangViens
+                    .FirstOrDefaultAsync(gv => gv.UserId == userIdStr);
+
+                if (giangVien == null)
+                {
+                    ViewBag.Error = "Giảng viên không tồn tại trong hệ thống.";
+                    return View(model);
+                }
+
+                // Gán GiangVienId trước khi lưu
+                model.GiangVienId = giangVien.Id;
+                model.CreatedAt = DateTime.Now;
+
+                model.TrangThaiId = _context.TrangThais
+                        .Where(tt => tt.TenTrangThai == "Chờ duyệt" && tt.LoaiTrangThai == "DonPhieu")
+                        .Select(tt => tt.Id)
+                        .FirstOrDefault();
+                // Parse giờ từ string sang TimeSpan
+                if (!string.IsNullOrEmpty(Request.Form["GioBatDauDayBu"]))
+                    model.GioBatDauDayBu = TimeSpan.Parse(Request.Form["GioBatDauDayBu"]);
+                if (!string.IsNullOrEmpty(Request.Form["GioKetThucDayBu"]))
+                    model.GioKetThucDayBu = TimeSpan.Parse(Request.Form["GioKetThucDayBu"]);
+
+                // Lưu vào DB
+                _context.XinVangDays.Add(model);
+                await _context.SaveChangesAsync();
+
+                //TempData["Success"] = "Đơn xin vắng dạy đã được gửi!";
+                return RedirectToAction("GuiDonThanhCong", new { id = model.Id });
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = "Lỗi: " + ex.Message;
+                return View(model);
+            }
+        }
+
+
+        [Authorize(Roles = "Teacher")]
+        public async Task<IActionResult> GuiDonThanhCong(int id)
+        {
+            var don = await _context.XinVangDays
+                .Include(d => d.LopHocPhan)
+                .Include(d => d.TrangThai)
+                .FirstOrDefaultAsync(d => d.Id == id);
+
+            if (don == null) return NotFound();
+
+            return View(don);
+        }
+
+
+
     }
 }
