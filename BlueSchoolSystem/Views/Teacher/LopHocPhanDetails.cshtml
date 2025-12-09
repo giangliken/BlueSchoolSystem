@@ -62,12 +62,19 @@
 <div class="modal fade" id="modalDiemQuaTrinh" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
+            <div class="modal-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="modal-title mb-0">
                     <i class="fa-solid fa-chart-line me-2"></i> Điểm quá trình - @lhp?.TenMonHoc
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnExportExcel" class="btn btn-outline-dark fw-semibold">
+                        <i class="fa-solid fa-file-excel me-1"></i> Xuất Excel
+                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
             </div>
+
 
             <div class="modal-body p-0">
                 <div class="table-responsive">
@@ -328,6 +335,7 @@ else
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script>
          window.__accessToken = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(token ?? ""));
@@ -472,6 +480,63 @@ else
         }, 5000);
     });
 
+
+            document.getElementById('btnExportExcel').addEventListener('click', function() {
+            if (!diemQuaTrinhData || diemQuaTrinhData.length === 0) return alert('Không có dữ liệu để xuất');
+
+            // Tạo worksheet
+            const ws_data = [];
+
+            // Header
+            const headers = ['STT', 'MSSV', 'Họ và tên'];
+            if (diemQuaTrinhData[0].DiemBuoi)
+                diemQuaTrinhData[0].DiemBuoi.forEach((b, i) => headers.push(`Buổi ${i+1}`));
+            headers.push('Tổng điểm');
+            ws_data.push(headers);
+
+            // Dữ liệu
+            diemQuaTrinhData.forEach((sv, i) => {
+                const row = [i+1, sv.MSSV, sv.HoVaTen];
+                let tongDiem = 10;
+                sv.DiemBuoi.forEach(b => {
+                    row.push(b.display);
+                    tongDiem -= b.diemTru;
+                });
+                row.push(tongDiem.toFixed(1));
+                ws_data.push(row);
+            });
+
+            // Tạo workbook và download
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            XLSX.utils.book_append_sheet(wb, ws, 'DiemQuaTrinh');
+            XLSX.writeFile(wb, `DiemQuaTrinh_${new Date().toISOString().slice(0,10)}.xlsx`);
+        });
+
+
+
     </script>
+
+    <script>
+    const diemQuaTrinhData = @Html.Raw(JsonSerializer.Serialize(
+        sinhVienList.Select(sv => new {
+            sv.MSSV,
+            HoVaTen = sv.HoVaTenDem + " " + sv.Ten,
+            DiemBuoi = attendanceList
+                .OrderBy(x => x.Ngay)
+                .Select(buoi => {
+                    var dd = buoi.DanhSachSinhVien?.FirstOrDefault(d => d.SinhVienId == sv.Id);
+                    var status = dd?.TrangThai ?? "Vắng mặt";
+                    double diemTru = status == "Có mặt" ? 0 : (status == "Đi trễ" ? 0.5 : 1);
+                    string display = status == "Có mặt" ? "" : (status == "Đi trễ" ? "-0.5" : "-1");
+                    return new { display, diemTru };
+                }).ToList()
+        }).ToList()
+    ));
+</script>
+
+   
+
+
 }
 
