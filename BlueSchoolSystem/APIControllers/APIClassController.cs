@@ -448,7 +448,83 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+        [Authorize(Roles = "Admin,Teacher", AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 
+        [HttpGet("danhsachsinhvien")]
+        public IActionResult GetSinhVienTrongLop(string maLop)
+        {
+            if (string.IsNullOrEmpty(maLop))
+            {
+                return BadRequest(new
+                {
+                    result = false,
+                    message = "Thiếu mã lớp"
+                });
+            }
+
+            // Lấy lớp
+            var lop = _context.LopHocs
+                .Include(l => l.ChiTietLopHocs)
+                .FirstOrDefault(l => l.MaLop.ToLower() == maLop.ToLower());
+
+            if (lop == null)
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    message = "Không tìm thấy lớp"
+                });
+            }
+
+            // Lấy phân quyền lớp (lớp trưởng / lớp phó / bí thư)
+            var ct = lop.ChiTietLopHocs.FirstOrDefault();
+
+            int? lopTruongId = ct?.LopTruongId;
+            int? lopPhoId = ct?.LopPhoId;
+            int? biThuId = ct?.BiThuId;
+
+            // Lấy danh sách sinh viên
+            var sinhviens = _context.SinhViens
+                 .Include(sv => sv.Lop)
+                 .Include(sv => sv.User)
+                .Where(sv => sv.LopId == lop.Id)
+                .Select(sv => new
+                {
+                    sv.Id,
+                    sv.MSSV,
+                    HoTen = sv.HoVaTenDem + " " + sv.Ten,
+                    Ten = sv.Ten,
+                    sv.User.Email,
+                    sv.User.PhoneNumber,
+                    sv.NgaySinh,
+                    sv.GioiTinh,
+                    VaiTro =
+                        sv.Id == lopTruongId ? "Lớp trưởng" :
+                        sv.Id == lopPhoId ? "Lớp phó" :
+                        sv.Id == biThuId ? "Bí thư" :
+                        "Sinh viên"
+                })
+                .OrderBy(sv => sv.Ten)   // ⭐ XÓNG THẲNG THEO TÊN
+                .ThenBy(sv => sv.HoTen)
+                .ToList();
+
+            return Ok(new
+            {
+                result = true,
+                count = sinhviens.Count,
+                data = new
+                {
+                    maLop = lop.MaLop,
+                    tenLop = lop.TenLop,
+
+                    lopTruong = sinhviens.FirstOrDefault(sv => sv.VaiTro == "Lớp trưởng"),
+                    lopPho = sinhviens.FirstOrDefault(sv => sv.VaiTro == "Lớp phó"),
+                    biThu = sinhviens.FirstOrDefault(sv => sv.VaiTro == "Bí thư"),
+
+                    sinhVien = sinhviens
+                }
+            });
+        }
 
     }
 }

@@ -31,10 +31,93 @@ namespace BlueSchoolSystem.Controllers
         }
 
         //Trang xem lịch giảng dạy
-        public async Task<IActionResult> LichGiangDay()
+        [Authorize(Roles = "Teacher")]
+        [HttpGet]
+        public async Task<IActionResult> LichGiangDay(
+            string maGV,
+            int weekOffset = 0,
+            int monthOffset = 0,
+            string viewMode = "week")
         {
-            return View();
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri("https://localhost:5001/");
+
+                // 🔥 Lấy token từ session
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                    client.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+
+                // 🔥 Nếu maGV không truyền → lấy từ Claims
+                maGV ??= User.Identity?.Name;
+
+                if (string.IsNullOrEmpty(maGV))
+                {
+                    ViewBag.Error = "Không xác định được mã giảng viên.";
+                    return View(new List<LichGiangDayViewModel>());
+                }
+
+                // 🔥 Call API
+                var response = await client.GetAsync($"api/lichgiangday/{maGV}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    ViewBag.Error = $"Không thể lấy dữ liệu lịch giảng dạy. Mã lỗi: {response.StatusCode}";
+                    return View(new List<LichGiangDayViewModel>());
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                // Parse JSON gốc
+                using var doc = JsonDocument.Parse(json);
+
+                if (!doc.RootElement.TryGetProperty("data", out var dataEle))
+                {
+                    ViewBag.Error = "Phản hồi API không chứa trường 'data'.";
+                    return View(new List<LichGiangDayViewModel>());
+                }
+
+                // 🔥 Deserialize về model mới
+                var lich = System.Text.Json.JsonSerializer.Deserialize<List<LichGiangDayViewModel>>(
+                    dataEle.GetRawText(),
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                // ---------- Logic tính tuần & tháng ----------
+                var today = DateTime.Today;
+
+                // Lấy thứ 2 của tuần hiện tại
+                var monday = today.AddDays(-(int)today.DayOfWeek + 1);
+                if (monday.DayOfWeek == DayOfWeek.Sunday)
+                    monday = monday.AddDays(-6);
+
+                monday = monday.AddDays(7 * weekOffset);
+
+                var monthDate = new DateTime(today.Year, today.Month, 1)
+                    .AddMonths(monthOffset);
+
+                // Gửi xuống View
+                ViewBag.WeekStart = monday;
+                ViewBag.MonthStart = monthDate;
+                ViewBag.WeekOffset = weekOffset;
+                ViewBag.MonthOffset = monthOffset;
+                ViewBag.ViewMode = viewMode;
+                ViewBag.MaGV = maGV;
+
+                return View("ThoiKhoaBieuGiangVien", lich);
+            }
+            catch (Exception)
+            {
+                ViewBag.Error = "Đã xảy ra lỗi khi tải lịch giảng dạy.";
+                return View(new List<LichGiangDayViewModel>());
+            }
         }
+
+
 
         //Trang xem lớp phụ trách
         [Authorize(Roles = "Teacher")]
@@ -67,47 +150,59 @@ namespace BlueSchoolSystem.Controllers
 
         // 2. Xem chi tiết danh sách sinh viên của một lớp phụ trách
         [Authorize(Roles = "Teacher")]
-        public async Task<IActionResult> LopPhuTrachDetails(int lopHocId, string tenLop)
+        public async Task<IActionResult> LopPhuTrachDetails(string maLop)
         {
+            if (string.IsNullOrEmpty(maLop))
+            {
+                TempData["Error"] = "Thiếu mã lớp.";
+                return RedirectToAction(nameof(LopPhuTrach));
+            }
+
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://localhost:5001/");
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+            }
 
-            // Giả định bạn có API lấy DSSV theo LopHocId: api/lophoc/{id}/sinhvien
-            // Nếu chưa có, bạn cần viết thêm API này bên Backend
-            var response = await client.GetAsync($"api/lophoc/{lopHocId}/chitiet");
+            var response = await client.GetAsync($"api/danhsachsinhvien?maLop={maLop}");
 
             if (!response.IsSuccessStatusCode)
             {
-                TempData["Error"] = "Không thể lấy danh sách sinh viên.";
+                TempData["Error"] = "Không thể lấy dữ liệu lớp học.";
                 return RedirectToAction(nameof(LopPhuTrach));
             }
 
             var body = await response.Content.ReadAsStringAsync();
             dynamic result = JsonConvert.DeserializeObject(body);
-
-            // Mapping dữ liệu
-            var model = new LopPhuTrachDetailViewModel
+            if (result == null || result.data == null)
             {
-                LopHocId = lopHocId,
-                TenLop = tenLop, // Lấy tạm từ tham số truyền vào hoặc parse từ API result
-                // Giả sử API trả về object có property 'sinhViens'
-                DanhSachSinhVien = JsonConvert.DeserializeObject<List<SinhVienViewModel>>(result.data.sinhViens.ToString())
-                                   ?? new List<SinhVienViewModel>()
-            };
-
-            // Nếu API trả về cả thông tin lớp trong data, hãy map lại cho chính xác:
-            if (result.data.info != null)
-            {
-                model.MaLop = result.data.info.maLop;
-                model.TenLop = result.data.info.tenLop;
+                TempData["Error"] = "API trả về dữ liệu rỗng.";
+                return RedirectToAction(nameof(LopPhuTrach));
             }
+            var data = result.data;
+
+            var model = new ChiTietLopHocViewModel
+            {
+                MaLop = data.maLop,
+                TenLop = data.tenLop,
+                LopTruong = data.lopTruong,
+                LopPho = data.lopPho,
+                BiThu = data.biThu,
+                TroLy = data.troLy,
+                SinhVien = data.sinhVien != null
+                    ? JsonConvert.DeserializeObject<List<dynamic>>(data.sinhVien.ToString())
+                    : new List<dynamic>()
+            };
 
             return View(model);
         }
+
+
+
 
         //Xem danh sách lớp học phần của giảng viên
         [Authorize(Roles = "Teacher")]
@@ -175,7 +270,7 @@ namespace BlueSchoolSystem.Controllers
             if (!string.IsNullOrEmpty(token))
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            // Gọi API chi tiết lớp học phần theo mã lớp
+            // 1️⃣ Lấy chi tiết lớp học phần
             var responseLHP = await client.GetAsync($"https://localhost:5001/api/chitietlophocphan/{maLopHocPhan}");
             if (!responseLHP.IsSuccessStatusCode)
             {
@@ -186,10 +281,10 @@ namespace BlueSchoolSystem.Controllers
             dynamic lhpResult = JsonConvert.DeserializeObject(lhpBody);
             var lopHocPhan = JsonConvert.DeserializeObject<LopHocPhanViewModel>(lhpResult.data.ToString());
 
-            // Danh sách sinh viên
+            // 2️⃣ Lấy danh sách sinh viên
             var listSV = lopHocPhan.DanhSachSinhVien ?? new List<SinhVienViewModel>();
 
-            // Lấy danh sách buổi điểm danh THEO MÃ lớp học phần
+            // 3️⃣ Lấy danh sách buổi điểm danh
             var responseAttendance = await client.GetAsync($"https://localhost:5001/api/lophocphan/ma/{maLopHocPhan}/buoidiemdanh");
             var listAttendance = new List<AttendanceSessionViewModel>();
             if (responseAttendance.IsSuccessStatusCode)
@@ -199,15 +294,67 @@ namespace BlueSchoolSystem.Controllers
                 listAttendance = JsonConvert.DeserializeObject<List<AttendanceSessionViewModel>>(attResult.data.ToString());
             }
 
-            // Truyền sang View
+
+            // 3️⃣ Lấy toàn bộ chi tiết điểm danh của các buổi này từ DB
+            var buoiIds = listAttendance.Select(b => b.Id).ToList();
+            var chiTietList = await _context.ChiTietDiemDanhs
+                .Where(c => buoiIds.Contains(c.DiemDanhId))
+                .ToListAsync();
+
+            // 4️⃣ Lấy tất cả trạng thái để map
+            var trangThaiDict = await _context.TrangThais
+                .Where(t => t.LoaiTrangThai == "DiemDanh")
+                .ToDictionaryAsync(t => t.Id, t => t.TenTrangThai);
+
+            // 5️⃣ Mapping trạng thái thực tế cho từng sinh viên
+            // 5️⃣ Mapping trạng thái thực tế cho từng sinh viên
+            foreach (var buoi in listAttendance)
+            {
+                buoi.DanhSachSinhVien = new List<AttendanceDetailViewModel>();
+
+                foreach (var sv in listSV)
+                {
+                    // Tìm bản ghi chi tiết điểm danh tương ứng
+                    var chiTiet = chiTietList.FirstOrDefault(c => c.DiemDanhId == buoi.Id && c.SinhVienId == sv.Id);
+
+                    // Bước 1: Đặt giá trị mặc định (Ví dụ: "Chưa điểm danh" hoặc "Vắng" tùy logic của bạn)
+                    string tenTrangThaiHienThi = "Vắng mặt";
+
+                    // Bước 2: Kiểm tra nếu có dữ liệu điểm danh trong DB
+                    if (chiTiet != null)
+                    {
+                        // Bước 3: Tra cứu ID trong Dictionary để lấy tên
+                        // Lưu ý: (int)chiTiet.TrangThaiId là vì có thể trong DB nó là nullable int?
+                        if (trangThaiDict.ContainsKey((int)chiTiet.TrangThaiId))
+                        {
+                            tenTrangThaiHienThi = trangThaiDict[(int)chiTiet.TrangThaiId];
+                        }
+                        else
+                        {
+                            // Trường hợp có ID nhưng ID đó không nằm trong bảng Trạng Thái (lỗi dữ liệu hiếm gặp)
+                            tenTrangThaiHienThi = "Trạng thái lỗi";
+                        }
+                    }
+
+                    // Bước 4: Thêm vào danh sách hiển thị
+                    buoi.DanhSachSinhVien.Add(new AttendanceDetailViewModel
+                    {
+                        SinhVienId = sv.Id,
+                        TrangThai = tenTrangThaiHienThi, // Gán giá trị đã map được
+                    });
+                }
+            }
+
+
+            // 5️⃣ Truyền dữ liệu sang View
             ViewBag.LopHocPhan = lopHocPhan;
             ViewBag.SinhVienList = listSV;
             ViewBag.AttendanceList = listAttendance;
             ViewBag.MaLopHocPhan = maLopHocPhan;
 
-
             return View();
         }
+
 
 
         [HttpPost]
