@@ -469,7 +469,9 @@ namespace BlueSchoolSystem.APIControllers
                                                          sv.MSSV,
                                                          sv.HoVaTenDem,
                                                          sv.Ten,
-                                                     }).ToList()
+                                                     }).
+                                                     OrderBy(sv => sv.Ten).
+                                                     ToList()
                              }).FirstOrDefaultAsync();
 
             if (lop == null)
