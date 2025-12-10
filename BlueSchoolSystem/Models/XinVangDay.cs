@@ -13,8 +13,11 @@
         public LopHocPhan? LopHocPhan { get; set; }
 
         // Buổi muốn nghỉ
-        public int LichHocId { get; set; }
+        public int? LichHocId { get; set; }
         public LichHoc? LichHoc { get; set; }
+
+        public string? NgayXinVang { get; set; }
+        public string? CaXinVang { get; set; }
 
         public string LyDo { get; set; } = string.Empty;
 

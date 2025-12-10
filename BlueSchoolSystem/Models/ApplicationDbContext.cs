@@ -191,10 +191,18 @@ namespace BlueSchoolSystem.Models
                     .HasForeignKey(x => x.TrangThaiId)
                     .OnDelete(DeleteBehavior.Restrict);
 
+
+                e.HasOne(x => x.LichHoc)
+                .WithMany() // hoặc WithOne nếu 1:1
+                .HasForeignKey(x => x.LichHocId)
+                .OnDelete(DeleteBehavior.Restrict); // KHÔNG cascade
+
                 e.Property(x => x.LyDo).IsRequired();
                 e.Property(x => x.CreatedAt).IsRequired();
                 e.ToTable("XinVangDays");
             });
+
+
 
 
 

@@ -1,5 +1,6 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using BlueSchoolSystem.Repository;
 using BlueSchoolSystem.Services;
 using Firebase.Database;
 using Firebase.Database.Query;
@@ -11,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Reflection.Metadata;
+using System.Security.Claims;
 using System.Text;
 
 namespace BlueSchoolSystem.APIControllers
@@ -21,10 +23,13 @@ namespace BlueSchoolSystem.APIControllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
-        public APIGiangVienConTroller(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        private readonly IEmailSender _emailSender;
+
+        public APIGiangVienConTroller(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IEmailSender emailSender)
         {
             _context = context;
             _userManager = userManager;
+            _emailSender = emailSender;
         }
 
         //Lấy danh sách giảng viên
@@ -1283,6 +1288,67 @@ namespace BlueSchoolSystem.APIControllers
                 code = 200,
                 data = list
             });
+        }
+
+
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("danhsachdonphieu")]
+        public async Task<IActionResult> GetDanhSachDon()
+        {
+            try
+            {
+                var userId = User.FindFirst("userId")?.Value;
+                var isAdmin = User.IsInRole(SD.Role_Admin);
+
+                IQueryable<XinVangDay> query = _context.XinVangDays
+                    .Include(x => x.LopHocPhan)
+                    .Include(x => x.PhongHoc)
+                    .Include(x => x.TrangThai)
+                    .Include(x => x.GiangVien)
+                    .OrderByDescending(x => x.CreatedAt);
+
+                if (!isAdmin) // nếu không phải admin => lọc theo giảng viên
+                {
+                    var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.UserId == userId);
+                    if (giangVien == null)
+                        return NotFound(new { result = false, message = "Giảng viên không tồn tại" });
+
+                    query = query.Where(x => x.GiangVienId == giangVien.Id);
+                }
+
+                var danhSachDon = await query.ToListAsync();
+
+                var danhSachDonDto = danhSachDon.Select(x => new XinVangDayViewModel
+                {
+                    Id = x.Id,
+                    MaGiangVien = x.GiangVien?.MaGiangVien,
+                    TenGiangVien = x.GiangVien?.HoVaTenDem + " " +x.GiangVien?.Ten,
+                    LyDo = x.LyDo,
+                    CreatedAt = x.CreatedAt,
+                    TrangThai = x.TrangThai?.TenTrangThai,
+                    MaLopHocPhan = x.LopHocPhan?.MaLopHocPhan,
+                    TenLopHocPhan = x.LopHocPhan?.TenLopHocPhan,
+                    NgayXinVang = x.NgayXinVang,
+                    CaXinVang = x.CaXinVang,
+                    NgayDayBu = x.NgayDayBu,
+                    GioBatDauDayBu = x.GioBatDauDayBu,
+                    GioKetThucDayBu = x.GioKetThucDayBu,
+                    Phong = x.PhongHoc?.MaPhongHoc
+                }).OrderByDescending(x => x.CreatedAt).ToList();
+
+                return Ok(new
+                {
+                    result = true,
+                    code = 200,
+                    message = "Lấy danh sách đơn thành công",
+                    soluong = danhSachDonDto.Count,
+                    data = danhSachDonDto
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { result = false, message = "Lỗi: " + ex.Message });
+            }
         }
 
 

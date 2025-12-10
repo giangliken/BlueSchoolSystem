@@ -1,5 +1,7 @@
-﻿using BlueSchoolSystem.Models;
+﻿using Azure.Core;
+using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using BlueSchoolSystem.Repository;
 using BlueSchoolSystem.Services;
 using Google.Apis.Drive.v3.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -21,12 +23,15 @@ namespace BlueSchoolSystem.APIControllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly LopHocPhanService _lopHocPhanService;
-        public APIAdminController(IActivityLogService activityLogService, ApplicationDbContext context, UserManager<ApplicationUser> userManager,LopHocPhanService lopHocPhanService)
+        private readonly IEmailSender _emailSender;
+
+        public APIAdminController(IActivityLogService activityLogService, ApplicationDbContext context, UserManager<ApplicationUser> userManager,LopHocPhanService lopHocPhanService, IEmailSender emailSender)
         {
             _activityLogService = activityLogService;
             _context = context;
             _userManager = userManager;
             _lopHocPhanService = lopHocPhanService;
+            _emailSender = emailSender;
         }
 
         //Ghi log hệ thống
@@ -1143,5 +1148,119 @@ namespace BlueSchoolSystem.APIControllers
             });
         }
 
+
+        // POST: api/admin/CheckPhongVaGan/{donId}
+        [HttpPost("CheckPhongVaGan/{donId}")]
+        public async Task<IActionResult> CheckPhongVaGan(int donId)
+        {
+            var don = await _context.XinVangDays
+                        .Include(x => x.PhongHoc) // load navigation
+                        .FirstOrDefaultAsync(x => x.Id == donId);
+
+            if (don == null)
+                return NotFound(new { result = false, message = "Đơn không tồn tại" });
+
+            if (don.PhongHoc != null && !string.IsNullOrEmpty(don.PhongHoc.MaPhongHoc))
+                return BadRequest(new { result = false, message = "Đơn đã có phòng" });
+
+            var dsPhong = await _context.PhongHocs.ToListAsync();
+
+            foreach (var phong in dsPhong)
+            {
+                bool trungLich = await _context.XinVangDays
+                    .AnyAsync(x => x.NgayDayBu == don.NgayDayBu
+                                   && x.PhongHocId == phong.Id
+                                   && ((x.GioBatDauDayBu < don.GioKetThucDayBu)
+                                       && (don.GioBatDauDayBu < x.GioKetThucDayBu)));
+
+                if (!trungLich)
+                {
+                    don.PhongHoc = phong; // hoặc don.PhongId = phong.Id;
+                    await _context.SaveChangesAsync();
+                    return Ok(new { result = true, phong = phong.MaPhongHoc });
+                }
+            }
+
+            return BadRequest(new { result = false, message = "Không còn phòng trống" });
+        }
+
+
+        // POST: api/admin/DuyetDon/{donId}
+        [HttpPost("DuyetDon/{donId}")]
+        public async Task<IActionResult> DuyetDon(int donId)
+        {
+            var don = await _context.XinVangDays
+                .Include(x => x.LichHoc)
+                .Include(x => x.GiangVien)
+                    .ThenInclude(us => us.User)
+                .Include(x => x.PhongHoc)
+                .FirstOrDefaultAsync(x => x.Id == donId);
+
+            if (don == null)
+                return NotFound(new { result = false, message = "Đơn không tồn tại" });
+
+            // Xóa lịch cũ nếu có
+            if (don.LichHoc != null)
+            {
+                _context.LichHocs.Remove(don.LichHoc);
+                don.LichHoc = null;
+                don.LichHocId = null; // quan trọng để EF không lỗi
+            }
+
+            // Tạo lịch mới dựa vào NgayDayBu, GioBatDauDayBu...
+            var lichMoi = new LichHoc
+            {
+                LopHocPhanId = don.LopHocPhanId,
+                Ngay = don.NgayDayBu.Value,
+                GioBatDau = don.GioBatDauDayBu.Value,
+                GioKetThuc = don.GioKetThucDayBu.Value,
+                PhongHocId = don.PhongHocId
+            };
+            _context.LichHocs.Add(lichMoi);
+            don.LichHoc = lichMoi;
+
+            // Cập nhật trạng thái
+            var trangThaiDuyet = await _context.TrangThais
+                .FirstOrDefaultAsync(t => t.LoaiTrangThai == "DonPhieu" && t.TenTrangThai == "Đã duyệt");
+            don.TrangThai = trangThaiDuyet;
+
+            await _context.SaveChangesAsync();
+
+            var emailGV = don.GiangVien?.User?.Email;
+
+            var gioBatDauBu = don.GioBatDauDayBu?.ToString(@"hh\:mm") ?? "-";
+            var gioKetThucBu = don.GioKetThucDayBu?.ToString(@"hh\:mm") ?? "-";
+
+            await _emailSender.SendEmailAsync(
+                emailGV,
+                "Thông báo duyệt đơn xin vắng dạy",
+                $"Đơn xin vắng dạy của bạn vào ngày {don.NgayXinVang:dd/MM/yyyy} đã được duyệt.\n" +
+                $"Thông tin cụ thể:\n" +
+                $"- Ngày xin vắng: {don.NgayXinVang} ({don.CaXinVang})\n" +
+                $"- Ngày dạy bù: {don.NgayDayBu:dd/MM/yyyy} ({gioBatDauBu} - {gioKetThucBu})\n" +
+                $"- Phòng học: {don.PhongHoc?.MaPhongHoc}"
+            );
+
+
+            return Ok(new { result = true });
+        }
+
+
+
+
+        // POST: api/admin/TuChoiDon/{donId}
+        [HttpPost("TuChoiDon/{donId}")]
+        public async Task<IActionResult> TuChoiDon(int donId)
+        {
+            var don = await _context.XinVangDays.FirstOrDefaultAsync(x => x.Id == donId);
+            if (don == null) return NotFound(new { result = false, message = "Đơn không tồn tại" });
+
+            var trangThaiTuChoi = await _context.TrangThais
+                                        .FirstOrDefaultAsync(t => t.LoaiTrangThai == "DonPhieu" && t.TenTrangThai == "Từ chối");
+
+            don.TrangThai = trangThaiTuChoi;
+            await _context.SaveChangesAsync();
+            return Ok(new { result = true });
+        }
     }
 }

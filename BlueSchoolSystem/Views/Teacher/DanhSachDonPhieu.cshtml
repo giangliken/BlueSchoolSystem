@@ -1,0 +1,82 @@
+﻿@model List<BlueSchoolSystem.Models.ViewModel.XinVangDayViewModel>
+
+@{
+    ViewData["Title"] = "Danh sách đơn đã gửi";
+}
+
+<div class="container mt-4">
+    <h3 class="mb-4">Danh sách đơn xin vắng đã gửi</h3>
+
+    @if (!string.IsNullOrEmpty(ViewBag.Error))
+    {
+        <div class="alert alert-danger">@ViewBag.Error</div>
+    }
+
+    <table class="table table-bordered table-striped">
+        <thead class="table-primary">
+            <tr>
+                <th class="text-center">#</th>
+                <th class="text-center">Mã lớp học phần</th>
+                <th class="text-center">Tên lớp học phần</th>
+                <th class="text-center">Ngày xin vắng</th>
+                <th class="text-center">Ngày dạy bù</th>
+                <th class="text-center">Phòng</th>
+                <th class="text-center">Lý do</th>
+                <th class="text-center">Trạng thái</th>
+                <th class="text-center">Ngày gửi</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null && Model.Count > 0)
+            {
+                int i = 1;
+                foreach (var don in Model)
+                {
+                    <tr>
+                        <td class="text-center">@i</td>
+                        <td>@don.MaLopHocPhan</td>
+                        <td>@don.TenLopHocPhan</td>
+                        <td>@don.NgayXinVang <br />(@don.CaXinVang)</td>
+                        <td>
+                            @don.NgayDayBu?.ToString("dd/MM/yyyy") <br />(@(don.GioBatDauDayBu.HasValue && don.GioKetThucDayBu.HasValue
+                                                ? $"{don.GioBatDauDayBu:hh\\:mm} - {don.GioKetThucDayBu:hh\\:mm}"
+                                                : "-"))
+                        </td>
+                            
+                    <td>@don.Phong</td>
+                    <td>@don.LyDo</td>
+
+                    <td>
+                        @if (don.TrangThai == "Từ chối")
+                                {
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times-circle me-1"></i>@don.TrangThai
+                                    </span>
+                                }
+                                else if (don.TrangThai == "Đã duyệt")
+                                {
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check-circle me-1"></i>@don.TrangThai
+                                    </span>
+                                }
+                                else if (don.TrangThai == "Chờ duyệt")
+                                {
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-hourglass-half me-1"></i>@don.TrangThai
+                                    </span>
+                                }
+                     </td>
+                        <td>@don.CreatedAt.ToString("HH:mm dd/MM/yyyy")</td>
+            </tr>
+                        i++;
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="7" class="text-center">Không có dữ liệu</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
