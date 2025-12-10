@@ -1,0 +1,422 @@
+﻿@using BlueSchoolSystem.Models
+@model IEnumerable<BlueSchoolSystem.Models.HoaDonHocPhi>
+
+@{
+    var sv = ViewBag.SinhVien as SinhVien;
+    var giaoDichs = ViewBag.GiaoDichs as IEnumerable<GiaoDichThanhToan>;
+    ViewData["Title"] = $"Hồ sơ Học phí - {sv?.MSSV}";
+}
+
+<div class="container-fluid mt-4">
+
+    @* ================================================================= *@
+    @* PHẦN 1: HEADER - THÔNG TIN SINH VIÊN & NÚT CHỨC NĂNG *@
+    @* ================================================================= *@
+    <div class="card shadow-sm mb-4 border-start border-5 border-primary">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <a asp-action="TuitionManager" class="text-decoration-none text-secondary mb-2 d-inline-block">
+                    <i class="fa fa-arrow-left"></i> Quay lại danh sách
+                </a>
+                <h4 class="fw-bold text-primary mb-1">
+                    <i class="fa fa-user-graduate me-2"></i> @sv?.HoVaTenDem @sv?.Ten
+                </h4>
+                <div class="text-muted">
+                    MSSV: <strong class="text-dark">@sv?.MSSV</strong> |
+                    Lớp: <strong class="text-dark">@sv?.Lop?.MaLop</strong>
+                </div>
+            </div>
+
+            <div class="text-end">
+                @* Hiển thị Ví tiền *@
+                <div class="mb-2">
+                    <span class="badge bg-success p-2 fs-6">
+                        <i class="fa fa-wallet me-1"></i> Ví dư: @sv?.SoDu.ToString("N0") đ
+                    </span>
+                </div>
+
+                @* Nút Cập nhật (Tính lại tiền) *@
+                <button type="button" class="btn btn-warning shadow-sm" data-bs-toggle="modal" data-bs-target="#modalUpdateTuition">
+                    <i class="fa fa-sync-alt me-1"></i> Cập nhật / Tính lại Công nợ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @* ================================================================= *@
+    @* PHẦN 2: CÁC TAB NỘI DUNG (HÓA ĐƠN & LỊCH SỬ) *@
+    @* ================================================================= *@
+    <ul class="nav nav-tabs nav-fill mb-3" id="tuitionTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-bold" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button" role="tab">
+                <i class="fa fa-list-alt me-2"></i> CHI TIẾT CÔNG NỢ & MÔN HỌC
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab">
+                <i class="fa fa-history me-2"></i> LỊCH SỬ ĐÓNG TIỀN
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content border rounded p-3 bg-white shadow-sm" id="tuitionTabsContent">
+
+        @* --- TAB 1: DANH SÁCH HÓA ĐƠN --- *@
+        <div class="tab-pane fade show active" id="invoices" role="tabpanel">
+            @if (!Model.Any())
+            {
+                <div class="alert alert-warning text-center py-5">
+                    <i class="fa fa-folder-open fa-3x mb-3"></i><br />
+                    Sinh viên chưa có dữ liệu học phí nào.<br />
+                    <small>Vui lòng bấm nút "Cập nhật / Tính lại Công nợ" ở trên để tạo dữ liệu.</small>
+                </div>
+            }
+            else
+            {
+                @* Thống kê tổng quan *@
+                <div class="row mb-4 text-center">
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light">
+                            <small class="text-muted">Tổng phải thu</small>
+                            <h4 class="fw-bold text-dark">@Model.Sum(x => x.TongTien).ToString("N0") đ</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light">
+                            <small class="text-muted">Đã đóng</small>
+                            <h4 class="fw-bold text-success">@Model.Sum(x => x.DaDong).ToString("N0") đ</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light">
+                            <small class="text-muted">Tổng nợ hiện tại</small>
+                            <h4 class="fw-bold text-danger">@Model.Sum(x => x.ConLai).ToString("N0") đ</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion" id="accordionTuition">
+                    @foreach (var hd in Model)
+                    {
+                        var isPaid = hd.ConLai <= 0;
+                        var bgHeader = isPaid ? "bg-success-subtle" : (hd.DaDong > 0 ? "bg-warning-subtle" : "bg-danger-subtle");
+                        var statusText = isPaid ? "Đã hoàn thành" : (hd.DaDong > 0 ? "Đóng một phần" : "Chưa hoàn thành");
+
+                        <div class="accordion-item mb-3 border">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button @(isPaid ? "collapsed" : "") @bgHeader" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_@hd.Id">
+                                    <div class="d-flex w-100 justify-content-between me-3 align-items-center">
+                                        <span>
+                                            <i class="fa fa-calendar-check me-2"></i>
+                                            <strong>Học kỳ @hd.HocKy - Năm học @hd.NamHoc</strong>
+                                            <span class="badge bg-white text-dark border ms-2">@statusText</span>
+                                        </span>
+                                        <span class="fw-bold">
+                                            Nợ: <span class="@(hd.ConLai > 0 ? "text-danger" : "text-success")">@hd.ConLai.ToString("N0") đ</span>
+                                        </span>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="collapse_@hd.Id" class="accordion-collapse collapse @(isPaid ? "" : "show")" data-bs-parent="#accordionTuition">
+                                <div class="accordion-body">
+                                    @* Tổng quan hóa đơn con *@
+                                    <div class="row text-center mb-3 align-items-center">
+                                        <div class="col-3 border-end">
+                                            <small class="text-muted d-block">Tổng học phí kỳ này</small>
+                                            <span class="fw-bold fs-5">@hd.TongTien.ToString("N0") đ</span>
+                                        </div>
+                                        <div class="col-3 border-end">
+                                            <small class="text-muted d-block">Đã đóng</small>
+                                            <span class="fw-bold text-success fs-5">@hd.DaDong.ToString("N0") đ</span>
+                                        </div>
+                                        <div class="col-3 border-end">
+                                            <small class="text-muted d-block">Phải đóng</small>
+                                            <span class="fw-bold text-danger fs-5">@hd.ConLai.ToString("N0") đ</span>
+                                        </div>
+                                        <div class="col-3">
+                                            @if (hd.ConLai > 0)
+                                            {
+                                                <button class="btn btn-primary btn-payment w-100"
+                                                        data-id="@hd.Id"
+                                                        data-amount="@hd.ConLai"
+                                                        data-info="HK @hd.HocKy (@hd.NamHoc)">
+                                                    <i class="fa fa-money-bill-wave me-1"></i> Thanh toán
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-secondary w-100" disabled>
+                                                    <i class="fa fa-check"></i> Xong
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    @* Chi tiết môn học *@
+                                    <h6 class="text-primary border-bottom pb-2 mt-4"><i class="fa fa-book me-1"></i> Các môn đã đăng ký trong kỳ:</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped table-hover mb-0">
+                                            <thead class="table-secondary">
+                                                <tr>
+                                                    <th>Môn học</th>
+                                                    <th class="text-center">Số TC</th>
+                                                    <th class="text-end">Học phí môn</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @if (hd.ChiTietHoaDons != null && hd.ChiTietHoaDons.Any())
+                                                {
+                                                    foreach (var ct in hd.ChiTietHoaDons)
+                                                    {
+                                                        <tr>
+                                                            <td>
+                                                                <span class="fw-bold">@ct.DangKyHocPhan?.LopHocPhan?.MonHoc?.TenMonHoc</span>
+                                                                <br /><small class="text-muted">Mã LHP: @ct.DangKyHocPhan?.LopHocPhan?.MaLopHocPhan</small>
+                                                            </td>
+                                                            <td class="text-center">@ct.DangKyHocPhan?.LopHocPhan?.MonHoc?.SoTinChi</td>
+                                                            <td class="text-end">@ct.SoTien.ToString("N0") đ</td>
+                                                        </tr>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <tr>
+                                                        <td colspan="3" class="text-center text-muted fst-italic">Không có chi tiết môn học.</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+@* --- TAB 2: LỊCH SỬ GIAO DỊCH (ĐÃ SỬA LỖI PROPERTY) --- *@
+        <div class="tab-pane fade" id="history" role="tabpanel">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Thời gian</th>
+                            <th>Người thực hiện</th>
+                            <th>Số tiền (Ví)</th>
+                            <th>Loại Giao dịch</th>
+                            <th>Nội dung / Ghi chú</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (giaoDichs != null && giaoDichs.Any())
+                        {
+                            foreach (var gd in giaoDichs)
+                            {
+                                // Logic hiển thị: Nạp tiền (1) thì cộng, Thanh toán (2) thì trừ
+                                // Lưu ý: Trong Service, SoTien đã lưu âm/dương rồi, nên hiển thị trực tiếp cũng được
+                                // Hoặc check LoaiGiaoDich để chắc chắn
+                                
+                                var isDeposit = gd.LoaiGiaoDich == 1; // 1: Nạp tiền
+                                var colorClass = isDeposit ? "text-success" : "text-danger";
+                                var sign = gd.SoTien > 0 ? "+" : ""; // Số âm tự có dấu -
+
+                                <tr>
+                                    <td>@gd.NgayThanhToan.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>
+                                        @* --- SỬA Ở ĐÂY: NguoiThucHien --- *@
+                                        <i class="fa fa-user-tie me-1"></i> @gd.NguoiThucHien
+                                    </td>
+                                    
+                                    <td class="fw-bold @colorClass">@sign@gd.SoTien.ToString("N0") đ</td> 
+                                    
+                                    <td>
+                                        <span class="badge @(isDeposit ? "bg-success" : "bg-primary")">
+                                            @gd.HinhThuc
+                                        </span>
+                                    </td>
+                                    
+                                    <td>
+                                        @if (isDeposit)
+                                        {
+                                            <span>Nạp tiền vào Ví</span> <br />
+                                            <small class="text-muted">(@gd.GhiChu)</small>
+                                        }
+                                        else
+                                        {
+                                            <span>Thanh toán hóa đơn</span> <br />
+                                            <small class="text-muted">
+                                                Áp dụng cho HK @gd.HoaDonHocPhi?.HocKy - @gd.HoaDonHocPhi?.NamHoc
+                                            </small>
+                                            @if (!string.IsNullOrEmpty(gd.GhiChu) && !gd.GhiChu.Contains("Thanh toán học phí"))
+                                            {
+                                                // Chỉ hiện ghi chú phụ nếu khác ghi chú mặc định
+                                                <small class="d-block text-muted">(@gd.GhiChu)</small>
+                                            }
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="5" class="text-center py-4 text-muted">Chưa có giao dịch nào phát sinh.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ================================================================= *@
+@* PHẦN 3: MODALS (ĐẶT Ở CUỐI FILE) *@
+@* ================================================================= *@
+
+@* --- MODAL 1: CẬP NHẬT HỌC PHÍ --- *@
+<div class="modal fade" id="modalUpdateTuition" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="UpdateTuition" method="post">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title text-dark"><i class="fa fa-sync"></i> Tính toán lại Học phí</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fa fa-info-circle me-1"></i>
+                        Hệ thống sẽ quét lại các môn đã đăng ký của sinh viên trong kỳ được chọn và áp dụng đơn giá mới nhất.
+                    </div>
+                    <input type="hidden" name="sinhVienId" value="@sv.Id" />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Chọn Học kỳ cần tính:</label>
+                        <select name="hocKyId" class="form-select" asp-items="@ViewBag.HocKys" required>
+                            <option value="">-- Chọn học kỳ --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-warning">Xác nhận cập nhật</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* ================= MODAL THANH TOÁN THÔNG MINH ================= *@
+<div class="modal fade" id="modalPayment" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="MakePayment" method="post">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fa fa-file-invoice-dollar"></i> Xác nhận Thanh toán</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="hoaDonId" id="paymentHoaDonId" />
+                    
+                    @* Thông tin thanh toán *@
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <span>Đang thanh toán cho:</span>
+                        <span id="paymentSemesterName" class="fw-bold text-primary">...</span>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <small class="text-muted">Tổng nợ hóa đơn:</small>
+                            <h5 class="text-danger fw-bold" id="displayDebt">0 đ</h5>
+                        </div>
+                        <div class="col-6 text-end">
+                            <small class="text-muted">Số dư ví hiện tại:</small>
+                            <h5 class="text-success fw-bold">@sv?.SoDu.ToString("N0") đ</h5>
+                            @* Lưu số dư vào biến hidden để JS dùng *@
+                            <input type="hidden" id="currentWallet" value="@sv?.SoDu" />
+                        </div>
+                    </div>
+
+                    @* Logic hiển thị trạng thái ví *@
+                    <div id="alertSufficient" class="alert alert-success d-none">
+                        <i class="fa fa-check-circle me-1"></i> Số dư ví <strong>đủ</strong> để thanh toán.
+                    </div>
+                    <div id="alertInsufficient" class="alert alert-warning d-none">
+                        <i class="fa fa-exclamation-triangle me-1"></i> Số dư ví <strong>thiếu</strong>. Cần thu thêm tiền.
+                    </div>
+
+                    @* Ô nhập tiền thu thêm *@
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Số tiền thu thêm (VNĐ):</label>
+                        <div class="input-group">
+                            @* SỬA Ở ĐÂY: đổi min="1000" thành min="0" *@
+                            <input type="number" name="soTien" id="paymentTopUp" 
+                                   class="form-control fw-bold text-primary" 
+                                   value="0" min="0" step="1000" required />
+                            <span class="input-group-text">VNĐ</span>
+                        </div>
+                        <small class="text-muted fst-italic">Nhập 0 nếu trừ trực tiếp từ ví.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Ghi chú:</label>
+                        <textarea name="ghiChu" class="form-control" rows="2" placeholder="Ví dụ: Sinh viên đóng tiền mặt..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnConfirmPay">
+                        <i class="fa fa-check"></i> Xác nhận Thanh toán
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@* ================================================================= *@
+@* PHẦN 4: SCRIPTS (XỬ LÝ NÚT BẤM) *@
+@* ================================================================= *@
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // Xử lý khi bấm nút Thanh toán ở từng dòng
+            $('.btn-payment').click(function () {
+                var hoaDonId = $(this).data('id');
+                var debtAmount = parseFloat($(this).data('amount')); // Số tiền nợ
+                var semester = $(this).data('info');
+                
+                // Lấy số dư ví từ hidden input (hoặc từ Razor nếu render trực tiếp vào JS)
+                var currentWallet = parseFloat($('#currentWallet').val());
+
+                // Điền thông tin vào Modal
+                $('#paymentHoaDonId').val(hoaDonId);
+                $('#paymentSemesterName').text(semester);
+                $('#displayDebt').text(debtAmount.toLocaleString('vi-VN') + ' đ');
+
+                // Tính toán logic
+                var missingAmount = 0;
+
+                if (currentWallet >= debtAmount) {
+                    // Đủ tiền
+                    $('#alertSufficient').removeClass('d-none');
+                    $('#alertInsufficient').addClass('d-none');
+                    missingAmount = 0;
+                    // Có thể disable ô nhập tiền nếu muốn
+                    // $('#paymentTopUp').prop('readonly', true); 
+                } else {
+                    // Thiếu tiền
+                    $('#alertSufficient').addClass('d-none');
+                    $('#alertInsufficient').removeClass('d-none');
+                    missingAmount = debtAmount - currentWallet;
+                    // $('#paymentTopUp').prop('readonly', false);
+                }
+
+                // Điền số tiền cần nạp thêm vào ô input
+                $('#paymentTopUp').val(missingAmount);
+
+                // Hiện Modal
+                var modal = new bootstrap.Modal(document.getElementById('modalPayment'));
+                modal.show();
+            });
+        });
+    </script>
+}

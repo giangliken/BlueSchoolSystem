@@ -45,6 +45,11 @@ namespace BlueSchoolSystem.Models
         public DbSet<DotDangKy> DotDangKys { get; set; } // Bảng đợt đăng ký
         public DbSet<GiangVienMonHoc> GiangVienMonHocs { get; set; }
 
+        public DbSet<DinhMucHocPhi> DinhMucHocPhis { get; set; }
+        public DbSet<HoaDonHocPhi> HoaDonHocPhis { get; set; }
+        public DbSet<ChiTietHoaDon> ChiTietHoaDons { get; set; }
+        public DbSet<TaiKhoanSinhVien> TaiKhoanSinhViens { get; set; } 
+        public DbSet<GiaoDichThanhToan> GiaoDichThanhToans { get; set; }
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -161,6 +166,89 @@ namespace BlueSchoolSystem.Models
                 e.ToTable("FaceVerifyLogs");
             });
 
+
+            // 1. HoaDonHocPhi
+            builder.Entity<HoaDonHocPhi>(e =>
+            {
+                // Liên kết SinhVien (1-N)
+                e.HasOne(h => h.SinhVien)
+                 .WithMany() // Nếu trong SinhVien chưa có List<HoaDon>, để trống
+                 .HasForeignKey(h => h.SinhVienId)
+                 .OnDelete(DeleteBehavior.Restrict); // Không xóa SV nếu có hóa đơn
+
+                // Decimal precision
+                e.Property(h => h.TongTien).HasColumnType("decimal(18, 2)");
+                e.Property(h => h.DaDong).HasColumnType("decimal(18, 2)");
+                e.Property(h => h.ConLai).HasColumnType("decimal(18, 2)");
+            });
+
+            // 2. ChiTietHoaDon
+            builder.Entity<ChiTietHoaDon>(e =>
+            {
+                e.HasOne(ct => ct.HoaDonHocPhi)
+                 .WithMany(hd => hd.ChiTietHoaDons)
+                 .HasForeignKey(ct => ct.HoaDonHocPhiId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+           
+                e.HasOne(ct => ct.DangKyHocPhan)
+                 .WithMany()
+                 .HasForeignKey(ct => ct.DangKyHocPhanId)
+                 .OnDelete(DeleteBehavior.Restrict);
+          
+                e.Property(ct => ct.SoTien).HasColumnType("decimal(18, 2)");
+            });
+
+            // 3. DinhMucHocPhi
+            builder.Entity<DinhMucHocPhi>(e =>
+            {
+                e.Property(d => d.GiaTienMotTinChi).HasColumnType("decimal(18, 2)");
+
+                // Liên kết với Ngành
+                e.HasOne(d => d.NganhHoc)
+                 .WithMany()
+                 .HasForeignKey(d => d.NganhId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                // XÓA BỎ LIÊN KẾT VỚI KHOAHOC Ở ĐÂY NẾU CÓ
+            });
+
+            // 1. TaiKhoanSinhVien (1-1 với SinhVien)
+            builder.Entity<TaiKhoanSinhVien>(e =>
+            {
+                e.HasKey(t => t.Id);
+                e.Property(t => t.SoDu).HasColumnType("decimal(18, 2)");
+                e.Property(t => t.RowVersion).IsRowVersion(); // Timestamp cho concurrency
+
+                // Quan hệ 1-1: SinhVien là Principal (Cha), TaiKhoan là Dependent (Con)
+                e.HasOne(t => t.SinhVien)
+                 .WithOne() // Bên SinhVien có thể không cần property điều hướng ngược lại
+                 .HasForeignKey<TaiKhoanSinhVien>(t => t.SinhVienId)
+                 .OnDelete(DeleteBehavior.Cascade); // Xóa SV -> Xóa Tài khoản
+
+                e.HasOne(t => t.TrangThai)
+                 .WithMany()
+                 .HasForeignKey(t => t.TrangThaiId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // 2. GiaoDichThanhToan
+            builder.Entity<GiaoDichThanhToan>(e =>
+            {
+                e.Property(g => g.SoTien).HasColumnType("decimal(18, 2)");
+
+                // Liên kết với TaiKhoanSinhVien (Bắt buộc)
+                e.HasOne(g => g.TaiKhoanSinhVien)
+                 .WithMany(tk => tk.LichSuGiaoDichs)
+                 .HasForeignKey(g => g.TaiKhoanSinhVienId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                // Liên kết với HoaDonHocPhi (Có thể null - ví dụ nạp tiền)
+                e.HasOne(g => g.HoaDonHocPhi)
+                 .WithMany() // HoaDon không cần list GiaoDich (hoặc có thể thêm nếu muốn)
+                 .HasForeignKey(g => g.HoaDonHocPhiId)
+                 .OnDelete(DeleteBehavior.Restrict); // Không xóa Hóa đơn nếu đã có giao dịch
+            });
 
         }
     }

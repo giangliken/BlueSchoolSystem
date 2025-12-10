@@ -36,8 +36,9 @@ namespace BlueSchoolSystem.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IActivityLogService _activityLogService;
         private readonly LopHocPhanService _lhpService;
+        private readonly HocPhiService _hocPhiService;
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService)
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, HocPhiService hocPhiService)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
@@ -45,6 +46,8 @@ namespace BlueSchoolSystem.Controllers
             _userManager = userManager;
             this.configuration = configuration;
             _lhpService = lhpService;
+            _hocPhiService = hocPhiService;
+
 
             _apiBaseUrl = configuration["ApiSettings:BaseUrl"];
             _activityLogService = activityLogService;
@@ -4095,7 +4098,214 @@ namespace BlueSchoolSystem.Controllers
             {
                 return StatusCode(500, new { result = false, message = "Lỗi hệ thống: " + ex.Message });
             }
-
         }
+
+
+
+        #region ======= Quản lý Học phí =======
+
+        // 1. Dashboard: Danh sách công nợ
+        public async Task<IActionResult> TuitionManager(string keyword, int? lopId)
+        {
+            try
+            {
+                // Gọi Service để lấy danh sách (đã sửa query lấy số dư từ bảng TaiKhoanSinhVien ở bước trước)
+                var data = await _hocPhiService.GetDanhSachCongNoAsync(keyword, lopId);
+
+                // Load dropdown lớp học để lọc
+                ViewBag.LopList = new SelectList(await _context.LopHocs.ToListAsync(), "Id", "MaLop", lopId);
+                // Load danh sách học kỳ cho Modal cập nhật nhanh
+                ViewBag.HocKys = new SelectList(await _context.HocKys.OrderByDescending(h => h.Id).ToListAsync(), "Id", "TenHocKy");
+                // Load danh sách ngành cho Modal (nếu cần)
+                ViewBag.NganhList = new SelectList(await _context.NganhHocs.ToListAsync(), "Id", "TenNganh");
+
+                ViewBag.Keyword = keyword;
+
+                return View(data);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi tải dữ liệu học phí: " + ex.Message;
+                return View(new List<HocPhiDashboardVM>());
+            }
+        }
+
+        // 2. Chi tiết học phí của 1 sinh viên
+        public async Task<IActionResult> TuitionDetails(int id) // id = SinhVienId
+        {
+            var sv = await _context.SinhViens
+                .Include(s => s.Lop)
+                .FirstOrDefaultAsync(s => s.Id == id);
+
+            if (sv == null)
+            {
+                TempData["Error"] = "Không tìm thấy sinh viên.";
+                return RedirectToAction(nameof(TuitionManager));
+            }
+
+            // A. Lấy thông tin Tài khoản (Ví) để hiển thị số dư
+            // Vì bảng SinhVien không còn cột SoDu, ta phải lấy từ TaiKhoanSinhVien
+            var taiKhoan = await _context.TaiKhoanSinhViens
+                .FirstOrDefaultAsync(tk => tk.SinhVienId == id);
+
+            // Gán tạm số dư vào property ảo của SV hoặc dùng ViewBag riêng
+            // Ở đây tôi gán vào sv.SoDu (nếu bạn giữ property này ở ViewModel/NotMapped) 
+            // hoặc tốt nhất là dùng ViewBag để View hiển thị
+            sv.SoDu = taiKhoan?.SoDu ?? 0;
+
+            // B. Lấy danh sách hóa đơn của SV này
+            var hoaDons = await _context.HoaDonHocPhis
+                .Include(hd => hd.ChiTietHoaDons)
+                    .ThenInclude(ct => ct.DangKyHocPhan)
+                        .ThenInclude(dk => dk.LopHocPhan)
+                            .ThenInclude(lhp => lhp.MonHoc)
+                .Where(hd => hd.SinhVienId == id)
+                .OrderByDescending(hd => hd.NamHoc)
+                .ThenByDescending(hd => hd.HocKy)
+                .ToListAsync();
+
+            // C. Lấy lịch sử giao dịch
+            // Logic mới: Lấy theo TaiKhoanSinhVienId (vì giao dịch gắn với Tài khoản)
+            var giaoDichs = new List<GiaoDichThanhToan>();
+            if (taiKhoan != null)
+            {
+                giaoDichs = await _context.GiaoDichThanhToans
+                    .Include(gd => gd.HoaDonHocPhi) // Include để hiển thị kỳ học nếu là thanh toán
+                    .Where(gd => gd.TaiKhoanSinhVienId == taiKhoan.Id)
+                    .OrderByDescending(gd => gd.NgayThanhToan)
+                    .ToListAsync();
+            }
+
+            ViewBag.SinhVien = sv;
+            ViewBag.GiaoDichs = giaoDichs;
+            ViewBag.HocKys = new SelectList(await _context.HocKys.OrderByDescending(h => h.Id).ToListAsync(), "Id", "TenHocKy");
+
+            return View(hoaDons);
+        }
+
+        // 3. Action: Cập nhật (Tính toán lại) học phí cho 1 kỳ
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateTuition(int sinhVienId, int hocKyId)
+        {
+            try
+            {
+                var userName = User.Identity.Name ?? "Admin";
+                await _hocPhiService.CalculateTuitionFeeAsync(sinhVienId, hocKyId, userName);
+                TempData["Success"] = "Đã cập nhật công nợ thành công!";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi cập nhật: " + ex.Message;
+            }
+            // Quay lại trang chi tiết
+            return RedirectToAction(nameof(TuitionDetails), new { id = sinhVienId });
+        }
+
+        // 4. Action: Thanh toán (Nạp tiền & Đóng tiền)
+        // Logic: Admin nhận tiền mặt -> Nạp vào Ví -> Trừ Ví đóng Hóa đơn
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MakePayment(int hoaDonId, decimal soTien, string ghiChu)
+        {
+            // soTien ở đây là số tiền NẠP THÊM. Có thể = 0.
+            if (soTien < 0)
+            {
+                TempData["Error"] = "Số tiền nạp thêm không được âm.";
+                return RedirectToAction(nameof(TuitionManager));
+            }
+
+            try
+            {
+                var userName = User.Identity.Name ?? "Admin";
+
+                // 1. Lấy thông tin hóa đơn
+                var hoaDon = await _context.HoaDonHocPhis.FindAsync(hoaDonId);
+                if (hoaDon == null) return NotFound();
+
+                // 2. Kiểm tra tài khoản sinh viên có đủ tiền không
+                var taiKhoan = await _context.TaiKhoanSinhViens
+                                             .FirstOrDefaultAsync(t => t.SinhVienId == hoaDon.SinhVienId);
+
+                decimal soDuHienTai = taiKhoan?.SoDu ?? 0;
+                decimal tongTienCo = soDuHienTai + soTien; // Ví + Nạp thêm
+
+                // Kiểm tra xem Tổng tiền có đủ trả nợ không
+                if (tongTienCo < hoaDon.ConLai)
+                {
+                    TempData["Error"] = $"Không đủ tiền. Ví hiện tại: {soDuHienTai:N0}đ + Nạp thêm: {soTien:N0}đ < Số nợ: {hoaDon.ConLai:N0}đ";
+                    return RedirectToAction(nameof(TuitionDetails), new { id = hoaDon.SinhVienId });
+                }
+
+                // 3. Thực hiện NẠP TIỀN (Chỉ nạp nếu Admin có nhập số tiền > 0)
+                if (soTien > 0)
+                {
+                    await _hocPhiService.NapTienVaoViAsync(hoaDon.SinhVienId, soTien, userName, "Nạp tiền bổ sung: " + ghiChu);
+                }
+
+                // 4. Thực hiện THANH TOÁN (Trừ tiền từ ví)
+                // Lưu ý: Lúc này trong Ví chắc chắn đã đủ tiền (vì đã check ở bước 2)
+                await _hocPhiService.ThanhToanHocPhiAsync(hoaDonId, hoaDon.ConLai, userName);
+
+                TempData["Success"] = $"Đã thanh toán thành công hóa đơn {hoaDon.ConLai:N0}đ!";
+                return RedirectToAction(nameof(TuitionDetails), new { id = hoaDon.SinhVienId });
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi xử lý: " + ex.Message;
+                // Cố gắng tìm ID để redirect về trang chi tiết
+                var hd = await _context.HoaDonHocPhis.FindAsync(hoaDonId);
+                if (hd != null)
+                    return RedirectToAction(nameof(TuitionDetails), new { id = hd.SinhVienId });
+                else
+                    return RedirectToAction(nameof(TuitionManager));
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateFeeRate(DinhMucHocPhi model)
+        {
+            try
+            {
+                // 1. Validate dữ liệu
+                if (model.GiaTienMotTinChi <= 0)
+                {
+                    TempData["Error"] = "Giá tiền phải lớn hơn 0.";
+                    return RedirectToAction(nameof(TuitionManager));
+                }
+
+                if (string.IsNullOrWhiteSpace(model.NamHoc))
+                {
+                    TempData["Error"] = "Vui lòng nhập Năm học.";
+                    return RedirectToAction(nameof(TuitionManager));
+                }
+
+                // 2. Kiểm tra xem đã tồn tại định mức cho Năm học + Ngành này chưa
+                // (Tránh trùng lặp dữ liệu)
+                var exists = await _context.DinhMucHocPhis
+                    .AnyAsync(d => d.NamHoc == model.NamHoc && d.NganhId == model.NganhId);
+
+                if (exists)
+                {
+                    TempData["Error"] = $"Định mức cho năm {model.NamHoc} (Ngành ID: {model.NganhId}) đã tồn tại.";
+                    return RedirectToAction(nameof(TuitionManager));
+                }
+
+                // 3. Lưu vào Database
+                // (Lưu ý: Không gán DangApDung vì model không có)
+                _context.DinhMucHocPhis.Add(model);
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = $"Đã thêm định mức giá cho năm {model.NamHoc}!";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi khi tạo định mức: " + ex.Message;
+            }
+            return RedirectToAction(nameof(TuitionManager));
+        }
+
+        #endregion
     }
 }

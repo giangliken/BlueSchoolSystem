@@ -29,6 +29,7 @@ builder.Services.AddScoped<IEmailSender, EmailSender>();
 
 builder.Services.AddScoped<LopHocPhanService>();
 
+builder.Services.AddScoped<HocPhiService>();
 
 
 // 1. Đăng ký dịch vụ localization
