@@ -38,3 +38,13 @@
 38,Mới tạo,Học kỳ vừa được tạo và chưa có thay đổi,HocKy
 39,Đang diễn ra,Học kỳ hiện tại đang diễn ra,HocKy
 40,Đã kết thúc,Học kỳ đã hoàn thành,HocKy
+41,Chưa đóng	Sinh viên chưa đóng khoản nào,HocPhi
+42,Đóng một phần,Sinh viên đã đóng một phần nhưng chưa đủ,HocPhi
+43,Đã hoàn thành,Sinh viên đã đóng đủ học phí,HocPhi
+44,Hoạt động,Tài khoản ví sinh viên đang hoạt động bình thường,TaiKhoanSinhVien
+45,Tạm khóa,Tài khoản bị khóa tạm thời (do lỗi, kiểm tra, hoặc yêu cầu sinh viên),TaiKhoanSinhVien
+46,Đã khóa,Tài khoản bị khóa vĩnh viễn, không thể sử dụng,TaiKhoanSinhVien
+47,Số dư âm,Tài khoản có số dư nhỏ hơn 0 (nợ học phí hoặc phí khác),TaiKhoanSinhVien
+48,Số dư dương,Tài khoản có số dư lớn hơn 0 (sinh viên còn dư tiền),TaiKhoanSinhVien
+49,Đang xử lý giao dịch,Có giao dịch nạp/rút/chuyển đang được xử lý,TaiKhoanSinhVien
+50,Đã đóng băng,Tài khoản bị tạm dừng mọi giao dịch do kiểm tra tài chính,TaiKhoanSinhVien
