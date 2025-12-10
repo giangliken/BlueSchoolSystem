@@ -21,6 +21,7 @@ using System.Text;
 using System.Text.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using System.Collections.Generic;
+using BlueSchoolSystem.Repository;
 
 namespace BlueSchoolSystem.Controllers
 {
@@ -36,8 +37,9 @@ namespace BlueSchoolSystem.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IActivityLogService _activityLogService;
         private readonly LopHocPhanService _lhpService;
+        private readonly IEmailSender _emailSender;
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService)
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, IEmailSender emailSender)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
@@ -49,7 +51,7 @@ namespace BlueSchoolSystem.Controllers
             _apiBaseUrl = configuration["ApiSettings:BaseUrl"];
             _activityLogService = activityLogService;
 
-
+            _emailSender = emailSender;
         }
 
         //Giao diện trang chủ của Admin
@@ -1984,7 +1986,8 @@ namespace BlueSchoolSystem.Controllers
 
                     // Lọc LHP theo Học kỳ đã chọn
                     lhpList = lhpList
-                        .Where(l => {
+                        .Where(l =>
+                        {
                             var dict = (IDictionary<string, object>)l;
                             if (dict.ContainsKey("hocKyId"))
                             {
@@ -3014,9 +3017,9 @@ namespace BlueSchoolSystem.Controllers
                 return View(new List<MonHocViewModel>());
             }
         }
-       
 
-       
+
+
 
         //Trang chi tiết môn học
         public async Task<IActionResult> SubjectDetails(int id)
@@ -4097,5 +4100,50 @@ namespace BlueSchoolSystem.Controllers
             }
 
         }
+
+        //Trang danh sách đơn phiếu giảng viên
+        [Authorize(Roles = SD.Role_Admin)]
+        public async Task<IActionResult> DanhSachDonPhieu(string maLop, string trangThai, string ngayGui)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri("https://localhost:5001/");
+                var token = HttpContext.Session.GetString("access_token");
+                if (!string.IsNullOrEmpty(token))
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await client.GetAsync("api/danhsachdonphieu");
+                List<XinVangDayViewModel> danhSachDon = new();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    dynamic result = JsonConvert.DeserializeObject(body);
+                    danhSachDon = JsonConvert.DeserializeObject<List<XinVangDayViewModel>>(result.data.ToString());
+                }
+
+                // Filter tại server side
+                if (!string.IsNullOrEmpty(maLop))
+                    danhSachDon = danhSachDon.Where(x => x.MaLopHocPhan != null && x.MaLopHocPhan.Contains(maLop)).ToList();
+
+                if (!string.IsNullOrEmpty(trangThai))
+                    danhSachDon = danhSachDon.Where(x => x.TrangThai == trangThai).ToList();
+
+                if (!string.IsNullOrEmpty(ngayGui))
+                {
+                    if (DateTime.TryParse(ngayGui, out var dt))
+                        danhSachDon = danhSachDon.Where(x => x.CreatedAt.Date == dt.Date).ToList();
+                }
+
+                return View(danhSachDon);
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = "Lỗi: " + ex.Message;
+                return View(new List<XinVangDayViewModel>());
+            }
+        }
+
     }
 }

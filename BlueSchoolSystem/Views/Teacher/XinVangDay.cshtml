@@ -1,0 +1,258 @@
+﻿@model BlueSchoolSystem.Models.XinVangDay
+@using BlueSchoolSystem.Models.ViewModel
+
+@{
+    ViewData["Title"] = "Đơn xin vắng dạy";
+    var token = Context.Session.GetString("access_token");
+}
+
+<div class="container mt-4">
+    <div class="card shadow-lg">
+
+        <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+            <h3 class="card-title m-0">
+                <i class="fa fa-envelope-open-text me-2"></i> @ViewData["Title"]
+            </h3>
+        </div>
+
+        <div class="card-body">
+
+            @if (ViewBag.Error != null)
+            {
+                <div class="alert alert-danger">@ViewBag.Error</div>
+            }
+
+            <form asp-action="XinVangDay" method="post">
+                @Html.AntiForgeryToken()
+
+                <h4 class="mb-3">Thông tin đơn</h4>
+                <hr />
+
+                <!-- Lớp học phần -->
+                <div class="mb-3">
+                    <label for="LopHocPhanId" class="form-label fw-bold">
+                        Lớp học phần <span class="text-danger">*</span>
+                    </label>
+
+                    <select id="LopHocPhanId" asp-for="LopHocPhanId" class="form-select select2">
+                        <option value="">-- Chọn lớp học phần --</option>
+
+                        @if (ViewBag.LopHocPhanList is List<LopHocPhanShortVM> list && list.Count > 0)
+                        {
+                            foreach (var lhp in list)
+                            {
+                                <option value="@lhp.Id">@lhp.MaLopHocPhan - @lhp.TenMonHoc</option>
+                            }
+                        }
+                    </select>
+
+                    <span asp-validation-for="LopHocPhanId" class="text-danger"></span>
+                </div>
+
+                <!-- Buổi muốn nghỉ -->
+                <div class="mb-3">
+                    <label for="LichHocId" class="form-label fw-bold">Buổi muốn nghỉ <span class="text-danger">*</span></label>
+
+                    <select id="LichHocId" asp-for="LichHocId" class="form-select select2">
+                        <option value="">-- Chọn buổi học --</option>
+                    </select>
+
+                    <span asp-validation-for="LichHocId" class="text-danger"></span>
+                </div>
+
+                <!-- Lý do -->
+                <div class="mb-3">
+                    <label for="LyDo" class="form-label fw-bold">Lý do <span class="text-danger">*</span></label>
+
+                    <input list="LyDoOptions" asp-for="LyDo" class="form-control" placeholder="Chọn lý do hoặc nhập lý do khác..." />
+
+                    <datalist id="LyDoOptions">
+                        <option value="Ốm bệnh"></option>
+                        <option value="Có việc cá nhân"></option>
+                        <option value="Công tác đột xuất"></option>
+                        <option value="Khác"></option>
+                    </datalist>
+
+                    <span asp-validation-for="LyDo" class="text-danger"></span>
+                </div>
+
+
+                <h4 class="mt-4">Thông tin dạy bù</h4>
+                <hr />
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">Ngày dạy bù</label>
+                        <input asp-for="NgayDayBu" type="date" class="form-control" />
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">Ca dạy bù</label>
+                        <select id="CaDayBu" class="form-select">
+                            <option value="">-- Chọn ca --</option>
+                            <option value="sang">Ca sáng</option>
+                            <option value="chieu">Ca chiều</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label fw-bold">Giờ bắt đầu</label>
+                        <input asp-for="GioBatDauDayBu" id="GioBatDauDayBu" class="form-control" readonly />
+                    </div>
+
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label fw-bold">Giờ kết thúc</label>
+                        <input asp-for="GioKetThucDayBu" id="GioKetThucDayBu" class="form-control" readonly />
+                    </div>
+
+                </div>
+
+                <div class="mt-4 pt-3 d-flex justify-content-between">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fa fa-paper-plane"></i> Gửi đơn
+                    </button>
+
+                    <a asp-action="Index" class="btn btn-secondary btn-lg">
+                        <i class="fa fa-arrow-left"></i> Trở về
+                    </a>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        $('#CaDayBu').on('change', function () {
+            const ca = $(this).val();
+            if (ca === 'sang') {
+                $('#GioBatDauDayBu').val('07:30');
+                $('#GioKetThucDayBu').val('11:35');
+            } else if (ca === 'chieu') {
+                $('#GioBatDauDayBu').val('12:30');
+                $('#GioKetThucDayBu').val('16:35');
+            } else {
+                $('#GioBatDauDayBu').val('');
+                $('#GioKetThucDayBu').val('');
+            }
+        });
+    </script>
+
+    <script>
+        $(".select2").select2({
+            width: "100%",
+            placeholder: "Tìm kiếm...",
+            allowClear: true,
+            language: { noResults: () => "Không tìm thấy dữ liệu" }
+        });
+    </script>
+
+    <script>
+        const jwtToken = @Html.Raw(Json.Serialize(token));
+
+        function parseJwt(token) {
+            if (!token) return null;
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c =>
+                '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+            ).join(''));
+
+            return JSON.parse(jsonPayload);
+        }
+
+        // ⭐ Convert ngày sang Thứ VN
+        function getThuVN(dateStr) {
+            const date = new Date(dateStr);
+            const thu = date.getDay(); // 0-6
+
+            const map = {
+                0: "Chủ nhật",
+                1: "Thứ 2",
+                2: "Thứ 3",
+                3: "Thứ 4",
+                4: "Thứ 5",
+                5: "Thứ 6",
+                6: "Thứ 7"
+            };
+
+            return map[thu] ?? "N/A";
+        }
+
+
+                function formatDateVN(dateStr) {
+            if (!dateStr) return "N/A";
+            const date = new Date(dateStr);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // Tháng JS từ 0-11
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+    </script>
+
+    <!-- ⭐ EVENT CHANGE LHP + FETCH LỊCH GIẢNG DẠY ⭐ -->
+    <script>
+        $('#LopHocPhanId').on('change', async function () {
+
+            console.log("🔥 EVENT change fired");
+
+            const selectedText = $("#LopHocPhanId option:selected").text();
+            console.log("Selected text:", selectedText);
+
+            const maLopHocPhan = selectedText.split(" - ")[0]?.trim();
+            console.log("maLopHocPhan:", maLopHocPhan);
+
+            const tokenData = parseJwt(jwtToken);
+            console.log("Token decoded:", tokenData);
+
+            if (!tokenData) {
+                console.error("❌ Token NULL — Session không có token");
+                return;
+            }
+
+            const maGV = tokenData.username;
+            console.log("Mã GV:", maGV);
+
+            const res = await fetch(`/api/lichgiangday/${maGV}`, {
+                headers: { "Authorization": `Bearer ${jwtToken}` }
+            });
+
+            console.log("API status:", res.status);
+
+            const data = await res.json();
+            console.log("API result:", data);
+
+            const lichHocSelect = $("#LichHocId");
+            lichHocSelect.empty();
+            lichHocSelect.append(`<option value="">-- Chọn buổi học --</option>`);
+
+            if (data?.data?.length > 0) {
+
+                        data.data.forEach(item => {
+            const ngay = formatDateVN(item.ngay); // chuyển sang DD/MM/YYYY
+            const thu = getThuVN(item.ngay);
+
+            const gioBD = item.gioBatDau ?? "";
+            const gioKT = item.gioKetThuc ?? "";
+
+            const text = `${thu} ${ngay} (${gioBD} - ${gioKT})  `;
+
+            lichHocSelect.append(`
+                <option value="${item.id}">
+                    ${text}
+                </option>
+            `);
+        });
+
+            }
+
+            lichHocSelect.trigger("change");
+        });
+    </script>
+}
+
