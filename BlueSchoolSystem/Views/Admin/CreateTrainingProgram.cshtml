@@ -1,0 +1,236 @@
+﻿@{
+    ViewData["Title"] = "Tạo Chương Trình Đào Tạo";
+
+
+}
+
+<div class="container-fluid mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="fa fa-book-open"></i> Thiết lập Chương trình đào tạo</h4>
+        </div>
+        <div class="card-body">
+            @* --- Phần 1: Thông tin chung --- *@
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Ngành học:</label>
+                    <select id="ddlNganh" class="form-select select2"
+                            asp-items="@(ViewBag.NganhList)">
+                        <option value="">-- Chọn ngành --</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Khóa học:</label>
+                    <select id="ddlKhoaHoc" class="form-select select2"
+                            asp-items="@(ViewBag.KhoaHocList)">
+                        <option value="">-- Chọn khóa học --</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr />
+
+            @* --- Phần 2: Danh sách môn học --- *@
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary">Danh sách môn học trong chương trình</h5>
+                <button type="button" class="btn btn-success btn-sm" id="btnAddRow">
+                    <i class="fa fa-plus"></i> Thêm môn học
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="tblSubjects">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th style="width: 35%">Môn học</th>
+                            <th style="width: 20%">Môn Tiên quyết</th>
+                            <th style="width: 15%">Học kỳ</th>
+                            <th style="width: 10%">Bắt buộc</th>
+                            <th style="width: 10%">Xóa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @* Dòng dữ liệu sẽ được thêm bằng JS *@
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer text-end">
+            <a href="/Admin/Index" class="btn btn-secondary">Hủy</a>
+            <button type="button" class="btn btn-primary" id="btnSaveAll">
+                <i class="fa fa-save"></i> Lưu Chương Trình
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @* Import thư viện cần thiết *@
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        // --- 1. LẤY DỮ LIỆU TỪ CONTROLLER ---
+        // Sử dụng Html.Raw để in thẳng JSON object vào biến JS (Không cần parse chuỗi)
+        // Cú pháp ?? "[]" đảm bảo không bao giờ bị lỗi null
+        var monHocData = @Html.Raw(ViewBag.MonHocJson ?? "[]");
+
+        $(document).ready(function () {
+            // Khởi tạo Select2 cho 2 dropdown phía trên
+            $('.select2').select2({ width: '100%' });
+
+            // Thêm dòng đầu tiên mặc định
+            if(monHocData.length > 0) {
+               // addRow(); // Có thể bỏ comment nếu muốn tự thêm 1 dòng khi vào trang
+            }
+
+            // Sự kiện thêm dòng
+            $('#btnAddRow').click(function () {
+                addRow();
+            });
+
+            // Sự kiện xóa dòng (Dùng delegation vì nút xóa được sinh ra động)
+            $(document).on('click', '.btn-remove', function () {
+                $(this).closest('tr').remove();
+            });
+
+            // Sự kiện Lưu toàn bộ
+            $('#btnSaveAll').click(function () {
+                saveData();
+            });
+        });
+
+        // --- 2. HÀM THÊM DÒNG ---
+        function addRow() {
+            // Tạo chuỗi HTML các options từ dữ liệu monHocData
+            var options = `<option value="">-- Chọn môn học --</option>`;
+
+            if (monHocData && monHocData.length > 0) {
+                monHocData.forEach(function(item) {
+                    // item.Code = Mã môn, item.Name = Tên hiển thị (đã format ở Controller)
+                    options += `<option value="${item.Code}">${item.Name}</option>`;
+                });
+            }
+
+            var tr = `
+                <tr>
+                    <td>
+                        <select class="form-select subject-select" style="width: 100%">
+                            ${options}
+                        </select>
+                    </td>
+                    <td>
+                        <input type="text" class="form-control pre-subject" placeholder="Mã môn (VD: INT100)">
+                    </td>
+                    <td>
+                        <input type="number" class="form-control semester text-center" min="1" max="12" value="1">
+                    </td>
+                    <td class="text-center align-middle">
+                        <div class="form-check d-flex justify-content-center">
+                            <input type="checkbox" class="form-check-input is-required" checked style="width: 20px; height: 20px;">
+                        </div>
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-outline-danger btn-sm btn-remove">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+
+            $('#tblSubjects tbody').append(tr);
+
+            // Kích hoạt Select2 cho dòng vừa thêm
+            $('#tblSubjects tbody tr:last .subject-select').select2({
+                placeholder: "Tìm kiếm môn học...",
+                allowClear: true,
+                width: '100%' // Fix lỗi hiển thị Select2 bị co nhỏ
+            });
+        }
+
+        // --- 3. HÀM LƯU DỮ LIỆU ---
+        function saveData() {
+            // A. Lấy thông tin Header
+            var nganhId = $('#ddlNganh').val();
+            var khoaId = $('#ddlKhoaHoc').val();
+
+            if (!nganhId || !khoaId) {
+                Swal.fire('Thiếu thông tin', 'Vui lòng chọn đầy đủ Ngành học và Khóa học', 'warning');
+                return;
+            }
+
+            // B. Duyệt bảng lấy thông tin Chi tiết
+            var details = [];
+            var isValid = true;
+
+            $('#tblSubjects tbody tr').each(function () {
+                var row = $(this);
+                var maMon = row.find('.subject-select').val();
+                var tienQuyet = row.find('.pre-subject').val();
+                var hocKy = row.find('.semester').val();
+                var batBuoc = row.find('.is-required').is(':checked');
+
+                if (!maMon) {
+                    isValid = false;
+                    return false; // break loop
+                }
+
+                // Kiểm tra trùng môn trong bảng
+                var isDuplicate = details.some(d => d.MaMonHoc === maMon);
+                if (isDuplicate) {
+                    Swal.fire('Trùng lặp', 'Môn học <b>' + maMon + '</b> bị lặp lại trong danh sách.', 'warning');
+                    isValid = false;
+                    return false;
+                }
+
+                details.push({
+                    MaMonHoc: maMon,
+                    MaMonHocTienQuyet: tienQuyet,
+                    HocKy: parseInt(hocKy),
+                    BatBuoc: batBuoc
+                });
+            });
+
+            if (!isValid && details.length > 0) { // Nếu đã báo lỗi trùng thì ko báo lỗi này nữa
+                 if(!Swal.isVisible()) Swal.fire('Thiếu thông tin', 'Vui lòng chọn môn học cho tất cả các dòng', 'warning');
+                 return;
+            }
+
+            if (details.length === 0) {
+                Swal.fire('Danh sách trống', 'Vui lòng thêm ít nhất một môn học vào chương trình.', 'warning');
+                return;
+            }
+
+            // C. Gửi Ajax
+            var payload = {
+                NganhHocId: parseInt(nganhId),
+                KhoaHocId: parseInt(khoaId),
+                ChiTiets: details
+            };
+
+            // Hiện loading
+            Swal.fire({ title: 'Đang xử lý...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+            $.ajax({
+                url: '/Admin/CreateTrainingProgram',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function (res) {
+                    if (res.success) {
+                        Swal.fire('Thành công', res.message, 'success').then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire('Thất bại', res.message, 'error');
+                    }
+                },
+                error: function (err) {
+                    console.error(err);
+                    Swal.fire('Lỗi hệ thống', 'Không thể kết nối đến server.', 'error');
+                }
+            });
+        }
+    </script>
+}

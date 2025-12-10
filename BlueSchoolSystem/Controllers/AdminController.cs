@@ -37,8 +37,10 @@ namespace BlueSchoolSystem.Controllers
         private readonly IActivityLogService _activityLogService;
         private readonly LopHocPhanService _lhpService;
         private readonly HocPhiService _hocPhiService;
+        private readonly ChuongTrinhDaoTaoService _ctdtService;
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, HocPhiService hocPhiService)
+
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, HocPhiService hocPhiService,ChuongTrinhDaoTaoService chuongTrinhDaoTaoService)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
@@ -47,6 +49,7 @@ namespace BlueSchoolSystem.Controllers
             this.configuration = configuration;
             _lhpService = lhpService;
             _hocPhiService = hocPhiService;
+            _ctdtService = chuongTrinhDaoTaoService;
 
 
             _apiBaseUrl = configuration["ApiSettings:BaseUrl"];
@@ -4305,6 +4308,53 @@ namespace BlueSchoolSystem.Controllers
             }
             return RedirectToAction(nameof(TuitionManager));
         }
+
+        #endregion
+
+        #region ======= Tạo chương trình đào tạo =======
+        // 1. GET: Hiển thị trang tạo
+        [HttpGet]
+        public async Task<IActionResult> CreateTrainingProgram()
+        {
+            // lấy dữ liệu từ DB (giữ nguyên code của bạn)
+            var listNganh = await _context.NganhHocs.ToListAsync();
+            var listKhoa = await _context.KhoaHocs.ToListAsync();
+
+            // Nganh: dùng TenNganh (đã có)
+            ViewBag.NganhList = new SelectList(listNganh ?? new List<NganhHoc>(), "Id", "TenNganh");
+
+            // Khoa: dùng NamHoc làm text (chuyển về string)
+            ViewBag.KhoaHocList = new SelectList(
+                (listKhoa ?? new List<KhoaHoc>())
+                    .Select(k => new { k.Id, Name = k.NamHoc.ToString() }),
+                "Id",
+                "Name"
+            );
+
+            // Môn học JSON (giữ an toàn)
+            var monHocs = await _context.MonHocs
+                .Select(m => new { Code = m.MaMonHoc, Name = $"{m.MaMonHoc} - {m.TenMonHoc}" })
+                .ToListAsync();
+            ViewBag.MonHocJson = System.Text.Json.JsonSerializer.Serialize(monHocs);
+
+            return View();
+        }
+
+        // 2. POST: Nhận dữ liệu JSON từ Ajax
+        [HttpPost]
+        public async Task<IActionResult> CreateTrainingProgram([FromBody] CreateChuongTrinhDaoTaoVM model)
+        {
+            try
+            {
+                await _ctdtService.CreateProgramAsync(model);
+                return Json(new { success = true, message = "Tạo chương trình đào tạo thành công!" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
 
         #endregion
     }
