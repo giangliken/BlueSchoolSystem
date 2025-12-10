@@ -20,6 +20,28 @@
         </div>
     </div>
 
+    <div class="card shadow-sm mb-4 bg-light">
+        <div class="card-body py-2">
+            <form method="get" asp-action="CourseClassManager" class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <span class="fw-bold text-secondary"><i class="fa fa-filter me-2"></i>Lọc theo:</span>
+                </div>
+                <div class="col-md-4">
+                    @* Dropdown Học kỳ *@
+                    <select name="hocKyId" class="form-select" onchange="this.form.submit()" asp-items="@ViewBag.HocKyList">
+                        <option value="">-- Tất cả học kỳ --</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    @* Nút reset bộ lọc *@
+                    <a asp-action="CourseClassManager" class="btn btn-outline-secondary" title="Xóa bộ lọc">
+                        <i class="fa fa-sync-alt"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
     @if (TempData["Success"] != null)
     {
         <div class="alert alert-success shadow-sm">@TempData["Success"]</div>
@@ -207,6 +229,11 @@
 @section Scripts {
     <script>
         $(function() {
+
+            var selected = '@ViewBag.SelectedHocKyId';
+        if (selected)
+            $('select[name="hocKyId"]').val(selected);
+
             // Lấy ID trạng thái Hủy từ DOM/ViewBag (An toàn hơn nếu để một ViewBag riêng)
             var huyStatusId = '@(((List<BlueSchoolSystem.Models.TrangThai>)ViewBag.TrangThaiLHPList).FirstOrDefault(t => t.TenTrangThai == "Bị Hủy")?.Id ?? 0)';
 

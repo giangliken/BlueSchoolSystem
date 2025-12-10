@@ -2239,9 +2239,8 @@ namespace BlueSchoolSystem.Controllers
 
         #region ======= Course Class Manager =======
 
-        public async Task<IActionResult> CourseClassManager()
+        public async Task<IActionResult> CourseClassManager(int? hocKyId)
         {
-            // API call giữ nguyên
             var (success, data, error) = await CallApiAsync("api/lophocphans", HttpMethod.Get);
             if (!success)
             {
@@ -2261,6 +2260,18 @@ namespace BlueSchoolSystem.Controllers
             ViewBag.PhongHocList = lists.phongHocList;
             ViewBag.GiangVienList = lists.giangVienList;
             ViewBag.TrangThaiLHPList = lists.trangThaiList;
+
+            // Lưu học kỳ hiện tại để View hiển thị lại chọn
+            ViewBag.SelectedHocKyId = hocKyId;
+
+            // --- Áp dụng bộ lọc ---
+            if (hocKyId.HasValue && hocKyId > 0)
+            {
+                // Giả sử dữ liệu ExpandoObject có trường "hocKyId"
+                lhpList = lhpList
+                    .Where(l => Convert.ToInt32(((IDictionary<string, object>)l)["hocKyId"]) == hocKyId)
+                    .ToList();
+            }
 
             return View(lhpList);
         }
