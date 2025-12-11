@@ -45,10 +45,6 @@ namespace BlueSchoolSystem.Models
         public DbSet<DotDangKy> DotDangKys { get; set; } // Bảng đợt đăng ký
         public DbSet<GiangVienMonHoc> GiangVienMonHocs { get; set; }
 
-        public DbSet<DinhMucHocPhi> DinhMucHocPhis { get; set; }
-        public DbSet<HocPhi> HocPhis { get; set; }
-        public DbSet<ChiTietHocPhi> ChiTietHocPhis { get; set; }
-        public DbSet<PhieuThu> PhieuThus { get; set; }
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -165,6 +161,45 @@ namespace BlueSchoolSystem.Models
                 e.ToTable("FaceVerifyLogs");
             });
 
+            builder.Entity<XinVangDay>(e =>
+            {
+                e.HasKey(x => x.Id);
+
+                // GiangVien: cascade delete
+                e.HasOne(x => x.GiangVien)
+                    .WithMany()
+                    .HasForeignKey(x => x.GiangVienId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // LichHoc: không cascade
+                e.HasOne(x => x.LichHoc)
+                    .WithMany()
+                    .HasForeignKey(x => x.LichHocId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // LopHocPhan: không cascade
+                e.HasOne(x => x.LopHocPhan)
+                    .WithMany()
+                    .HasForeignKey(x => x.LopHocPhanId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // TrangThai: không cascade
+                e.HasOne(x => x.TrangThai)
+                    .WithMany()
+                    .HasForeignKey(x => x.TrangThaiId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                e.HasOne(x => x.LichHoc)
+                .WithMany() // hoặc WithOne nếu 1:1
+                .HasForeignKey(x => x.LichHocId)
+                .OnDelete(DeleteBehavior.Restrict); // KHÔNG cascade
+
+                e.Property(x => x.LyDo).IsRequired();
+                e.Property(x => x.CreatedAt).IsRequired();
+                e.ToTable("XinVangDays");
+            });
+
 
             builder.Entity<HocPhi>(e =>
             {
@@ -220,6 +255,9 @@ namespace BlueSchoolSystem.Models
                  .HasForeignKey(d => d.NganhId)
                  .OnDelete(DeleteBehavior.Restrict);
             });
+
+
+
 
         }
     }

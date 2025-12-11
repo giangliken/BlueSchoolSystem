@@ -124,6 +124,11 @@
 
                     </li>
 
+                    <li>
+                        <a href="/Admin/DanhSachDonPhieu" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/DanhSachDonPhieu") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-file-alt me-2"></i>Đơn phiếu
+                        </a>
+                    </li>
                     @* <li>
                         <a href="/Admin/StudentManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/StudentManager") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-users me-2"></i>Tài khoản người dùng
@@ -156,7 +161,7 @@
                     </li>
                     <li>
                         <a href="/Teacher/LichGiangDay" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/LichGiangDay") ? "active text-white bg-primary" : "text-white")">
-                            <i class="fas fa-home me-2"></i> Lịch giảng dạy
+                            <i class="fa-solid fa-calendar-days me-2"></i> Lịch giảng dạy
                         </a>
                     </li>
                     <li>
@@ -169,21 +174,31 @@
                             <i class="fa-solid fa-users-rectangle me-2"></i>Lớp học phần
                         </a>
                     </li>
-                    <li>
+                    @* <li>
                         <a href="/Teacher/DiemDanh" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/DiemDanh") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-clipboard-user me-2"></i>Điểm danh
                         </a>
-                    </li>
+                    </li> *@
                     <li>
                         <a href="/Teacher/XemDiem" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/XemDiem") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-calendar-check me-2"></i>Nhập điểm
                         </a>
                     </li>
                     <li>
+                        <a href="/Teacher/XinVangDay" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/XinVangDay") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-clipboard me-2"></i>Xin vắng dạy
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Teacher/DanhSachDonPhieu" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/DanhSachDonPhieu") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-file-alt me-2"></i>Đơn phiếu đã gửi
+                        </a>
+                    </li>
+                    @* <li>
                         <a href="/Teacher/ActivityLogs" class="nav-link @(Context.Request.Path.StartsWithSegments("/Teacher/ActivityLogs") ? "active text-white bg-primary" : "text-white")">
                             <i class="fas fa-clipboard-list me-2"></i>Nhật ký giảng viên
                         </a>
-                    </li>
+                    </li> *@
                     <li>
                         <a href="/Identity/Account/Manage" class="nav-link @(Context.Request.Path.StartsWithSegments("/Identity/Account/Manage") ? "active text-white bg-primary" : "text-white")">
                             <i class="fas fa-user-gear me-2"></i>Hồ sơ cá nhân

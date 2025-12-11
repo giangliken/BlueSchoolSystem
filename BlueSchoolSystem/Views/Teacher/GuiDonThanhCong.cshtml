@@ -1,0 +1,100 @@
+﻿@model BlueSchoolSystem.Models.XinVangDay
+@{
+    ViewData["Title"] = "Đơn xin vắng dạy thành công";
+}
+
+
+@{
+    string ngay = Model.LichHoc?.Ngay.ToString("dd/MM/yyyy") ?? "";
+    string thuStr = "";
+
+    if (Model.LichHoc != null)
+    {
+        // Lấy DayOfWeek
+        var dayOfWeek = Model.LichHoc.Ngay.DayOfWeek;
+        thuStr = dayOfWeek switch
+        {
+            DayOfWeek.Monday => "Thứ 2",
+            DayOfWeek.Tuesday => "Thứ 3",
+            DayOfWeek.Wednesday => "Thứ 4",
+            DayOfWeek.Thursday => "Thứ 5",
+            DayOfWeek.Friday => "Thứ 6",
+            DayOfWeek.Saturday => "Thứ 7",
+            DayOfWeek.Sunday => "Chủ nhật",
+            _ => ""
+        };
+    }
+
+    string thuDayBuStr = "";
+    if (Model.NgayDayBu.HasValue)
+    {
+        var dow = Model.NgayDayBu.Value.DayOfWeek;
+        thuDayBuStr = dow switch
+        {
+            DayOfWeek.Monday => "Thứ 2",
+            DayOfWeek.Tuesday => "Thứ 3",
+            DayOfWeek.Wednesday => "Thứ 4",
+            DayOfWeek.Thursday => "Thứ 5",
+            DayOfWeek.Friday => "Thứ 6",
+            DayOfWeek.Saturday => "Thứ 7",
+            DayOfWeek.Sunday => "Chủ nhật",
+            _ => ""
+        };
+    }
+
+}
+<div class="container mt-5">
+    <div class="card shadow-lg border-0">
+        <div class="card-body text-center">
+            <div class="mb-4">
+                <i class="fa fa-check-circle fa-5x text-success"></i>
+            </div>
+            <h2 class="text-success mb-3">Gửi đơn thành công!</h2>
+            <p class="lead mb-4">Đơn xin vắng dạy của bạn đã được gửi và đang chờ xử lý.</p>
+
+            <div class="card shadow-sm p-3 mb-4">
+                <h5 class="mb-3">Thông tin cơ bản</h5>
+                <div class="row text-start">
+                    <div class="col-md-6 mb-2"><strong>Mã đơn:</strong> #@Model.Id</div>
+                    <div class="col-md-6 mb-2"><strong>Người gửi đơn:</strong> @Model.GiangVien?.HoVaTenDem @Model.GiangVien?.Ten (@Model.GiangVien?.MaGiangVien)</div>
+                    <div class="col-md-6 mb-2"><strong>Ngày gửi:</strong> @Model.CreatedAt.ToString("HH:mm dd/MM/yyyy")</div>
+                    <div class="col-md-6 mb-2"><strong>Lớp học phần:</strong> @Model.LopHocPhan?.MaLopHocPhan - @Model.LopHocPhan?.TenLopHocPhan</div>
+                    <div class="col-md-6 mb-2"><strong>Buổi xin nghỉ:</strong> @thuStr (@ngay) @Model.LichHoc?.GioBatDau - @Model.LichHoc?.GioKetThuc</div>
+                    <div class="col-md-6 mb-2"><strong>Ngày dạy bù:</strong> @thuDayBuStr (@Model.NgayDayBu?.ToString("dd/MM/yyyy")) @(Model.GioBatDauDayBu.HasValue && Model.GioKetThucDayBu.HasValue ? $"{Model.GioBatDauDayBu:hh\\:mm} - {Model.GioKetThucDayBu:hh\\:mm}" : "-")</div>
+
+                    <div class="col-md-6 mb-2"><strong>Lý do:</strong> @Model.LyDo</div>
+                    <div class="col-md-6 mb-2">
+                        <strong>Trạng thái:</strong>
+
+                        @if (Model.TrangThai?.TenTrangThai == "Chờ duyệt")
+                        {
+                            <span class="text-warning">
+                                <i class="fa fa-hourglass-half me-1"></i> Chờ duyệt
+                            </span>
+                        }
+                        else if (Model.TrangThai?.TenTrangThai == "Đã duyệt")
+                        {
+                            <span class="text-success">
+                                <i class="fa fa-check-circle me-1"></i> Đã duyệt
+                            </span>
+                        }
+                        else if (Model.TrangThai?.TenTrangThai == "Từ chối")
+                        {
+                            <span class="text-danger">
+                                <i class="fa fa-times-circle me-1"></i> Từ chối
+                            </span>
+                        }
+                        else
+                        {
+                            <span>@Model.TrangThai?.TenTrangThai</span>
+                        }
+                    </div>
+                </div>
+            </div>
+            <p class="mt-3 small text-muted"><i>*Phòng đào tạo sẽ phản hồi lại trong thời gian sớm nhất</i></p>
+            <a asp-action="DanhSachDonPhieu" class="btn btn-primary btn-lg">
+                <i class="fa fa-arrow-left me-2"></i> Xem lại danh sách đơn đã gửi
+            </a>
+        </div>
+    </div>
+</div>

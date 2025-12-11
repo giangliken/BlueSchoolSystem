@@ -28,8 +28,9 @@
 27,Đi trễ,Sinh viên đến lớp nhưng trễ giờ,DiemDanh
 28,Về sớm,Sinh viên rời lớp sớm hơn giờ quy định,DiemDanh
 29,Có phép,Sinh viên vắng mặt có lý do và đã xin phép,DiemDanh
-30,Đã đóng,Buổi điểm danh đã đóng và sinh viên không thể điểm danh,DiemDanh#
+30,Đã đóng,Sinh viên vắng mặt không có lý do chính đáng,DiemDanh#
 31,Đang diễn ra,Buổi điểm danh đang diễn ra,DiemDanh#
+32,Chưa điểm danh,Sinh viên chưa điểm danh,DiemDanh
 33,Chưa diễn ra,Lịch thi chưa đến thời gian tổ chức,LichThi
 34,Đang diễn ra,Buổi thi đang được tổ chức,LichThi
 35,Đã hoàn thành,Lịch thi đã kết thúc và có thể nhập điểm,LichThi
@@ -37,6 +38,10 @@
 37,Hủy,Lịch thi bị hủy và không tổ chức lại,LichThi
 38,Mới tạo,Học kỳ vừa được tạo và chưa có thay đổi,HocKy
 39,Đang diễn ra,Học kỳ hiện tại đang diễn ra,HocKy
+40,Đã kết thúc,Học kỳ đã hoàn thành,HocKy
+41,Chờ duyệt,"Đơn chờ Admin, Cán bộ duyệt",DonPhieu
+42,Từ chối,Đơn phiếu bị từ chối,DonPhieu
+43,Đã duyệt,"Đơn phiếu đã được Admin, Cán bộ duyệt",DonPhieu
 40,Đã kết thúc,Học kỳ đã hoàn thành,HocKy
 41,Chưa đóng,Sinh viên chưa đóng khoản nào,HocPhi
 42,Đóng một phần,Sinh viên đã đóng một phần nhưng chưa đủ,HocPhi

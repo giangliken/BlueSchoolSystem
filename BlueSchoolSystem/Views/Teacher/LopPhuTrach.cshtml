@@ -5,7 +5,7 @@
 }
 
 <div class="container-fluid px-4">
-    <h2 class="mt-4">Lớp Phụ Trách (Chủ nhiệm/Cố vấn)</h2>
+    <h6 class="mb-3">Giảng viên/Lớp phụ trách - cố vấn học tập</h6>
 
     @if (ViewBag.Error != null)
     {
@@ -34,11 +34,11 @@
                             </div>
                             <hr />
                             <a asp-action="LopPhuTrachDetails"
-                               asp-route-lopHocId="@item.LopHocId"
-                               asp-route-tenLop="@item.TenLop"
+                               asp-route-maLop="@item.MaLop"
                                class="btn btn-sm btn-primary w-100">
                                 Xem Danh Sách SV
                             </a>
+
                         </div>
                     </div>
                 </div>
