@@ -64,8 +64,6 @@ namespace BlueSchoolSystem.Models
 
         public List<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; } = new();
 
-        [NotMapped] // Đánh dấu không tạo cột trong SQL
-        public decimal SoDu { get; set; }
 
     }
 }
