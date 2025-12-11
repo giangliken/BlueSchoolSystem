@@ -181,12 +181,42 @@ namespace BlueSchoolSystem.Services
         {
             var hp = await GetOrCreateHocPhiAsync(sinhVienId);
 
-            var listNo = await _context.ChiTietHocPhis
-                .Include(ct => ct.DangKyHocPhan).ThenInclude(dk => dk.LopHocPhan).ThenInclude(l => l.MonHoc)
+            // 1. Lấy danh sách nợ (Chi tiết môn học)
+            var listNoRaw = await _context.ChiTietHocPhis
+                .Include(ct => ct.DangKyHocPhan)
+                    .ThenInclude(dk => dk.LopHocPhan)
+                        .ThenInclude(lhp => lhp.MonHoc)
+                .Include(ct => ct.DangKyHocPhan)
+                    .ThenInclude(dk => dk.LopHocPhan)
+                        .ThenInclude(lhp => lhp.HocKy)
                 .Where(ct => ct.HocPhiId == hp.Id)
                 .OrderByDescending(ct => ct.NgayPhatSinh)
                 .ToListAsync();
 
+            // 2. Nhóm theo Học kỳ
+            var danhSachTheoKy = listNoRaw
+                .GroupBy(x => new {
+                    Id = x.DangKyHocPhan?.LopHocPhan?.HocKyId ?? 0,
+                    Ten = x.DangKyHocPhan?.LopHocPhan?.HocKy?.TenHocKy ?? "Khác"
+                })
+                .Select(g => new HocPhiTheoKyVM
+                {
+                    HocKyId = g.Key.Id,
+                    TenHocKy = g.Key.Ten,
+                    ChiTietMonHoc = g.Select(ct => new ChiTietHocPhiVM
+                    {
+                        NgayDK = ct.NgayPhatSinh,
+                        MaMonHoc = ct.DangKyHocPhan?.LopHocPhan?.MonHoc?.MaMonHoc ?? "",
+                        TenMonHoc = ct.DangKyHocPhan?.LopHocPhan?.MonHoc?.TenMonHoc ?? ct.DangKyHocPhan?.LoaiDangKy ?? "Phí khác",
+                        TenLopHP = ct.DangKyHocPhan?.LopHocPhan?.MaLopHocPhan ?? "",
+                        SoTinChi = ct.DangKyHocPhan?.LopHocPhan?.MonHoc?.SoTinChi ?? 0,
+                        SoTien = ct.SoTien
+                    }).ToList()
+                })
+                .OrderByDescending(k => k.HocKyId) // Kỳ mới nhất lên đầu
+                .ToList();
+
+            // 3. Lấy lịch sử đóng tiền
             var listDong = await _context.PhieuThus
                 .Where(p => p.SinhVienId == sinhVienId)
                 .OrderByDescending(p => p.NgayDong)
@@ -195,7 +225,8 @@ namespace BlueSchoolSystem.Services
             return new HocPhiViewModel
             {
                 DuNoHienTai = hp.DuNoConLai,
-                LichSuPhatSinh = listNo,
+                DanhSachHocKy = danhSachTheoKy,
+                LichSuPhatSinh = listNoRaw,
                 LichSuDongTien = listDong
             };
         }

@@ -1,5 +1,209 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+﻿@model List<BlueSchoolSystem.Models.ViewModel.DangKyHocPhanVM>
+
 @{
+    ViewData["Title"] = "Đăng ký học phần";
+    // Tách danh sách thành 2 phần: Đã đăng ký và Chưa đăng ký
+    var listDaDangKy = Model.Where(x => x.IsRegistered).ToList();
+    var listLopMo = Model; // Hiển thị tất cả để SV dễ chọn
+}
+
+<div class="container mt-4">
+
+    @* --- PHẦN 1: DANH SÁCH LỚP HỌC PHẦN ĐANG MỞ --- *@
+    <div class="card shadow-sm mb-5">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fa-solid fa-book-open me-2"></i> Đăng ký Học phần</h5>
+        </div>
+        <div class="card-body">
+            @* Bộ lọc Học kỳ *@
+            <form method="get" class="row g-3 align-items-center mb-3">
+                <div class="col-auto">
+                    <label class="col-form-label fw-bold">Chọn Học kỳ:</label>
+                </div>
+                <div class="col-auto">
+                    <select name="hocKyId" class="form-select" asp-items="@ViewBag.HocKyList" onchange="this.form.submit()">
+                    </select>
+                </div>
+            </form>
+
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-bordered table-hover align-middle sticky-top">
+                    <thead class="table-light text-center sticky-top" style="top: 0; z-index: 1;">
+                        <tr>
+                            <th>Mã LHP</th>
+                            <th>Môn học</th>
+                            <th>Tín chỉ</th>
+                            <th>Giảng viên</th>
+                            <th>Lịch học</th>
+                            <th>Sĩ số</th>
+                            <th width="100px">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (listLopMo != null && listLopMo.Any())
+                        {
+                            foreach (var item in listLopMo)
+                            {
+                                bool isFull = item.DaDangKy >= item.SiSo;
+                                // Nếu đã đăng ký thì ẩn nút hoặc đổi màu
+                                string rowClass = item.IsRegistered ? "table-success" : "";
+
+                                <tr class="@rowClass" id="row-register-@item.Id">
+                                    <td class="text-center fw-bold">
+                                        <a asp-action="ChiTietLopHP" asp-route-id="@item.Id" class="text-decoration-none">
+                                            @item.MaLopHocPhan
+                                        </a>
+                                    </td>
+                                    <td>@item.TenMonHoc</td>
+                                    <td class="text-center">@item.SoTinChi</td>
+                                    <td>@item.GiangVien</td>
+                                    <td class="small">@item.LichHoc</td>
+                                    <td class="text-center">
+                                        <span id="count-@item.Id">@item.DaDangKy</span>/@item.SiSo
+                                    </td>
+                                    <td class="text-center">
+                                        @if (item.IsRegistered)
+                                        {
+                                            <span class="badge bg-success"><i class="fa fa-check"></i> Đã chọn</span>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-primary btn-sm btn-action"
+                                                    data-id="@item.Id"
+                                                    data-action="register"
+                                                    @(isFull ? "disabled" : "")>
+                                                Đăng ký
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="7" class="text-center text-muted">Không có lớp học phần nào mở.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @* --- PHẦN 2: DANH SÁCH HỌC PHẦN ĐÃ CHỌN (KẾT QUẢ ĐĂNG KÝ) --- *@
+    <div class="card shadow-sm border-success">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="fa-solid fa-list-check me-2"></i> Kết quả Đăng ký (@listDaDangKy.Count môn)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0 align-middle">
+                    <thead class="table-success text-center">
+                        <tr>
+                            <th>STT</th>
+                            <th>Mã LHP</th>
+                            <th>Tên môn học</th>
+                            <th>Số TC</th>
+                            <th>Giảng viên</th>
+                            <th>Lịch học</th>
+                            <th width="100px">Xóa</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-registered-body">
+                        @if (listDaDangKy.Any())
+                        {
+                            int i = 1;
+                            int tongTinChi = 0;
+                            foreach (var item in listDaDangKy)
+                            {
+                                tongTinChi += item.SoTinChi;
+                                <tr id="row-result-@item.Id">
+                                    <td class="text-center">@(i++)</td>
+                                    <td class="text-center fw-bold">@item.MaLopHocPhan</td>
+                                    <td>@item.TenMonHoc</td>
+                                    <td class="text-center">@item.SoTinChi</td>
+                                    <td>@item.GiangVien</td>
+                                    <td class="small">@item.LichHoc</td>
+                                    <td class="text-center">
+                                        <button class="btn btn-danger btn-sm btn-action"
+                                                data-id="@item.Id"
+                                                data-action="cancel"
+                                                title="Hủy đăng ký môn này">
+                                            <i class="fa fa-trash"></i> Xóa
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                            <tr class="table-light fw-bold">
+                                <td colspan="3" class="text-end">Tổng cộng:</td>
+                                <td class="text-center text-primary">@tongTinChi</td>
+                                <td colspan="3"></td>
+                            </tr>
+                        }
+                        else
+                        {
+                            <tr id="empty-row"><td colspan="7" class="text-center text-muted py-3">Bạn chưa đăng ký môn học nào trong kỳ này.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        $(document).ready(function () {
+            // Xử lý chung cho cả nút Đăng ký (bảng trên) và nút Xóa (bảng dưới)
+            $('.btn-action').click(function () {
+                var btn = $(this);
+                var lhpId = btn.data('id');
+                var action = btn.data('action'); // 'register' hoặc 'cancel'
+                var isDangKy = action === 'register';
+
+                // Hiệu ứng loading
+                var originalHtml = btn.html();
+                btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+
+                $.ajax({
+                    url: '/Home/XuLyDangKy',
+                    type: 'POST',
+                    data: {
+                        lopHocPhanId: lhpId,
+                        isDangKy: isDangKy
+                    },
+                    success: function (res) {
+                        if (res.success) {
+                            // Dùng SweetAlert thông báo nhanh
+                            const Toast = Swal.mixin({
+                                toast: true,
+                                position: 'top-end',
+                                showConfirmButton: false,
+                                timer: 1500,
+                                timerProgressBar: true
+                            });
+
+                            Toast.fire({
+                                icon: 'success',
+                                title: res.message
+                            }).then(() => {
+                                // Reload trang để cập nhật lại cả 2 bảng (trên và dưới)
+                                // Đây là cách an toàn nhất để đồng bộ dữ liệu (Sĩ số, Trạng thái, Tổng tín chỉ)
+                                location.reload();
+                            });
+
+                        } else {
+                            Swal.fire('Thất bại', res.message, 'error');
+                            // Trả lại trạng thái nút nếu lỗi
+                            btn.prop('disabled', false).html(originalHtml);
+                        }
+                    },
+                    error: function () {
+                        Swal.fire('Lỗi', 'Không thể kết nối đến máy chủ.', 'error');
+                        btn.prop('disabled', false).html(originalHtml);
+                    }
+                });
+            });
+        });
+    </script>
 }

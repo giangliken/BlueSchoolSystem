@@ -1,5 +1,191 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+﻿@using BlueSchoolSystem.Models
+@model BlueSchoolSystem.Models.ViewModel.HocPhiViewModel
+
 @{
+    ViewData["Title"] = "Thông tin Học phí";
+    decimal duNo = Model.DuNoHienTai;
+    // Tính tổng đã đóng từ lịch sử phiếu thu
+    decimal tongDaDong = Model.LichSuDongTien.Sum(x => x.SoTienDong);
+    // Tính tổng phải đóng (tổng học phí phát sinh của tất cả các kỳ)
+    decimal tongPhaiDong = Model.DanhSachHocKy.Sum(k => k.TongHocPhiKy);
+}
+
+<div class="container mt-4">
+
+    @* --- PHẦN TỔNG QUAN (GIỮ NGUYÊN) --- *@
+    <div class="row mb-4">
+        @* ... (Code 3 ô màu giữ nguyên như cũ) ... *@
+        <div class="col-md-4">
+            <div class="card bg-primary text-white shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase opacity-75">Tổng học phí phải đóng</h6>
+                    <h3 class="fw-bold">@tongPhaiDong.ToString("N0") đ</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase opacity-75">Tổng tiền đã đóng</h6>
+                    <h3 class="fw-bold">@tongDaDong.ToString("N0") đ</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card @(duNo > 0 ? "bg-danger" : "bg-info") text-white shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase opacity-75">@(duNo > 0 ? "Còn nợ" : "Dư (Ví)")</h6>
+                    <h3 class="fw-bold">@Math.Abs(duNo).ToString("N0") đ</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* --- TABS --- *@
+    <ul class="nav nav-tabs nav-fill mb-3 fw-bold" id="hpTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" id="chitiet-tab" data-bs-toggle="tab" data-bs-target="#tabChiTiet" type="button">
+                <i class="fa fa-list-ul me-2"></i> Chi tiết theo Học kỳ
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="ls-tab" data-bs-toggle="tab" data-bs-target="#tabLichSu" type="button">
+                <i class="fa fa-history me-2"></i> Lịch sử Đóng tiền
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+        @* TAB 1: CHI TIẾT THEO KỲ *@
+        <div class="tab-pane fade show active" id="tabChiTiet">
+
+            @* [MỚI] THANH LỌC HỌC KỲ *@
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <label class="input-group-text bg-light fw-bold" for="filterHocKy">
+                            <i class="fa fa-filter me-2"></i> Lọc Học kỳ
+                        </label>
+                        <select id="filterHocKy" class="form-select">
+                            <option value="all">-- Hiển thị tất cả --</option>
+                            @foreach (var ky in Model.DanhSachHocKy)
+                            {
+                                <option value="@ky.HocKyId">@ky.TenHocKy</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.DanhSachHocKy.Any())
+            {
+                foreach (var ky in Model.DanhSachHocKy)
+                {
+                    @* [MỚI] Thêm class 'semester-item' và 'data-id' để JS xử lý *@
+                    <div class="card shadow-sm mb-4 border-0 semester-item" data-id="@ky.HocKyId">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 text-primary fw-bold"><i class="fa fa-calendar-alt me-2"></i> @ky.TenHocKy</h5>
+                            <span class="badge bg-primary fs-6">Tổng kỳ: @ky.TongHocPhiKy.ToString("N0") đ</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light text-secondary">
+                                        <tr>
+                                            <th class="text-center" width="50">STT</th>
+                                            <th>Mã môn</th>
+                                            <th>Tên môn học / Nội dung</th>
+                                            <th>Tên lớp</th>
+                                            <th class="text-center">STC</th>
+                                            <th class="text-end">Học phí</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @{
+                                            int stt = 1;
+                                        }
+                                        @foreach (var item in ky.ChiTietMonHoc)
+                                        {
+                                            <tr>
+                                                <td class="text-center">@(stt++)</td>
+                                                <td class="fw-bold text-muted">@item.MaMonHoc</td>
+                                                <td>@item.TenMonHoc</td>
+                                                <td>@item.TenLopHP</td>
+                                                <td class="text-center">@item.SoTinChi</td>
+                                                <td class="text-end fw-bold text-dark">@item.SoTien.ToString("N0")</td>
+                                            </tr>
+                                        }
+                                        <tr class="table-secondary fw-bold">
+                                            <td colspan="5" class="text-end">Tổng cộng học kỳ:</td>
+                                            <td class="text-end text-danger">@ky.TongHocPhiKy.ToString("N0") đ</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="alert alert-info text-center">Chưa có dữ liệu đăng ký môn học.</div>
+            }
+        </div>
+
+        @* TAB 2: LỊCH SỬ ĐÓNG TIỀN (GIỮ NGUYÊN) *@
+        <div class="tab-pane fade" id="tabLichSu">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="bg-success text-white">
+                            <tr>
+                                <th>Ngày đóng</th>
+                                <th>Người thu</th>
+                                <th>Ghi chú</th>
+                                <th class="text-end">Số tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.LichSuDongTien)
+                            {
+                                <tr>
+                                    <td>@item.NgayDong.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@item.NguoiThu</td>
+                                    <td>@item.GhiChu</td>
+                                    <td class="text-end fw-bold">+ @item.SoTienDong.ToString("N0") đ</td>
+                                </tr>
+                            }
+                            @if (!Model.LichSuDongTien.Any())
+                            {
+                                <tr><td colspan="4" class="text-center py-3">Chưa có lịch sử đóng tiền.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // Xử lý sự kiện khi chọn Dropdown lọc học kỳ
+            $('#filterHocKy').change(function () {
+                var selectedId = $(this).val();
+
+                if (selectedId === 'all') {
+                    // Hiện tất cả với hiệu ứng fade
+                    $('.semester-item').fadeIn();
+                } else {
+                    // Ẩn tất cả trước
+                    $('.semester-item').hide();
+
+                    // Chỉ hiện cái có data-id trùng khớp
+                    $('.semester-item[data-id="' + selectedId + '"]').fadeIn();
+                }
+            });
+        });
+    </script>
 }
