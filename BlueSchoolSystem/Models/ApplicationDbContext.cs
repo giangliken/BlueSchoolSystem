@@ -44,6 +44,12 @@ namespace BlueSchoolSystem.Models
         public DbSet<ChiTietChuongTrinhDaoTao> ChiTietChuongTrinhDaoTaos { get; set; } // Bảng chi tiết chương trình đào tạo
         public DbSet<DotDangKy> DotDangKys { get; set; } // Bảng đợt đăng ký
         public DbSet<GiangVienMonHoc> GiangVienMonHocs { get; set; }
+        public DbSet<DinhMucHocPhi> DinhMucHocPhis { get; set; }
+        public DbSet<HocPhi> HocPhis { get; set; }
+        public DbSet<ChiTietHocPhi> ChiTietHocPhis { get; set; }
+        public DbSet<PhieuThu> PhieuThus { get; set; }
+
+        public DbSet<XinVangDay> XinVangDays { get; set; } // Bảng xin vắng dạy
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

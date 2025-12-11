@@ -42,8 +42,7 @@ namespace BlueSchoolSystem.Controllers
         private readonly IEmailSender _emailSender;
 
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, HocPhiService hocPhiService,ChuongTrinhDaoTaoService chuongTrinhDaoTaoService)
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, IEmailSender emailSender)
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, IEmailSender emailSender, HocPhiService hocPhiService, ChuongTrinhDaoTaoService chuongTrinhDaoTaoService)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;

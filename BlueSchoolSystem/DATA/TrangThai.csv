@@ -42,7 +42,7 @@
 41,Chờ duyệt,"Đơn chờ Admin, Cán bộ duyệt",DonPhieu
 42,Từ chối,Đơn phiếu bị từ chối,DonPhieu
 43,Đã duyệt,"Đơn phiếu đã được Admin, Cán bộ duyệt",DonPhieu
-40,Đã kết thúc,Học kỳ đã hoàn thành,HocKy
-41,Chưa đóng,Sinh viên chưa đóng khoản nào,HocPhi
-42,Đóng một phần,Sinh viên đã đóng một phần nhưng chưa đủ,HocPhi
-43,Đã hoàn thành,Sinh viên đã đóng đủ học phí,HocPhi
+44,Đã kết thúc,Học kỳ đã hoàn thành,HocKy
+45,Chưa đóng,Sinh viên chưa đóng khoản nào,HocPhi
+46,Đóng một phần,Sinh viên đã đóng một phần nhưng chưa đủ,HocPhi
+47,Đã hoàn thành,Sinh viên đã đóng đủ học phí,HocPhi
