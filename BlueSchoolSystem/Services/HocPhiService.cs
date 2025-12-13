@@ -157,15 +157,27 @@ namespace BlueSchoolSystem.Services
         // PHẦN 3: QUERY DỮ LIỆU
         // =================================================================================
 
-        public async Task<List<HocPhiDashboardVM>> GetDanhSachCongNoAsync(string? keyword, int? lopId)
+        public async Task<List<HocPhiDashboardVM>> GetDanhSachCongNoAsync(string? keyword, int? khoaId, int? khoaHoc)
         {
-            var query = _context.SinhViens.Include(sv => sv.Lop).AsQueryable();
+            var query = _context.SinhViens
+                    .Include(sv => sv.Lop)
+                    .ThenInclude(l => l.Nganh)
+                    .ThenInclude(l => l.Khoa)
+                    .AsQueryable();
 
             if (!string.IsNullOrEmpty(keyword))
                 query = query.Where(sv => sv.MSSV.Contains(keyword) || (sv.HoVaTenDem + " " + sv.Ten).Contains(keyword));
 
-            if (lopId.HasValue)
-                query = query.Where(sv => sv.LopId == lopId);
+            if (khoaId.HasValue)
+            {
+                query = query.Where(sv => sv.Lop != null && sv.Lop.Nganh.KhoaId == khoaId);
+            }
+
+            if (khoaHoc.HasValue)
+            {
+               
+                query = query.Where(sv => sv.NgayNhapHoc.Year == khoaHoc);
+            }
 
             return await query.Select(sv => new HocPhiDashboardVM
             {
@@ -173,6 +185,7 @@ namespace BlueSchoolSystem.Services
                 MSSV = sv.MSSV,
                 HoTen = sv.HoVaTenDem + " " + sv.Ten,
                 TenLop = sv.Lop != null ? sv.Lop.MaLop : "N/A",
+                TenKhoa = sv.Lop != null && sv.Lop.Nganh.Khoa != null ? sv.Lop.Nganh.Khoa.TenKhoa : "N/A",
                 TongNo = _context.HocPhis.Where(hp => hp.SinhVienId == sv.Id).Select(hp => hp.DuNoConLai).FirstOrDefault()
             }).ToListAsync();
         }

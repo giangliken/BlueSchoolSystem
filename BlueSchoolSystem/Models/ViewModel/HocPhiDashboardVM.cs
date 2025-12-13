@@ -6,6 +6,7 @@
         public string MSSV { get; set; }
         public string HoTen { get; set; }
         public string TenLop { get; set; }
+        public string TenKhoa { get; set; }
         public decimal TongNo { get; set; }
         public decimal SoDuVi { get; set; }
 

@@ -443,111 +443,147 @@ namespace BlueSchoolSystem.Controllers
         //Giao diện đăng ký học phần
         #region ======= Đăng ký học phần =======
 
-        // 1. Giao diện Đăng ký học phần
         [Authorize]
         [HttpGet]
-        public async Task<IActionResult> DangKyLopHP(int? hocKyId)
+        public async Task<IActionResult> DangKyLopHP()
         {
             // A. Lấy thông tin sinh viên
             var mssv = User.Identity?.Name ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var sv = await _context.SinhViens.FirstOrDefaultAsync(s => s.MSSV == mssv); // Vẫn dùng _context lấy SV cho nhanh
+            var sv = await _context.SinhViens.FirstOrDefaultAsync(s => s.MSSV == mssv);
             if (sv == null) return RedirectToAction("Login", "Account");
 
-            // B. Load danh sách Học kỳ
-            var listHocKy = await _context.HocKys.OrderByDescending(h => h.NgayBatDau).ToListAsync();
+            // B. Tự động lấy Học kỳ mới nhất
+            var hocKyMoiNhat = await _context.HocKys
+                .OrderByDescending(h => h.NgayBatDau)
+                .FirstOrDefaultAsync();
 
-            if (hocKyId == null && listHocKy.Any())
+            if (hocKyMoiNhat == null)
             {
-                var kyHienTai = listHocKy.FirstOrDefault(h => h.NgayBatDau <= DateTime.Now && h.NgayKetThuc >= DateTime.Now);
-                hocKyId = kyHienTai?.Id ?? listHocKy.First().Id;
+                ViewBag.Error = "Hiện tại chưa có học kỳ nào được mở đăng ký.";
+                return View(new List<DangKyHocPhanVM>());
             }
 
-            ViewBag.HocKyList = new SelectList(listHocKy, "Id", "TenHocKy", hocKyId);
-            ViewBag.SelectedHocKyId = hocKyId;
+            ViewBag.TenHocKy = hocKyMoiNhat.TenHocKy;
 
-            // C. GỌI SERVICE: Lấy danh sách lớp
-            // Thay vì viết query dài dòng, ta gọi hàm đã viết trong Service
-            var listLopRaw = await _lhpService.GetLopMoDangKyAsync(hocKyId.Value);
+            // C. Lấy danh sách Lớp học phần
+            var listLopRaw = await _context.LopHocPhans
+                .Include(l => l.MonHoc)
+                .Include(l => l.GiangVien)
+                .Include(l => l.TrangThai)
+                .Include(l => l.LichHocs).ThenInclude(lh => lh.PhongHoc)
+                .Where(l => l.HocKyId == hocKyMoiNhat.Id)
+                .Where(l => l.TrangThai.TenTrangThai == "Đang mở")
+                .ToListAsync();
 
-            // D. GỌI SERVICE: Lấy danh sách ID đã đăng ký
-            var daDangKyIds = await _lhpService.GetDaDangKyIdsAsync(sv.Id, hocKyId.Value);
+            // D. Lấy danh sách đã đăng ký
+            var daDangKyIds = await _context.DangKyHocPhans
+                .Where(dk => dk.SinhVienId == sv.Id && dk.LopHocPhan.HocKyId == hocKyMoiNhat.Id)
+                .Select(dk => dk.LopHocPhanId)
+                .ToListAsync();
 
-            // E. Map sang ViewModel
+            // E. Map sang ViewModel (QUAN TRỌNG: Tách lịch học chi tiết)
             var model = new List<DangKyHocPhanVM>();
+
             foreach (var lhp in listLopRaw)
             {
-                // GỌI SERVICE: Đếm sĩ số
-                int soLuongDaDK = await _lhpService.CountSiSoHienTaiAsync(lhp.Id);
+                int soLuongDaDK = await _context.DangKyHocPhans.CountAsync(dk => dk.LopHocPhanId == lhp.Id);
 
-                // GỌI SERVICE: Format lịch học
-                string lichStr = _lhpService.FormatLichHoc(lhp);
+                // --- XỬ LÝ TÁCH LỊCH HỌC ---
+                var lichList = new List<LichHocChiTietVM>();
+                if (lhp.LichHocs != null && lhp.LichHocs.Any())
+                {
+                    var uniqueSchedules = lhp.LichHocs
+                        .GroupBy(lh => new { lh.Ngay.DayOfWeek, lh.GioBatDau, lh.GioKetThuc, Phong = lh.PhongHoc.MaPhongHoc })
+                        .Select(g => g.Key)
+                        .OrderBy(g => g.DayOfWeek)
+                        .ToList();
+
+                    var mapStart = _lhpService.GetTietStartMap();
+                    var mapEnd = _lhpService.GetTietEndMap();
+
+                    foreach (var item in uniqueSchedules)
+                    {
+                        string thu = item.DayOfWeek == DayOfWeek.Sunday ? "CN" : "T" + ((int)item.DayOfWeek + 1);
+
+                        int tietBD = mapStart.FirstOrDefault(x => Math.Abs((TimeSpan.Parse(x.Value) - item.GioBatDau).TotalMinutes) < 2).Key;
+                        int tietKT = mapEnd.FirstOrDefault(x => Math.Abs((TimeSpan.Parse(x.Value) - item.GioKetThuc).TotalMinutes) < 2).Key;
+                        int soTiet = (tietBD > 0 && tietKT > 0) ? (tietKT - tietBD + 1) : 0;
+
+                        lichList.Add(new LichHocChiTietVM
+                        {
+                            Thu = thu,
+                            TietBatDau = tietBD > 0 ? tietBD : 0,
+                            SoTiet = soTiet,
+                            Phong = item.Phong
+                        });
+                    }
+                }
+
+                // Fallback nếu chưa có lịch
+                if (!lichList.Any()) lichList.Add(new LichHocChiTietVM { Thu = "-", Phong = "Chưa xếp" });
 
                 model.Add(new DangKyHocPhanVM
                 {
                     Id = lhp.Id,
                     MaLopHocPhan = lhp.MaLopHocPhan,
-                    TenMonHoc = lhp.MonHoc?.TenMonHoc ?? "Chưa cập nhật",
+                    MaMonHoc = lhp.MonHoc?.MaMonHoc ?? "",
+                    TenMonHoc = lhp.MonHoc?.TenMonHoc ?? "",
                     SoTinChi = lhp.MonHoc?.SoTinChi ?? 0,
-                    GiangVien = lhp.GiangVien?.MaGiangVien ?? "Chưa phân công",
-                    LichHoc = lichStr,
+                    GiangVien = lhp.GiangVien?.MaGiangVien ?? "Chưa gán",
+                    NgayBatDau = lhp.NgayBatDau,
+                    NgayKetThuc = lhp.NgayKetThuc,
                     SiSo = lhp.SiSo,
                     DaDangKy = soLuongDaDK,
-                    TrangThaiLop = lhp.TrangThai?.TenTrangThai ?? "",
-                    IsRegistered = daDangKyIds.Contains(lhp.Id)
+                    IsRegistered = daDangKyIds.Contains(lhp.Id),
+                    LichHocChiTiet = lichList // Gán list chi tiết
                 });
             }
 
             return View(model);
         }
 
+        // 2. Xử lý Đăng ký / Hủy đăng ký (AJAX POST)
         [HttpPost]
         [Authorize]
         public async Task<IActionResult> XuLyDangKy(int lopHocPhanId, bool isDangKy)
         {
             try
             {
-                // Lấy thông tin sinh viên
                 var mssv = User.Identity?.Name ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 var sv = await _context.SinhViens.FirstOrDefaultAsync(s => s.MSSV == mssv);
-                if (sv == null) return Json(new { success = false, message = "Lỗi xác thực sinh viên." });
+                if (sv == null) return Json(new { success = false, message = "Không tìm thấy thông tin sinh viên." });
 
                 var lhp = await _context.LopHocPhans.Include(l => l.MonHoc).FirstOrDefaultAsync(l => l.Id == lopHocPhanId);
                 if (lhp == null) return Json(new { success = false, message = "Lớp học phần không tồn tại." });
 
-                // ---------------------------------------------------------
-                // CASE 1: ĐĂNG KÝ MỚI -> GHI NỢ
-                // ---------------------------------------------------------
+                // ================= LOGIC ĐĂNG KÝ =================
                 if (isDangKy)
                 {
                     // 1. Kiểm tra đã đăng ký chưa
-
                     bool exists = await _context.DangKyHocPhans.AnyAsync(dk => dk.SinhVienId == sv.Id && dk.LopHocPhanId == lopHocPhanId);
-
                     if (exists) return Json(new { success = false, message = "Bạn đã đăng ký lớp này rồi." });
 
-
-
-                    // 2. Kiểm tra trùng môn
-
+                    // 2. Kiểm tra trùng môn (trong cùng học kỳ)
                     bool trungMon = await _context.DangKyHocPhans
-
                         .Include(dk => dk.LopHocPhan)
-
                         .AnyAsync(dk => dk.SinhVienId == sv.Id
-
                                      && dk.LopHocPhan.HocKyId == lhp.HocKyId
-
                                      && dk.LopHocPhan.MonHocId == lhp.MonHocId);
-
                     if (trungMon) return Json(new { success = false, message = $"Bạn đã đăng ký môn {lhp.MonHoc?.TenMonHoc} ở lớp khác trong kỳ này." });
 
-                    // 3. Kiểm tra sĩ số
-                    if (exists) return Json(new { success = false, message = "Đã đăng ký lớp này rồi." });
+                    // 3. [QUAN TRỌNG] Kiểm tra trùng lịch học
+                    // Gọi Service CheckTrungLichSinhVienAsync đã viết trước đó
+                    var checkLich = await _lhpService.CheckTrungLichSinhVienAsync(sv.Id, lopHocPhanId);
+                    if (checkLich.isConflict)
+                    {
+                        return Json(new { success = false, message = $"Trùng lịch: {checkLich.conflictDetails}" });
+                    }
 
+                    // 4. Kiểm tra sĩ số
                     int currentCount = await _context.DangKyHocPhans.CountAsync(dk => dk.LopHocPhanId == lopHocPhanId);
-                    if (currentCount >= lhp.SiSo) return Json(new { success = false, message = "Lớp đã đầy." });
+                    if (currentCount >= lhp.SiSo) return Json(new { success = false, message = "Lớp đã đầy sĩ số." });
 
-                    // 2. Tạo bản ghi Đăng ký
+                    // --- A. THÊM VÀO BẢNG ĐĂNG KÝ ---
                     var dkMoi = new DangKyHocPhan
                     {
                         SinhVienId = sv.Id,
@@ -557,32 +593,29 @@ namespace BlueSchoolSystem.Controllers
                     };
                     _context.DangKyHocPhans.Add(dkMoi);
 
-                    // 3. Tạo bản ghi Chi tiết lớp (để điểm danh)
+                    // --- B. THÊM VÀO CHI TIẾT LỚP HỌC PHẦN ---
                     _context.ChiTietLopHocPhans.Add(new ChiTietLopHocPhan
                     {
                         LopHocPhanId = lopHocPhanId,
                         SinhVienId = sv.Id
                     });
 
-                    // 4. LƯU DB ĐỂ CÓ ID (Bắt buộc trước khi tính tiền)
+                    // Lưu DB để có ID
                     await _context.SaveChangesAsync();
 
-                    // 5. GỌI SERVICE TÍNH TIỀN (GHI NỢ)
+                    // --- C. TÍNH TIỀN ---
                     try
                     {
-                        // Chỉ truyền ID, không cần "System" nữa vì bạn đã xóa log
                         await _hocPhiService.GhiNoHocPhiAsync(dkMoi.Id);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"Lỗi tính tiền SV {sv.MSSV}: {ex.Message}");
+                        // Log lỗi nhưng không chặn luồng
                     }
 
                     return Json(new { success = true, message = "Đăng ký thành công!", daDangKy = currentCount + 1 });
                 }
-                // ---------------------------------------------------------
-                // CASE 2: HỦY ĐĂNG KÝ -> HỦY NỢ (TRỪ TIỀN)
-                // ---------------------------------------------------------
+                // ================= LOGIC HỦY ĐĂNG KÝ =================
                 else
                 {
                     var dkToDelete = await _context.DangKyHocPhans
@@ -590,25 +623,20 @@ namespace BlueSchoolSystem.Controllers
 
                     if (dkToDelete == null) return Json(new { success = false, message = "Bạn chưa đăng ký lớp này." });
 
-                    // 1. GỌI SERVICE HỦY TIỀN TRƯỚC (QUAN TRỌNG: Phải gọi trước khi xóa bản ghi Đăng ký)
-                    // Vì service cần đọc thông tin từ DangKyHocPhan để biết số tiền cần trừ
+                    // 1. Trừ tiền trước
                     try
                     {
                         await _hocPhiService.HuyNoHocPhiAsync(dkToDelete.Id);
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError($"Lỗi hoàn tiền SV {sv.MSSV}: {ex.Message}");
-                    }
+                    catch (Exception ex) { }
 
-                    // 2. Xóa dữ liệu Đăng ký & Chi tiết lớp
+                    // 2. Xóa Đăng ký & Chi tiết
                     _context.DangKyHocPhans.Remove(dkToDelete);
 
                     var chiTietToDelete = await _context.ChiTietLopHocPhans
                         .FirstOrDefaultAsync(ct => ct.SinhVienId == sv.Id && ct.LopHocPhanId == lopHocPhanId);
                     if (chiTietToDelete != null) _context.ChiTietLopHocPhans.Remove(chiTietToDelete);
 
-                    // 3. Lưu thay đổi
                     await _context.SaveChangesAsync();
 
                     int currentCount = await _context.DangKyHocPhans.CountAsync(dk => dk.LopHocPhanId == lopHocPhanId);
@@ -627,10 +655,6 @@ namespace BlueSchoolSystem.Controllers
         #region ======= HỌC PHÍ SINH VIÊN =======
 
 
-
-        // =============================================================
-        // XEM HỌC PHÍ (THEO MODEL MỚI)
-        // =============================================================
         [Authorize]
         [HttpGet]
         public async Task<IActionResult> HocPhi()
@@ -640,8 +664,32 @@ namespace BlueSchoolSystem.Controllers
 
             if (sv == null) return RedirectToAction("Login", "Account");
 
-            // Gọi Service lấy toàn bộ thông tin (Dư nợ, Lịch sử nợ, Lịch sử đóng)
+            // 1. Gọi Service lấy toàn bộ thông tin
             var model = await _hocPhiService.GetThongTinHocPhi(sv.Id);
+
+            // 2. Xử lý lọc: Lấy học kỳ mới nhất dựa trên NGÀY BẮT ĐẦU (Time) thay vì ID
+            if (model.DanhSachHocKy != null && model.DanhSachHocKy.Any())
+            {
+                // B1: Lấy danh sách các ID học kỳ mà sinh viên có dữ liệu
+                var existingHocKyIds = model.DanhSachHocKy.Select(k => k.HocKyId).ToList();
+
+                // B2: Truy vấn DB để tìm ID có NgayBatDau mới nhất trong số các ID trên
+                var latestHocKyId = await _context.HocKys
+                    .Where(h => existingHocKyIds.Contains(h.Id)) // Chỉ xét các kỳ SV có tham gia
+                    .OrderByDescending(h => h.NgayBatDau)       // Sắp xếp theo thời gian thực tế
+                    .Select(h => h.Id)
+                    .FirstOrDefaultAsync();
+
+                // B3: Lọc model chỉ giữ lại học kỳ đó
+                if (latestHocKyId > 0)
+                {
+                    var kyMoiNhat = model.DanhSachHocKy.FirstOrDefault(k => k.HocKyId == latestHocKyId);
+                    if (kyMoiNhat != null)
+                    {
+                        model.DanhSachHocKy = new List<HocPhiTheoKyVM> { kyMoiNhat };
+                    }
+                }
+            }
 
             return View(model);
         }

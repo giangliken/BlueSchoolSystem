@@ -897,6 +897,63 @@ namespace BlueSchoolSystem.Services
 
             return string.Join(", ", listStr);
         }
+
+        public async Task<(bool isConflict, string conflictDetails)> CheckTrungLichSinhVienAsync(int sinhVienId, int lopHocPhanMoiId)
+        {
+            // 1. Lấy thông tin lớp mới và lịch học của nó
+            var lhpMoi = await _context.LopHocPhans
+                .Include(l => l.LichHocs)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(l => l.Id == lopHocPhanMoiId);
+
+            if (lhpMoi == null || lhpMoi.LichHocs == null || !lhpMoi.LichHocs.Any())
+                return (false, string.Empty); // Lớp mới không có lịch -> Không trùng
+
+            // 2. Lấy danh sách các lớp ĐÃ ĐĂNG KÝ của SV trong cùng học kỳ (Trừ lớp đang xét nếu có)
+            var cacLopDaDangKyIds = await _context.DangKyHocPhans
+                .Where(dk => dk.SinhVienId == sinhVienId
+                          && dk.LopHocPhan.HocKyId == lhpMoi.HocKyId
+                          && dk.LopHocPhanId != lopHocPhanMoiId)
+                .Select(dk => dk.LopHocPhanId)
+                .ToListAsync();
+
+            if (!cacLopDaDangKyIds.Any()) return (false, string.Empty);
+
+            // 3. Lấy toàn bộ lịch học của các lớp đã đăng ký
+            var lichDaDangKy = await _context.LichHocs
+                .Include(lh => lh.LopHocPhan).ThenInclude(l => l.MonHoc) // Để lấy tên môn báo lỗi
+                .Where(lh => cacLopDaDangKyIds.Contains(lh.LopHocPhanId))
+                .AsNoTracking()
+                .ToListAsync();
+
+            // 4. So sánh trùng lặp từng buổi học
+            foreach (var lichMoi in lhpMoi.LichHocs)
+            {
+                foreach (var lichCu in lichDaDangKy)
+                {
+                    // Logic trùng: Cùng Ngày VÀ Thời gian giao nhau
+                    if (lichMoi.Ngay.Date == lichCu.Ngay.Date)
+                    {
+                        // Kiểm tra giao nhau: (StartA < EndB) && (EndA > StartB)
+                        if (lichMoi.GioBatDau < lichCu.GioKetThuc && lichMoi.GioKetThuc > lichCu.GioBatDau)
+                        {
+                            string tenMonTrung = lichCu.LopHocPhan?.MonHoc?.TenMonHoc ?? "Môn học khác";
+                            string maLopTrung = lichCu.LopHocPhan?.MaLopHocPhan ?? "";
+
+                            string gioMoi = $"{lichMoi.GioBatDau:hh\\:mm}-{lichMoi.GioKetThuc:hh\\:mm}";
+                            string gioCu = $"{lichCu.GioBatDau:hh\\:mm}-{lichCu.GioKetThuc:hh\\:mm}";
+
+                            string msg = $"Trùng lịch với môn '{tenMonTrung}' ({maLopTrung}) vào ngày {lichMoi.Ngay:dd/MM/yyyy}. " +
+                                         $"Giờ lớp mới: {gioMoi}, Giờ lớp cũ: {gioCu}.";
+
+                            return (true, msg);
+                        }
+                    }
+                }
+            }
+
+            return (false, string.Empty);
+        }
         #endregion
     }
 }

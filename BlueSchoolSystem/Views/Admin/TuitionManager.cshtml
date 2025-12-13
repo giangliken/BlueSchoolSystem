@@ -5,35 +5,40 @@
 }
 
 <style>
-    /* Hàng hover */
+    /* Tùy chỉnh màu đường kẻ bảng cho rõ hơn */
+    .table-bordered th,
+    .table-bordered td {
+        border: 1px solid #dee2e6 !important; /* Màu xám nhạt chuẩn Bootstrap */
+    }
+
+    /* Header bảng: Màu nền xám đậm hơn chút để tách biệt */
+    table thead.custom-header th {
+        background-color: #000 !important; /* NỀN ĐEN */
+        color: #fff !important; /* CHỮ TRẮNG */
+        font-weight: 700 !important;
+        font-size: 0.9rem;
+        vertical-align: middle;
+        border-bottom: 2px solid #222;
+    }
+
+    /* Hiệu ứng hover khi di chuột vào hàng */
     .clickable-row {
         cursor: pointer;
-        transition: background-color 0.15s;
     }
 
-        .clickable-row:hover {
-            background-color: #f2f2f2;
-        }
+    /* Màu hover đậm hơn màu stripe một chút để dễ nhận biết */
+    .table-hover tbody tr:hover {
+        background-color: #e2e6ea !important;
+    }
 
-    /* Bỏ in đậm body, không ảnh hưởng header */
+    /* Canh giữa nội dung trong ô cho đẹp */
     table tbody td {
-        font-weight: normal !important;
-        color: inherit !important;
-    }
-
-    /* Tăng độ ưu tiên cho header */
-    table thead.custom-header th {
-        background-color: #d7d7d7 !important;
-        font-weight: 700 !important;
-        font-size: 15px !important;
-        color: #000 !important;
+        vertical-align: middle;
     }
 </style>
 
 <div class="container-fluid mt-4">
 
-
-    <!-- Bộ lọc -->
     <div class="card shadow-sm mb-4">
         <div class="card-body">
             <form method="get" class="row g-3">
@@ -42,9 +47,17 @@
                            placeholder="Tìm theo MSSV hoặc Tên..." value="@ViewBag.Keyword">
                 </div>
 
+                @* 2. Dropdown chọn KHOA *@
                 <div class="col-md-3">
-                    <select name="lopId" class="form-select" asp-items="@ViewBag.LopList">
-                        <option value="">-- Tất cả lớp --</option>
+                    <select name="khoaId" class="form-select" asp-items="@ViewBag.KhoaList">
+                        <option value="">-- Tất cả Khoa --</option>
+                    </select>
+                </div>
+
+                @* 3. Dropdown chọn KHÓA HỌC *@
+                <div class="col-md-3">
+                    <select name="khoaHoc" class="form-select" asp-items="@ViewBag.KhoaHocList">
+                        <option value="">-- Tất cả Khóa --</option>
                     </select>
                 </div>
 
@@ -57,59 +70,51 @@
         </div>
     </div>
 
-    <!-- Bảng dữ liệu -->
     <div class="card shadow">
         <div class="card-body p-0">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-bordered table-striped table-hover align-middle mb-0">
                 <thead class="custom-header">
                     <tr>
                         <th>MSSV</th>
                         <th>Họ tên</th>
-                        <th>Lớp</th>
+                        <th>Khoa</th>
                         <th class="text-end">Dư nợ hiện tại</th>
                         <th class="text-center">Trạng thái</th>
-
                     </tr>
                 </thead>
-
 
                 <tbody>
                     @foreach (var item in Model)
                     {
                         <tr class="clickable-row" onclick="window.location='@Url.Action("TuitionDetails", new { id = item.SinhVienId })'">
-                            <td>@item.MSSV</td>
-                            <td>@item.HoTen</td>
-
-                            <td>@item.TenLop</td>
+                            <td >@item.MSSV</td>
+                            <td >@item.HoTen</td>
+                            <td>@item.TenKhoa</td>
 
                             <td class="text-end">
-                                @* Dư = số âm, Nợ = số dương *@
                                 @if (item.TongNo > 0)
                                 {
-                                    <span>+@item.TongNo.ToString("N0") đ</span>
+                                    <span >+@item.TongNo.ToString("N0") đ</span>
                                 }
                                 else if (item.TongNo < 0)
                                 {
-                                    <span>@item.TongNo.ToString("N0") đ</span> @* Sẽ tự hiện dấu - *@
+                                    <span >@item.TongNo.ToString("N0") đ</span>
                                 }
                                 else
                                 {
-                                    <span>0 đ</span>
+                                    <span >0 đ</span>
                                 }
                             </td>
-
                             <td class="text-center">
                                 @if (item.TongNo > 0)
                                 {
-                                    <span>Chưa hoàn thành</span>
+                                    <span >Nợ phí</span>
                                 }
                                 else
                                 {
-                                    <span>Hoàn thành</span>
+                                    <span >Hoàn thành</span>
                                 }
                             </td>
-
-
                         </tr>
                     }
                 </tbody>

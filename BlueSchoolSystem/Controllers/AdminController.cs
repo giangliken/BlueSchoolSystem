@@ -4124,18 +4124,25 @@ namespace BlueSchoolSystem.Controllers
         #region ======= Quản lý Học phí (Mô hình Dư nợ) =======
 
         // 1. Dashboard: Danh sách công nợ sinh viên
-        public async Task<IActionResult> TuitionManager(string keyword, int? lopId)
+        public async Task<IActionResult> TuitionManager(string keyword, int? khoaId, int? khoaHoc)
         {
             try
             {
-                // Gọi Service lấy danh sách tổng hợp (đã viết ở bước trước)
-                var data = await _hocPhiService.GetDanhSachCongNoAsync(keyword, lopId);
+                var listKhoa = await _context.Khoas.OrderBy(k => k.TenKhoa).ToListAsync();
+                ViewBag.KhoaList = new SelectList(listKhoa, "Id", "TenKhoa", khoaId);
 
-                // Load dropdown lớp học
-                ViewBag.LopList = new SelectList(await _context.LopHocs.ToListAsync(), "Id", "MaLop", lopId);
+                // 2. Load danh sách Khóa học (Năm) cho Dropdown
+                // Ví dụ: Lấy 5 năm gần nhất hoặc lấy từ DB
+                int currentYear = DateTime.Now.Year;
+                var listKhoaHoc = Enumerable.Range(currentYear - 4, 5).OrderByDescending(x => x).Select(x => new { Id = x, Name = "K" + x });
+                ViewBag.KhoaHocList = new SelectList(listKhoaHoc, "Id", "Name", khoaHoc);
+
                 ViewBag.Keyword = keyword;
 
-                return View(data);
+                // 3. Gọi Service với tham số mới
+                var model = await _hocPhiService.GetDanhSachCongNoAsync(keyword, khoaId, khoaHoc);
+
+                return View(model);
             }
             catch (Exception ex)
             {
