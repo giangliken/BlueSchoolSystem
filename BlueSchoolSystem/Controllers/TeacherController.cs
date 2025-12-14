@@ -20,7 +20,7 @@ namespace BlueSchoolSystem.Controllers
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ApplicationDbContext _context;
         private readonly IActivityLogService _logService;
-        public TeacherController(IHttpClientFactory httpClientFactory, ApplicationDbContext context,IActivityLogService logService)
+        public TeacherController(IHttpClientFactory httpClientFactory, ApplicationDbContext context, IActivityLogService logService)
         {
             _httpClientFactory = httpClientFactory;
             _context = context;
@@ -834,7 +834,7 @@ namespace BlueSchoolSystem.Controllers
                 if (!string.IsNullOrEmpty(Request.Form["GioKetThucDayBu"]))
                     model.GioKetThucDayBu = TimeSpan.Parse(Request.Form["GioKetThucDayBu"]);
 
-                
+
 
                 // Lưu vào DB
                 _context.XinVangDays.Add(model);
@@ -897,5 +897,12 @@ namespace BlueSchoolSystem.Controllers
             }
         }
 
+
+        //Trang quản lý nhập điểm GV
+        public IActionResult NhapDiem()
+        {
+            return View();
+        }
     }
+
 }
