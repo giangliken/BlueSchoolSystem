@@ -1,121 +1,121 @@
 ﻿@using BlueSchoolSystem.Models
+@using System.Globalization
 @model BlueSchoolSystem.Models.ViewModel.HocPhiViewModel
 
 @{
     var sv = ViewBag.SinhVien as SinhVien;
     ViewData["Title"] = $"Học phí - {sv?.MSSV}";
 
-    // Tính toán hiển thị
+    // Cấu hình hiển thị tiền (Dùng space)
+    var customCulture = (CultureInfo)CultureInfo.GetCultureInfo("vi-VN").Clone();
+    customCulture.NumberFormat.NumberGroupSeparator = " ";
+
     decimal duNo = Model.DuNoHienTai;
     bool dangNo = duNo > 0;
 }
 
-
 <style>
-    /* Giống style trang Quản lý Học phí */
-
-    /* Hàng hover nhẹ */
+    /* Style riêng cho bảng */
     table.table-hover tbody tr:hover {
-        background-color: #f2f2f2;
+        background-color: #f8f9fa;
     }
 
-    /* Không chữ màu, không bold */
     table td {
         font-weight: normal !important;
-        color: inherit !important;
+        vertical-align: middle;
     }
 
-    /* Header giống trang danh sách học phí */
-    thead.custom-header {
+    thead.custom-header th {
         background-color: #e9ecef !important;
-        font-weight: bold !important;
+        font-weight: 700 !important;
+        color: #495057;
+        text-transform: uppercase;
+        font-size: 0.85rem;
     }
 
-    /* Không badge màu trong bảng */
-    .no-badge {
-        background: none !important;
-        color: inherit !important;
-        padding: 0 !important;
-        font-size: inherit !important;
+    .text-amount {
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-weight: bold !important;
     }
 </style>
 
-
 <div class="container-fluid mt-4">
 
+    @* --- NÚT QUAY LẠI --- *@
     <div class="mb-3">
-        <a asp-action="TuitionManager" asp-controller="Admin" class="btn btn-outline-secondary">
-            <i class="fa fa-arrow-left me-2"></i> Quay lại
+        <a asp-action="TuitionManager" asp-controller="Admin" class="btn btn-outline-secondary btn-sm">
+            <i class="fa fa-arrow-left me-2"></i> Quay lại danh sách
         </a>
     </div>
 
-    @* --- Header Thông tin & Số dư --- *@
-    <div class="row mb-4">
+    @* --- HEADER --- *@
+    <div class="row mb-4 align-items-center">
         <div class="col-md-8">
-            <h4 class="fw-bold text-primary">
-                <i class="fa fa-user-graduate me-2"></i> @sv?.HoVaTenDem @sv?.Ten <span class="text-muted fs-6">(@sv?.MSSV)</span>
+            <h4 class="fw-bold text-primary mb-1">
+                <i class="fa fa-user-graduate me-2"></i> @sv?.HoVaTenDem @sv?.Ten
+                <span class="text-muted fs-5">(@sv?.MSSV)</span>
             </h4>
-            <span class="badge bg-secondary">Lớp: @sv?.Lop?.MaLop</span>
+            <div>
+                <span class="badge bg-secondary me-2"><i class="fa fa-users"></i> Lớp: @sv?.Lop?.MaLop</span>
+            </div>
         </div>
         <div class="col-md-4 text-end">
-            <button class="btn btn-success shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#modalThuTien">
-                <i class="fa fa-money-bill-wave me-2"></i> Ghi nhận thu
+            <button class="btn btn-success shadow-sm px-4 py-2 fw-bold" data-bs-toggle="modal" data-bs-target="#modalThuTien">
+                <i class="fa fa-money-bill-wave me-2"></i> GHI NHẬN GIAO DỊCH
             </button>
         </div>
     </div>
 
-    @* --- Card Trạng thái tài chính --- *@
+    @* --- CARD TRẠNG THÁI --- *@
     <div class="card shadow-sm mb-4 border-start border-5 @(dangNo ? "border-danger" : "border-success")">
         <div class="card-body d-flex justify-content-between align-items-center">
             <div>
-                <h5 class="text-muted mb-1">Trạng thái tài chính hiện tại</h5>
+                <h6 class="text-muted text-uppercase mb-2">Tình trạng công nợ hiện tại</h6>
                 @if (dangNo)
                 {
-                    <h2 class="text-danger fw-bold mb-0">ĐANG NỢ: @duNo.ToString("N0") đ</h2>
+                    <h2 class="text-danger fw-bold mb-0 text-amount">Học phí chưa thanh toán: @duNo.ToString("N0", customCulture) đ</h2>
                     <small class="text-danger"><i class="fa fa-exclamation-circle"></i> Sinh viên cần đóng thêm tiền.</small>
                 }
                 else if (duNo < 0)
                 {
-                    <h2 class="text-success fw-bold mb-0">DƯ (VÍ): @Math.Abs(duNo).ToString("N0") đ</h2>
-                    <small class="text-success"><i class="fa fa-check-circle"></i> Số tiền này sẽ được trừ tự động khi đăng ký môn mới.</small>
+                    <h2 class="text-success fw-bold mb-0 text-amount">Số dư tài khoản: @Math.Abs(duNo).ToString("N0", customCulture) đ</h2>
+                    <small class="text-success"><i class="fa fa-check-circle"></i> Số dư sẽ được tự động đối trừ vào học phí khi phát sinh đăng ký học phần.</small>
                 }
                 else
                 {
-                    <h2 class="text-muted fw-bold mb-0">0 đ (Hoàn thành)</h2>
+                    <h2 class="text-muted fw-bold mb-0 text-amount">0 đ (Hoàn thành)</h2>
                 }
             </div>
-            <div class="text-end text-muted">
-                <i class="fa fa-wallet fa-4x opacity-25"></i>
-            </div>
+            <div class="text-end text-muted opacity-25"><i class="fa fa-wallet fa-4x"></i></div>
         </div>
     </div>
 
-    @* --- Tabs Lịch sử --- *@
-    <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
+    @* --- TABS CHI TIẾT --- *@
+    <ul class="nav nav-tabs mb-3 fw-bold" id="myTab" role="tablist">
         <li class="nav-item">
-            <button class="nav-link active fw-bold" id="phatsinh-tab" data-bs-toggle="tab" data-bs-target="#phatsinh" type="button">
-                <i class="fa fa-list-ul me-2"></i> Khoản phí phải đóng (Ghi Nợ)
+            <button class="nav-link active" id="phatsinh-tab" data-bs-toggle="tab" data-bs-target="#phatsinh" type="button">
+                <i class="fa fa-list-ul me-2"></i> Khoản phải thu
             </button>
         </li>
         <li class="nav-item">
-            <button class="nav-link fw-bold" id="dongtien-tab" data-bs-toggle="tab" data-bs-target="#dongtien" type="button">
-                <i class="fa fa-history me-2"></i> Lịch sử Đóng tiền (Ghi Có)
+            <button class="nav-link" id="dongtien-tab" data-bs-toggle="tab" data-bs-target="#dongtien" type="button">
+                <i class="fa fa-history me-2"></i> Lịch sử thu
             </button>
         </li>
     </ul>
 
     <div class="tab-content">
-
-        @* TAB 1: DANH SÁCH MÔN ĐÃ ĐĂNG KÝ (NỢ) *@
+        @* TAB 1: PHÁT SINH *@
         <div class="tab-pane fade show active" id="phatsinh">
-            <div class="card shadow-sm">
+            <div class="card shadow-sm border-0">
                 <div class="card-body p-0">
-                    <table class="table table-hover mb-0 align-middle">
+                    <table class="table table-hover mb-0">
                         <thead class="custom-header">
                             <tr>
-                                <th>Thời gian</th>
-                                <th> Môn học</th>
+                                <th>Thời gian ĐK</th>
+                                <th>Môn học </th>
                                 <th>Mã LHP</th>
+                                <th>Học kỳ</th>
                                 <th class="text-end">Số tiền</th>
                             </tr>
                         </thead>
@@ -125,16 +125,16 @@
                                 <tr>
                                     <td>@item.NgayPhatSinh.ToString("dd/MM/yyyy HH:mm")</td>
                                     <td>
-                                        <span>@item.DangKyHocPhan?.LopHocPhan?.MonHoc?.TenMonHoc</span>
-                                       
+                                        <span >@item.DangKyHocPhan?.LopHocPhan?.MonHoc?.TenMonHoc</span><br />
                                     </td>
-                                    <td>@item.DangKyHocPhan?.LopHocPhan?.MaLopHocPhan</td>
-                                    <td class="text-end">+@item.SoTien.ToString("N0") đ</td>
+                                    <td><span >@item.DangKyHocPhan?.LopHocPhan?.MaLopHocPhan</span></td>
+                                    <td>@item.DangKyHocPhan?.LopHocPhan?.HocKy?.TenHocKy</td>
+                                    <td >+@item.SoTien.ToString("N0", customCulture) đ</td>
                                 </tr>
                             }
                             @if (!Model.LichSuPhatSinh.Any())
                             {
-                                <tr><td colspan="4" class="text-center py-4 text-muted">Chưa có dữ liệu đăng ký môn học.</td></tr>
+                                <tr><td colspan="5" >Chưa có dữ liệu công nợ.</td></tr>
                             }
                         </tbody>
                     </table>
@@ -142,17 +142,17 @@
             </div>
         </div>
 
-        @* TAB 2: LỊCH SỬ ĐÓNG TIỀN (CÓ) *@
+        @* TAB 2: LỊCH SỬ GIAO DỊCH *@
         <div class="tab-pane fade" id="dongtien">
-            <div class="card shadow-sm">
+            <div class="card shadow-sm border-0">
                 <div class="card-body p-0">
-                    <table class="table table-hover mb-0 align-middle">
+                    <table class="table table-hover mb-0">
                         <thead class="custom-header">
                             <tr>
-                                <th>Ngày đóng</th>
-                                <th>Người thu</th>
-                                <th>Ghi chú</th>
-                                <th class="text-end">Số tiền đóng</th>
+                                <th>Ngày giao dịch</th>
+                                <th>Người thực hiện</th>
+                                <th>Nội dung / Ghi chú</th>
+                                <th class="text-end">Số tiền giao dịch</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -162,12 +162,21 @@
                                     <td>@item.NgayDong.ToString("dd/MM/yyyy HH:mm")</td>
                                     <td>@item.NguoiThu</td>
                                     <td>@item.GhiChu</td>
-                                    <td class="text-end">+ @item.SoTienDong.ToString("N0") đ</td>
+                                    <td class="text-end ">
+                                        @if (item.SoTienDong > 0)
+                                        {
+                                            <span > +@item.SoTienDong.ToString("N0", customCulture) đ</span>
+                                        }
+                                        else
+                                        {
+                                            <span > @item.SoTienDong.ToString("N0", customCulture) đ</span>
+                                        }
+                                    </td>
                                 </tr>
                             }
                             @if (!Model.LichSuDongTien.Any())
                             {
-                                <tr><td colspan="4" class="text-center py-4 text-muted">Chưa có lịch sử đóng tiền.</td></tr>
+                                <tr><td colspan="4" class="text-center py-4 ">Chưa có lịch sử giao dịch.</td></tr>
                             }
                         </tbody>
                     </table>
@@ -177,42 +186,114 @@
     </div>
 </div>
 
-@* --- MODAL THU TIỀN --- *@
+@* --- MODAL THU TIỀN (ĐÃ NÂNG CẤP INPUT) --- *@
 <div class="modal fade" id="modalThuTien" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form asp-action="MakePayment" method="post">
+            <form asp-action="MakePayment" method="post" id="formThuTien">
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title"><i class="fa fa-money-bill-wave"></i> Ghi nhận thu</h5>
+                    <h5 class="modal-title fw-bold"><i class="fa fa-money-check-alt"></i> Ghi nhận Giao dịch</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="sinhVienId" value="@sv.Id" />
 
-                    <div class="alert alert-light border text-center">
-                        Dư nợ hiện tại: <strong class="@(dangNo ? "text-danger" : "text-success")">@duNo.ToString("N0") đ</strong>
+                    @* Hiển thị số dư hiện tại *@
+                    <div class="alert alert-light border text-center mb-3">
+                        Nợ phí hiện tại:
+                        <strong class="@(dangNo ? "text-danger" : "text-success") fs-5">
+                            @duNo.ToString("N0", customCulture) đ
+                        </strong>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Số tiền khách đóng (VNĐ):</label>
+                        <label class="form-label fw-bold">Số tiền (VNĐ):</label>
                         <div class="input-group">
-                            <input type="number" name="soTien" class="form-control fw-bold text-success fs-4"
-                                   min="1000" step="1000" required placeholder="0"
-                                   value="@(dangNo? duNo : 0)" /> @* Gợi ý số tiền bằng đúng số nợ *@
-                            <span class="input-group-text">VNĐ</span>
+                            @* 1. INPUT HIỂN THỊ (Type=Text để format) *@
+                            <input type="text" id="displaySoTien" class="form-control fw-bold text-primary fs-4"
+                                   required placeholder="Nhập số tiền..." autocomplete="off"
+                                   value="@(dangNo? duNo.ToString("N0", customCulture) : "0")" />
+
+                            @* 2. INPUT THỰC TẾ GỬI VỀ SERVER (Hidden) *@
+                            <input type="hidden" name="soTien" id="realSoTien" value="@(dangNo? duNo : 0)" />
+
+                            <span class="input-group-text fw-bold">VNĐ</span>
+                        </div>
+                        <div class="form-text mt-2">
+                            <ul class="mb-0 ps-3 small text-muted">
+                                <li>Nhập số <strong>Dương (+)</strong>: Thu tiền học phí (Giảm nợ).</li>
+                                <li>Nhập số <strong>Âm (-)</strong>: Hoàn tiền hoặc Điều chỉnh (Tăng nợ).</li>
+                            </ul>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Ghi chú (Mã GD/Nội dung):</label>
-                        <textarea name="ghiChu" class="form-control" rows="2" placeholder="VD: Thu tiền mặt tại văn phòng..."></textarea>
+                        <label class="form-label fw-bold">Nội dung / Ghi chú:</label>
+                        <textarea name="ghiChu" class="form-control" rows="3" 
+                                  placeholder="VD: Thu tiền mặt... hoặc Hoàn tiền..."></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-success px-4 fw-bold">Xác nhận Thu</button>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-success px-4 fw-bold">
+                        <i class="fa fa-save me-2"></i> Xác nhận Giao dịch
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // Hàm định dạng số: 10000 -> 10 000
+            function formatNumber(n) {
+                // Giữ lại dấu trừ nếu có
+                var isNegative = false;
+                if (n.indexOf("-") === 0) {
+                    isNegative = true;
+                    n = n.substring(1);
+                }
+
+                // Xóa hết ký tự không phải số
+                n = n.replace(/\D/g, "");
+
+                // Format phân cách ngàn bằng khoảng trắng
+                var formatted = n.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+                return isNegative ? "-" + formatted : formatted;
+            }
+
+            // Xử lý sự kiện khi gõ vào ô hiển thị
+            $('#displaySoTien').on('input', function () {
+                var inputVal = $(this).val();
+
+                // 1. Cho phép gõ dấu trừ (-) ở đầu tiên
+                if (inputVal === "-") return;
+
+                // 2. Format hiển thị
+                var formattedVal = formatNumber(inputVal);
+                $(this).val(formattedVal);
+
+                // 3. Cập nhật giá trị thực vào ô hidden (Xóa khoảng trắng để thành số thuần)
+                // Lưu ý: Giữ lại dấu trừ
+                var realVal = formattedVal.replace(/\s/g, '');
+
+                // Nếu rỗng hoặc chỉ có dấu trừ thì set = 0 để tránh lỗi
+                if (realVal === "" || realVal === "-") realVal = "0";
+
+                $('#realSoTien').val(realVal);
+            });
+
+            // Xử lý khi submit form để đảm bảo dữ liệu đúng
+            $('#formThuTien').on('submit', function(e) {
+                var realVal = $('#realSoTien').val();
+                if (realVal == "0" || realVal == "") {
+                    e.preventDefault();
+                    alert("Vui lòng nhập số tiền hợp lệ (khác 0).");
+                }
+            });
+        });
+    </script>
+}

@@ -132,25 +132,25 @@ namespace BlueSchoolSystem.Services
         // THANH TOÁN
         public async Task NopTienHocPhiAsync(int sinhVienId, decimal soTien, string nguoiThu, string ghiChu)
         {
-            if (soTien <= 0) throw new Exception("Số tiền nộp phải lớn hơn 0.");
+            if (soTien == 0) throw new Exception("Số tiền không hợp lệ.");
 
             var hoSo = await GetOrCreateHocPhiAsync(sinhVienId);
 
             var phieu = new PhieuThu
             {
                 SinhVienId = sinhVienId,
-                SoTienDong = soTien,
+                SoTienDong = soTien, 
                 NguoiThu = nguoiThu,
                 GhiChu = ghiChu,
                 NgayDong = DateTime.Now
             };
             _context.PhieuThus.Add(phieu);
 
+
             hoSo.DuNoConLai -= soTien;
             hoSo.NgayCapNhatCuoi = DateTime.Now;
 
             await _context.SaveChangesAsync();
-            // ĐÃ XÓA LOG
         }
 
         // =================================================================================

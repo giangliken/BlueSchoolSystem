@@ -1,6 +1,8 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using BlueSchoolSystem.Repository;
 using BlueSchoolSystem.Services;
+using Google.Apis.Drive.v3.Data;
 using Humanizer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +14,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using OfficeOpenXml;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Dynamic;
 using System.Net;
@@ -20,8 +23,6 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
-using System.Collections.Generic;
-using BlueSchoolSystem.Repository;
 
 namespace BlueSchoolSystem.Controllers
 {
@@ -4176,11 +4177,11 @@ namespace BlueSchoolSystem.Controllers
         // 3. Action: Thu tiền trực tiếp (Admin thu tiền mặt)
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> MakePayment(int sinhVienId, decimal soTien, string ghiChu)
+        public async Task<IActionResult> MakePayment(int sinhVienId, decimal soTien, string? ghiChu) // Thêm dấu ?
         {
-            if (soTien <= 0)
+            if (soTien == 0)
             {
-                TempData["Error"] = "Số tiền thu phải lớn hơn 0.";
+                TempData["Error"] = "Số tiền phải khác 0.";
                 return RedirectToAction(nameof(TuitionDetails), new { id = sinhVienId });
             }
 
@@ -4188,14 +4189,40 @@ namespace BlueSchoolSystem.Controllers
             {
                 var userName = User.Identity.Name ?? "Admin";
 
-                // Gọi Service: Tự động tạo Phiếu thu và Trừ nợ
-                await _hocPhiService.NopTienHocPhiAsync(sinhVienId, soTien, userName, ghiChu);
+                var userId = User.FindFirst("userId")?.Value ?? _userManager.GetUserId(User) ?? "Unknown";
 
-                TempData["Success"] = $"Đã thu {soTien:N0}đ thành công!";
+                // Xử lý ghi chú: Nếu null hoặc rỗng thì gán mặc định
+                string userNote = string.IsNullOrWhiteSpace(ghiChu) ? "Giao dịch hệ thống" : ghiChu;
+
+                string actionType = soTien > 0 ? "Thu tiền" : "Hoàn tiền/Điều chỉnh";
+
+                // Format lại: [Loại] Nội dung
+                string finalNote = $"[{actionType}] {userNote}";
+
+                await _hocPhiService.NopTienHocPhiAsync(sinhVienId, soTien, userName, finalNote);
+                try
+                {
+                    await _activityLogService.LogAsync(
+                        userId: userId,
+                        userName: userName,
+                        device: Request.Headers["User-Agent"].ToString(), 
+                        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A", 
+                        actionType: actionType,
+                        tableName: "PhieuThu",
+                        objectId: sinhVienId.ToString(), 
+                        description: $"Giao dịch tài chính: {soTien:N0} VNĐ. Nội dung: {finalNote}"
+                    );
+                }
+                catch (Exception logEx)
+                {
+                    // Nếu ghi log lỗi thì chỉ log ra console/file, không chặn luồng chính
+                    _logger.LogError(logEx, "Lỗi ghi log hệ thống khi thu tiền.");
+                }
+                TempData["Success"] = $"Đã {actionType.ToLower()} {soTien:N0}đ thành công!";
             }
             catch (Exception ex)
             {
-                TempData["Error"] = "Lỗi thu tiền: " + ex.Message;
+                TempData["Error"] = "Lỗi xử lý: " + ex.Message;
             }
 
             return RedirectToAction(nameof(TuitionDetails), new { id = sinhVienId });
