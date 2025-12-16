@@ -1,1 +1,1 @@
-# BlueSchoolSystem
+# HỆ THỐNG QUẢN LÝ ĐÀO TẠO - BLUESCHOOL EMS
