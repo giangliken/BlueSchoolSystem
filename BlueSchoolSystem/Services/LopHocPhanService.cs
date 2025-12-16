@@ -16,6 +16,7 @@ namespace BlueSchoolSystem.Services
         private readonly ILogger<LopHocPhanService> _logger;
         private readonly Random _random = new Random();
         private readonly HocPhiService _hocPhiService;
+        private readonly LichThiService _lichThiService;
 
         // Map Tiết học (Copy từ Controller cũ)
         private readonly Dictionary<int, string> TietStartMap = new Dictionary<int, string> {
@@ -30,11 +31,12 @@ namespace BlueSchoolSystem.Services
             {13,"18:45"},{14,"19:30"},{15,"20:15"}
         };
 
-        public LopHocPhanService(ApplicationDbContext context, ILogger<LopHocPhanService> logger, HocPhiService hocPhiService)
+        public LopHocPhanService(ApplicationDbContext context, ILogger<LopHocPhanService> logger, HocPhiService hocPhiService, LichThiService lichThiService)
         {
             _context = context;
             _logger = logger;
             _hocPhiService = hocPhiService;
+            _lichThiService = lichThiService;
         }
 
         // ====== HELPER METHODS ======
@@ -453,7 +455,7 @@ namespace BlueSchoolSystem.Services
 
         // Trong class LopHocPhanService
 
-        public async Task<(int classesCreated, int successCount, int schedulesCreated)> RunAutoEnrollmentJobAsync(AutoEnrollmentApiPayload dto)
+        public async Task<(int classesCreated, int successCount, int schedulesCreated,int examsCreated)> RunAutoEnrollmentJobAsync(AutoEnrollmentApiPayload dto)
         {
             // 1. XÁC ĐỊNH KHÓA HỌC VÀ SINH VIÊN MỤC TIÊU
             var khoaHoc = await _context.KhoaHocs.FirstOrDefaultAsync(kh => kh.NamHoc == dto.KhoaNhapHoc);
@@ -483,6 +485,7 @@ namespace BlueSchoolSystem.Services
             int successCount = 0;
             int classesCreated = 0;
             int schedulesCreatedTotal = 0;
+            int examsCreatedTotal = 0;
             var createdLhpsBySubject = new Dictionary<string, List<LopHocPhan>>();
 
             // Lấy tham số lịch học từ DTO
@@ -659,6 +662,22 @@ namespace BlueSchoolSystem.Services
                                 schedulesCreatedTotal++;
                             }
                             await _context.SaveChangesAsync();
+                            try
+                            {
+                                var examResult = await _lichThiService.AutoScheduleExamAsync(selectedLhp.Id);
+                                if (examResult.Success)
+                                {
+                                    examsCreatedTotal++;
+                                }
+                                else
+                                {
+                                    _logger.LogWarning($"[AUTO-EXAM] Lỗi xếp thi cho lớp {selectedLhp.MaLopHocPhan}: {examResult.Message}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"[AUTO-EXAM] Exception khi xếp thi cho lớp {selectedLhp.MaLopHocPhan}");
+                            }
                         }
                     } // Kết thúc khối IF (selectedLhp == null)
 
@@ -712,7 +731,7 @@ namespace BlueSchoolSystem.Services
                 }
             }
 
-            return (classesCreated, successCount, schedulesCreatedTotal);
+            return (classesCreated, successCount, schedulesCreatedTotal, examsCreatedTotal);
         }
 
 

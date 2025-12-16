@@ -41,9 +41,10 @@ namespace BlueSchoolSystem.Controllers
         private readonly HocPhiService _hocPhiService;
         private readonly ChuongTrinhDaoTaoService _ctdtService;
         private readonly IEmailSender _emailSender;
+        private readonly LichThiService _lichThiService;
 
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, IEmailSender emailSender, HocPhiService hocPhiService, ChuongTrinhDaoTaoService chuongTrinhDaoTaoService)
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, IEmailSender emailSender, HocPhiService hocPhiService, ChuongTrinhDaoTaoService chuongTrinhDaoTaoService, LichThiService lichThiService)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
@@ -59,6 +60,7 @@ namespace BlueSchoolSystem.Controllers
             _activityLogService = activityLogService;
 
             _emailSender = emailSender;
+            _lichThiService = lichThiService;
         }
 
         //Giao diện trang chủ của Admin
@@ -2365,7 +2367,20 @@ namespace BlueSchoolSystem.Controllers
             if (success)
             {
                 int newLhpId = data.GetProperty("lopHocPhanId").GetInt32();
-                TempData["Success"] = data.GetProperty("message").GetString() ?? $"Tạo Lớp Học Phần **{dto.MaLopHocPhan}** thành công!";
+                string message = "Tạo lớp thành công.";
+
+                    var examResult = await _lichThiService.AutoScheduleExamAsync(newLhpId);
+
+                    if (examResult.Success)
+                    {
+                        message += $" <br/>✅ {examResult.Message}";
+                    }
+                    else
+                    {
+                        message += $" <br/>⚠️ Lỗi xếp lịch thi: {examResult.Message}";
+                    }
+
+                TempData["Success"] = message;
                 return RedirectToAction(nameof(CourseClassDetail), new { id = newLhpId });
             }
 
@@ -2910,17 +2925,17 @@ namespace BlueSchoolSystem.Controllers
 
             try
             {
-                // Gọi thẳng hàm xử lý logic, bỏ qua HTTP Client
+                // Gọi hàm Service (lúc này nó trả về 4 giá trị)
                 var result = await _lhpService.RunAutoEnrollmentJobAsync(apiPayload);
 
+                // Hiển thị thông báo (Thêm thông tin lịch thi)
                 TempData["Success"] = $"Hoàn tất! Đã tạo {result.classesCreated} lớp, " +
-                                      $"Đăng ký thành công cho {result.successCount} lượt sinh viên (kèm tính học phí).";
+                                      $"xếp {result.examsCreated} lịch thi, " +  
+                                      $"Đăng ký thành công cho {result.successCount} lượt sinh viên.";
             }
             catch (Exception ex)
             {
-                // Ghi log lỗi ra debug window để kiểm tra
                 Console.WriteLine(ex.ToString());
-
                 TempData["Error"] = "Lỗi xử lý: " + ex.Message;
                 await LoadAutoEnrollmentViewBags();
                 return View(request);
