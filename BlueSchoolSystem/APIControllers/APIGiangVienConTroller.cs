@@ -638,7 +638,7 @@ namespace BlueSchoolSystem.APIControllers
                 DiemDanhId = buoi.Id,
                 SinhVienId = (int)x.SinhVienId,
                 TrangThaiId = trangThaiChuaDiemDanhId,
-                ThoiGian = DateTime.MinValue
+                ThoiGian = DateTime.Now
             });
 
             _context.ChiTietDiemDanhs.AddRange(details);
