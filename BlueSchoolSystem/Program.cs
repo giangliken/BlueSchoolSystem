@@ -32,7 +32,7 @@ builder.Services.AddScoped<LopHocPhanService>();
 builder.Services.AddScoped<HocPhiService>();
 
 builder.Services.AddScoped<ChuongTrinhDaoTaoService>();
-
+builder.Services.AddScoped<LichThiService>();
 
 // 1. Đăng ký dịch vụ localization
 builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");

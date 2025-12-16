@@ -995,19 +995,20 @@ namespace BlueSchoolSystem.APIControllers
             int classesCreated = 0;
             int enrollmentsCreated = 0;
             int schedulesCreated = 0;
+            int examsCreated = 0;
             string logDesc = "";
 
             try
             {
                 // Gọi hàm Service (đã được cập nhật để nhận AutoEnrollmentRequestWithScheduleDTO hoặc lớp kế thừa nó)
                 // Lưu ý: AutoEnrollmentApiPayload kế thừa từ AutoEnrollmentRequestWithScheduleDTO nên truyền vào được.
-                (int createdClassesCount, int successEnrollmentsCount, int schedulesCreatedCount) =
+                (int createdClassesCount, int successEnrollmentsCount, int schedulesCreatedCount,int examsCreatedTotal) =
                     await _lopHocPhanService.RunAutoEnrollmentJobAsync(payload);
 
                 classesCreated = createdClassesCount;
                 enrollmentsCreated = successEnrollmentsCount;
                 schedulesCreated = schedulesCreatedCount;
-
+                examsCreated = examsCreatedTotal;
                 logDesc = $"API Auto Tạo/Đăng ký cho Ngành {payload.NganhId}, Khóa {payload.KhoaNhapHoc}, Kỳ {payload.ThuTuHocKy}. " +
                           $"Kết quả: Tạo **{classesCreated}** LHP, **{schedulesCreated}** Lịch học, Đăng ký **{enrollmentsCreated}** lượt.";
             }
