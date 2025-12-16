@@ -1,5 +1,257 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+﻿@model List<BlueSchoolSystem.Models.ViewModel.DangKyHocPhanVM>
+
 @{
+    ViewData["Title"] = "Đăng ký học phần";
+    var listDaDangKy = Model.Where(x => x.IsRegistered).ToList();
+    var listLopMo = Model;
+}
+
+<div class="container-fluid mt-4">
+
+    @* --- THANH CÔNG CỤ TÌM KIẾM --- *@
+    <div class="row mb-3 align-items-center">
+        <div class="col-md-6">
+            <h4 class="fw-bold text-primary mb-0"><i class="fa-solid fa-calendar-check me-2"></i> ĐĂNG KÝ HỌC PHẦN: @ViewBag.TenHocKy</h4>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <span class="input-group-text bg-white"><i class="fa fa-search text-muted"></i></span>
+                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm theo Mã môn, Tên môn học, Mã LHP...">
+            </div>
+        </div>
+    </div>
+
+    @* --- BẢNG 1: DANH SÁCH LỚP ĐANG MỞ (ĐỂ ĐĂNG KÝ) --- *@
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3 border-bottom">
+            <h5 class="mb-0 text-primary fw-bold">Danh sách Lớp học phần đang mở</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                <table class="table table-bordered table-hover mb-0 align-middle text-center" id="tableLopHP">
+                    <thead class="table-dark sticky-top" style="top: 0; z-index: 10;">
+                        <tr>
+                            <th width="50">STT</th>
+                            <th>Mã MH</th>
+                            <th>Tên Môn học</th>
+                            <th>Mã LHP</th>
+                            <th>Sĩ số</th>
+                            <th>Thứ</th>
+                            <th>Tiết BĐ</th>
+                            <th>Số tiết</th>
+                            <th>Phòng</th>
+                            <th>GV</th>
+                            <th>Thời gian</th>
+                            <th width="100">Chọn</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (listLopMo != null && listLopMo.Any())
+                        {
+                            int stt = 1;
+                            foreach (var item in listLopMo)
+                            {
+                                int rowSpan = item.LichHocChiTiet.Count;
+                                bool isFull = item.ChoTrong <= 0;
+                                string rowClass = item.IsRegistered ? "table-warning" : "";
+
+                                for (int i = 0; i < rowSpan; i++)
+                                {
+                                    var lich = item.LichHocChiTiet[i];
+
+                                    <tr class="@rowClass search-row" data-search="@item.MaMonHoc @item.TenMonHoc @item.MaLopHocPhan">
+                                        @if (i == 0)
+                                        {
+                                            <td rowspan="@rowSpan">@(stt++)</td>
+                                            <td rowspan="@rowSpan">@item.MaMonHoc</td>
+                                            <td rowspan="@rowSpan">@item.TenMonHoc</td>
+                                            <td rowspan="@rowSpan">@item.MaLopHocPhan</td>
+                                            <td rowspan="@rowSpan">@item.ChoTrong </td>
+                                        }
+
+                                        <td>@lich.Thu</td>
+                                        <td>@(lich.TietBatDau == 0 ? "-" : lich.TietBatDau.ToString())</td>
+                                        <td>@(lich.SoTiet == 0 ? "-" : lich.SoTiet.ToString())</td>
+                                        <td>@lich.Phong</td>
+
+                                        @if (i == 0)
+                                        {
+                                            <td rowspan="@rowSpan">@item.GiangVien</td>
+                                            <td rowspan="@rowSpan" class="small">
+                                                @item.NgayBatDau.ToString("dd/MM")<br />--> @item.NgayKetThuc.ToString("dd/MM")
+                                            </td>
+                                            <td rowspan="@rowSpan">
+                                                @if (item.IsRegistered)
+                                                {
+                                                    <button class="btn btn-secondary btn-sm" disabled><i class="fa fa-check"></i> </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-primary btn-sm btn-action" data-id="@item.Id" data-action="register" @(isFull ? "disabled" : "")><i class="fa fa-plus"></i></button>
+                                                }
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="12" class="text-center text-muted py-4">Không có lớp học phần nào đang mở.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @* --- BẢNG 2: KẾT QUẢ ĐĂNG KÝ (ĐÃ SỬA GIỐNG BẢNG TRÊN) --- *@
+    <div class="card shadow-sm border-success mt-5 mb-5">
+        <div class="card-header bg-success text-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fa-solid fa-list-check me-2"></i> Lớp học phần ĐÃ ĐĂNG KÝ</h5>
+            <span class="badge bg-light text-success fs-6">Tổng TC: @listDaDangKy.Sum(x => x.SoTinChi)</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                @* Cấu trúc bảng y hệt bảng trên *@
+                <table class="table table-bordered table-hover mb-0 align-middle text-center">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="50">STT</th>
+                            <th>Mã MH</th>
+                            <th>Tên Môn học</th>
+                            <th>Mã LHP</th> 
+                            <th>Thứ</th>
+                            <th>Tiết BĐ</th>
+                            <th>Số tiết</th>
+                            <th>Phòng</th>
+                            <th>GV</th>
+                            <th>Thời gian</th>
+                            <th width="100">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (listDaDangKy.Any())
+                        {
+                            int i = 1;
+                            foreach (var item in listDaDangKy)
+                            {
+                                int rowSpan = item.LichHocChiTiet.Count;
+
+                                for (int j = 0; j < rowSpan; j++)
+                                {
+                                    var lich = item.LichHocChiTiet[j];
+
+                                    <tr>
+                                        @if (j == 0)
+                                        {
+                                            <td rowspan="@rowSpan">@(i++)</td>
+                                            <td rowspan="@rowSpan" >@item.MaMonHoc</td>
+                                            <td rowspan="@rowSpan" >@item.TenMonHoc</td>
+                                            <td rowspan="@rowSpan">@item.MaLopHocPhan</td>
+                                        }
+
+                                        <td>@lich.Thu</td>
+                                        <td>@(lich.TietBatDau == 0 ? "-" : lich.TietBatDau.ToString())</td>
+                                        <td>@(lich.SoTiet == 0 ? "-" : lich.SoTiet.ToString())</td>
+                                        <td>@lich.Phong</td>
+
+                                        @if (j == 0)
+                                        {
+                                            <td rowspan="@rowSpan">@item.GiangVien</td>
+                                            <td rowspan="@rowSpan" class="small">
+                                                @item.NgayBatDau.ToString("dd/MM")<br />--> @item.NgayKetThuc.ToString("dd/MM")
+                                            </td>
+                                            <td rowspan="@rowSpan">
+                                                <button class="btn btn-danger btn-sm btn-action"
+                                                        data-id="@item.Id" data-action="cancel"
+                                                        title="Hủy lớp này">
+                                                    <i class="fa fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="11" class="text-center text-muted py-3">Bạn chưa đăng ký môn nào trong học kỳ này.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        $(document).ready(function () {
+
+            // 1. Tìm kiếm (chỉ áp dụng cho Bảng 1)
+            $("#searchInput").on("keyup", function () {
+                var value = $(this).val().toLowerCase();
+                // Chỉ tìm trong bảng #tableLopHP (bảng trên)
+                $("#tableLopHP tbody tr").filter(function () {
+                    var content = $(this).attr('data-search') || "";
+                    $(this).toggle(content.toLowerCase().indexOf(value) > -1)
+                });
+            });
+
+            // 2. Xử lý Đăng ký / Hủy
+            $('.btn-action').click(function () {
+                var btn = $(this);
+                var lhpId = btn.data('id');
+                var action = btn.data('action');
+                var isDangKy = action === 'register';
+
+                // Xác nhận nếu hủy
+                if(!isDangKy) {
+                    Swal.fire({
+                        title: 'Xác nhận hủy?',
+                        text: "Bạn muốn hủy lớp này?",
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Đồng ý',
+                        cancelButtonText: 'Không'
+                    }).then((result) => {
+                        if (result.isConfirmed) callAjax(lhpId, isDangKy, btn);
+                    });
+                } else {
+                    callAjax(lhpId, isDangKy, btn);
+                }
+            });
+
+            function callAjax(lhpId, isDangKy, btn) {
+                var originalHtml = btn.html();
+                btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+
+                $.ajax({
+                    url: '/Home/XuLyDangKy',
+                    type: 'POST',
+                    data: { lopHocPhanId: lhpId, isDangKy: isDangKy },
+                    success: function (res) {
+                        if (res.success) {
+                            Swal.fire({
+                                title: 'Thành công',
+                                text: res.message,
+                                icon: 'success',
+                                timer: 1500,
+                                showConfirmButton: false
+                            }).then(() => location.reload());
+                        } else {
+                            Swal.fire('Lỗi', res.message, 'error');
+                            btn.prop('disabled', false).html(originalHtml);
+                        }
+                    },
+                    error: function () {
+                        Swal.fire('Lỗi', 'Không kết nối được server', 'error');
+                        btn.prop('disabled', false).html(originalHtml);
+                    }
+                });
+            }
+        });
+    </script>
 }

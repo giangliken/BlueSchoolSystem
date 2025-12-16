@@ -1,6 +1,8 @@
 ﻿using BlueSchoolSystem.Models;
 using BlueSchoolSystem.Models.ViewModel;
+using BlueSchoolSystem.Repository;
 using BlueSchoolSystem.Services;
+using Google.Apis.Drive.v3.Data;
 using Humanizer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +14,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using OfficeOpenXml;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Dynamic;
 using System.Net;
@@ -20,8 +23,6 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
-using System.Collections.Generic;
-using BlueSchoolSystem.Repository;
 
 namespace BlueSchoolSystem.Controllers
 {
@@ -37,9 +38,12 @@ namespace BlueSchoolSystem.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IActivityLogService _activityLogService;
         private readonly LopHocPhanService _lhpService;
+        private readonly HocPhiService _hocPhiService;
+        private readonly ChuongTrinhDaoTaoService _ctdtService;
         private readonly IEmailSender _emailSender;
 
-        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, IEmailSender emailSender)
+
+        public AdminController(ILogger<AdminController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConfiguration configuration, IActivityLogService activityLogService, LopHocPhanService lhpService, IEmailSender emailSender, HocPhiService hocPhiService, ChuongTrinhDaoTaoService chuongTrinhDaoTaoService)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
@@ -47,6 +51,9 @@ namespace BlueSchoolSystem.Controllers
             _userManager = userManager;
             this.configuration = configuration;
             _lhpService = lhpService;
+            _hocPhiService = hocPhiService;
+            _ctdtService = chuongTrinhDaoTaoService;
+
 
             _apiBaseUrl = configuration["ApiSettings:BaseUrl"];
             _activityLogService = activityLogService;
@@ -2236,9 +2243,8 @@ namespace BlueSchoolSystem.Controllers
 
         #region ======= Course Class Manager =======
 
-        public async Task<IActionResult> CourseClassManager()
+        public async Task<IActionResult> CourseClassManager(int? hocKyId)
         {
-            // API call giữ nguyên
             var (success, data, error) = await CallApiAsync("api/lophocphans", HttpMethod.Get);
             if (!success)
             {
@@ -2258,6 +2264,18 @@ namespace BlueSchoolSystem.Controllers
             ViewBag.PhongHocList = lists.phongHocList;
             ViewBag.GiangVienList = lists.giangVienList;
             ViewBag.TrangThaiLHPList = lists.trangThaiList;
+
+            // Lưu học kỳ hiện tại để View hiển thị lại chọn
+            ViewBag.SelectedHocKyId = hocKyId;
+
+            // --- Áp dụng bộ lọc ---
+            if (hocKyId.HasValue && hocKyId > 0)
+            {
+                // Giả sử dữ liệu ExpandoObject có trường "hocKyId"
+                lhpList = lhpList
+                    .Where(l => Convert.ToInt32(((IDictionary<string, object>)l)["hocKyId"]) == hocKyId)
+                    .ToList();
+            }
 
             return View(lhpList);
         }
@@ -2799,7 +2817,6 @@ namespace BlueSchoolSystem.Controllers
         #endregion
 
 
-
         #region ======= Tu dong tao lop va dang ky =======
 
 
@@ -2854,28 +2871,26 @@ namespace BlueSchoolSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AutoCreateClassAndEnroll(AutoEnrollmentRequestDTO request)
         {
-            // 1. Validate dữ liệu từ Form View (Chỉ chứa các trường CTĐT)
+            // 1. Validate dữ liệu (Giữ nguyên)
             if (!ModelState.IsValid)
             {
                 await LoadAutoEnrollmentViewBags();
                 return View(request);
             }
 
-            // 2. Lấy danh sách Môn học bắt buộc
+            // 2. Lấy danh sách Môn học (Giữ nguyên)
             var mandatorySubjects = await _lhpService.GetMandatorySubjectsForAutoClassCreationAsync(
                 request.NganhId, request.KhoaNhapHoc, request.ThuTuHocKy);
 
             if (!mandatorySubjects.Any())
             {
-                TempData["Error"] = $"Không tìm thấy môn học bắt buộc nào trong CTĐT cho Ngành ID {request.NganhId}, Khóa {request.KhoaNhapHoc}, Kỳ {request.ThuTuHocKy}.";
+                TempData["Error"] = $"Không tìm thấy môn học bắt buộc nào...";
                 return RedirectToAction(nameof(CourseClassManager));
             }
 
-            // --- BƯỚC QUAN TRỌNG: SINH DỮ LIỆU LỊCH HỌC NGẪU NHIÊN TẠI ĐÂY ---
+            // 3. Chuẩn bị dữ liệu (Giữ nguyên)
             var (randomTietBatDau, randomTietKetThuc, _) = _lhpService.GetRandomScheduleSettings();
             int randomPhongHocId = await GetRandomPhongHocId();
-
-            // 2. Gửi TOÀN BỘ ngày trong tuần để Service có thể chọn bất kỳ ngày nào
             var fullWeekDays = new List<int> { 2, 3, 4, 5, 6, 7 };
 
             var apiPayload = new AutoEnrollmentApiPayload
@@ -2884,71 +2899,31 @@ namespace BlueSchoolSystem.Controllers
                 NganhId = request.NganhId,
                 KhoaNhapHoc = request.KhoaNhapHoc,
                 ThuTuHocKy = request.ThuTuHocKy,
-
                 ShouldAutoCreateSchedule = true,
-
-                // Các giá trị này chỉ là "giá trị mồi" để qua mặt Validation.
-                // Service sẽ KHÔNG dùng cứng nhắc các giá trị này mà sẽ Random lại.
                 DefaultPhongHocId = randomPhongHocId,
                 TietBatDau = randomTietBatDau,
                 TietKetThuc = randomTietKetThuc,
-
-                // Quan trọng: Gửi full tuần
                 CacNgayTrongTuan = fullWeekDays,
-
                 MandatorySubjectCodes = mandatorySubjects.Select(s => s.MaMonHoc).ToList()
             };
 
-            // 4. Gọi API
-            var (success, data, error) = await CallApiAsync("api/auto-create-enroll", HttpMethod.Post, apiPayload);
 
-            if (!success)
+            try
             {
-                // Xử lý hiển thị lỗi chi tiết từ API
-                string errorMsg = error;
-                try
-                {
-                    if (error.Contains("API error:") && error.Contains("{"))
-                    {
-                        // Cắt chuỗi để lấy phần JSON
-                        var jsonPart = error.Substring(error.IndexOf('{'));
-                        dynamic errObj = JsonConvert.DeserializeObject(jsonPart);
+                // Gọi thẳng hàm xử lý logic, bỏ qua HTTP Client
+                var result = await _lhpService.RunAutoEnrollmentJobAsync(apiPayload);
 
-                        // Kiểm tra xem có property "errors" (Validation Error) không
-                        if (errObj?.errors != null)
-                        {
-                            errorMsg = "Lỗi dữ liệu: ";
-                            foreach (var err in errObj.errors)
-                            {
-                                errorMsg += $"{err.Name}: {err.Value[0]} ";
-                            }
-                        }
-                        else
-                        {
-                            errorMsg = errObj?.message ?? error;
-                        }
-                    }
-                }
-                catch { }
+                TempData["Success"] = $"Hoàn tất! Đã tạo {result.classesCreated} lớp, " +
+                                      $"Đăng ký thành công cho {result.successCount} lượt sinh viên (kèm tính học phí).";
+            }
+            catch (Exception ex)
+            {
+                // Ghi log lỗi ra debug window để kiểm tra
+                Console.WriteLine(ex.ToString());
 
-                TempData["Error"] = errorMsg;
-
+                TempData["Error"] = "Lỗi xử lý: " + ex.Message;
                 await LoadAutoEnrollmentViewBags();
                 return View(request);
-            }
-            else
-            {
-                string message = "Đăng ký tự động thành công.";
-                try
-                {
-                    if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("message", out var msgProp))
-                    {
-                        message = msgProp.GetString();
-                    }
-                }
-                catch { }
-
-                TempData["Success"] = message;
             }
 
             return RedirectToAction(nameof(CourseClassManager));
@@ -4145,5 +4120,161 @@ namespace BlueSchoolSystem.Controllers
             }
         }
 
+
+
+        #region ======= Quản lý Học phí (Mô hình Dư nợ) =======
+
+        // 1. Dashboard: Danh sách công nợ sinh viên
+        public async Task<IActionResult> TuitionManager(string keyword, int? khoaId, int? khoaHoc)
+        {
+            try
+            {
+                var listKhoa = await _context.Khoas.OrderBy(k => k.TenKhoa).ToListAsync();
+                ViewBag.KhoaList = new SelectList(listKhoa, "Id", "TenKhoa", khoaId);
+
+                // 2. Load danh sách Khóa học (Năm) cho Dropdown
+                // Ví dụ: Lấy 5 năm gần nhất hoặc lấy từ DB
+                int currentYear = DateTime.Now.Year;
+                var listKhoaHoc = Enumerable.Range(currentYear - 4, 5).OrderByDescending(x => x).Select(x => new { Id = x, Name = "K" + x });
+                ViewBag.KhoaHocList = new SelectList(listKhoaHoc, "Id", "Name", khoaHoc);
+
+                ViewBag.Keyword = keyword;
+
+                // 3. Gọi Service với tham số mới
+                var model = await _hocPhiService.GetDanhSachCongNoAsync(keyword, khoaId, khoaHoc);
+
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi tải dữ liệu: " + ex.Message;
+                return View(new List<HocPhiDashboardVM>());
+            }
+        }
+
+        // 2. Chi tiết học phí & Lịch sử giao dịch của 1 SV
+        public async Task<IActionResult> TuitionDetails(int id) // id = SinhVienId
+        {
+            var sv = await _context.SinhViens
+                .Include(s => s.Lop)
+                .FirstOrDefaultAsync(s => s.Id == id);
+
+            if (sv == null)
+            {
+                TempData["Error"] = "Không tìm thấy sinh viên.";
+                return RedirectToAction(nameof(TuitionManager));
+            }
+
+            // Lấy toàn bộ thông tin tài chính từ Service
+            var hocPhiInfo = await _hocPhiService.GetThongTinHocPhi(id);
+
+            ViewBag.SinhVien = sv;
+
+            // Truyền model sang View (HocPhiViewModel đã tạo ở bước Service)
+            return View(hocPhiInfo);
+        }
+
+        // 3. Action: Thu tiền trực tiếp (Admin thu tiền mặt)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MakePayment(int sinhVienId, decimal soTien, string? ghiChu) // Thêm dấu ?
+        {
+            if (soTien == 0)
+            {
+                TempData["Error"] = "Số tiền phải khác 0.";
+                return RedirectToAction(nameof(TuitionDetails), new { id = sinhVienId });
+            }
+
+            try
+            {
+                var userName = User.Identity.Name ?? "Admin";
+
+                var userId = User.FindFirst("userId")?.Value ?? _userManager.GetUserId(User) ?? "Unknown";
+
+                // Xử lý ghi chú: Nếu null hoặc rỗng thì gán mặc định
+                string userNote = string.IsNullOrWhiteSpace(ghiChu) ? "Giao dịch hệ thống" : ghiChu;
+
+                string actionType = soTien > 0 ? "Thu tiền" : "Hoàn tiền/Điều chỉnh";
+
+                // Format lại: [Loại] Nội dung
+                string finalNote = $"[{actionType}] {userNote}";
+
+                await _hocPhiService.NopTienHocPhiAsync(sinhVienId, soTien, userName, finalNote);
+                try
+                {
+                    await _activityLogService.LogAsync(
+                        userId: userId,
+                        userName: userName,
+                        device: Request.Headers["User-Agent"].ToString(), 
+                        ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A", 
+                        actionType: actionType,
+                        tableName: "PhieuThu",
+                        objectId: sinhVienId.ToString(), 
+                        description: $"Giao dịch tài chính: {soTien:N0} VNĐ. Nội dung: {finalNote}"
+                    );
+                }
+                catch (Exception logEx)
+                {
+                    // Nếu ghi log lỗi thì chỉ log ra console/file, không chặn luồng chính
+                    _logger.LogError(logEx, "Lỗi ghi log hệ thống khi thu tiền.");
+                }
+                TempData["Success"] = $"Đã {actionType.ToLower()} {soTien:N0}đ thành công!";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi xử lý: " + ex.Message;
+            }
+
+            return RedirectToAction(nameof(TuitionDetails), new { id = sinhVienId });
+        }
+
+        #endregion
+
+        #region ======= Tạo chương trình đào tạo =======
+        // 1. GET: Hiển thị trang tạo
+        [HttpGet]
+        public async Task<IActionResult> CreateTrainingProgram()
+        {
+            // lấy dữ liệu từ DB (giữ nguyên code của bạn)
+            var listNganh = await _context.NganhHocs.ToListAsync();
+            var listKhoa = await _context.KhoaHocs.ToListAsync();
+
+            // Nganh: dùng TenNganh (đã có)
+            ViewBag.NganhList = new SelectList(listNganh ?? new List<NganhHoc>(), "Id", "TenNganh");
+
+            // Khoa: dùng NamHoc làm text (chuyển về string)
+            ViewBag.KhoaHocList = new SelectList(
+                (listKhoa ?? new List<KhoaHoc>())
+                    .Select(k => new { k.Id, Name = k.NamHoc.ToString() }),
+                "Id",
+                "Name"
+            );
+
+            // Môn học JSON (giữ an toàn)
+            var monHocs = await _context.MonHocs
+                .Select(m => new { Code = m.MaMonHoc, Name = $"{m.MaMonHoc} - {m.TenMonHoc}" })
+                .ToListAsync();
+            ViewBag.MonHocJson = System.Text.Json.JsonSerializer.Serialize(monHocs);
+
+            return View();
+        }
+
+        // 2. POST: Nhận dữ liệu JSON từ Ajax
+        [HttpPost]
+        public async Task<IActionResult> CreateTrainingProgram([FromBody] CreateChuongTrinhDaoTaoVM model)
+        {
+            try
+            {
+                await _ctdtService.CreateProgramAsync(model);
+                return Json(new { success = true, message = "Tạo chương trình đào tạo thành công!" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+
+        #endregion
     }
 }

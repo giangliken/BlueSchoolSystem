@@ -44,6 +44,10 @@ namespace BlueSchoolSystem.Models
         public DbSet<ChiTietChuongTrinhDaoTao> ChiTietChuongTrinhDaoTaos { get; set; } // Bảng chi tiết chương trình đào tạo
         public DbSet<DotDangKy> DotDangKys { get; set; } // Bảng đợt đăng ký
         public DbSet<GiangVienMonHoc> GiangVienMonHocs { get; set; }
+        public DbSet<DinhMucHocPhi> DinhMucHocPhis { get; set; }
+        public DbSet<HocPhi> HocPhis { get; set; }
+        public DbSet<ChiTietHocPhi> ChiTietHocPhis { get; set; }
+        public DbSet<PhieuThu> PhieuThus { get; set; }
 
         public DbSet<XinVangDay> XinVangDays { get; set; } // Bảng xin vắng dạy
 
@@ -202,6 +206,61 @@ namespace BlueSchoolSystem.Models
                 e.ToTable("XinVangDays");
             });
 
+
+            builder.Entity<HocPhi>(e =>
+            {
+                e.HasKey(h => h.Id);
+                e.Property(h => h.DuNoConLai).HasColumnType("decimal(18, 2)");
+
+                // Quan hệ 1-1 với SinhVien
+                e.HasOne(h => h.SinhVien)
+                 .WithOne() // Bên SV không cần navigation property ngược lại (hoặc thêm nếu muốn)
+                 .HasForeignKey<HocPhi>(h => h.SinhVienId)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ChiTietHocPhi
+            builder.Entity<ChiTietHocPhi>(e =>
+            {
+                e.HasKey(ct => ct.Id);
+                e.Property(ct => ct.SoTien).HasColumnType("decimal(18, 2)");
+
+                // Quan hệ N-1 với HocPhi
+                e.HasOne(ct => ct.HocPhi)
+                 .WithMany() // HocPhi không cần list chi tiết nếu không dùng
+                 .HasForeignKey(ct => ct.HocPhiId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                // Quan hệ 1-1 (hoặc N-1) với DangKyHocPhan
+                e.HasOne(ct => ct.DangKyHocPhan)
+                 .WithMany()
+                 .HasForeignKey(ct => ct.DangKyHocPhanId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // PhieuThu
+            builder.Entity<PhieuThu>(e =>
+            {
+                e.HasKey(p => p.Id);
+                e.Property(p => p.SoTienDong).HasColumnType("decimal(18, 2)");
+
+                // Quan hệ N-1 với SinhVien (để biết ai đóng)
+                // Lưu ý: Không cần quan hệ với TaiKhoanSinhVien nữa vì bảng đó đã xóa
+                e.HasOne<SinhVien>() // Chỉ định rõ kiểu nếu không có navigation property
+                 .WithMany()
+                 .HasForeignKey(p => p.SinhVienId)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // DinhMucHocPhi
+            builder.Entity<DinhMucHocPhi>(e =>
+            {
+                e.Property(d => d.GiaTienMotTinChi).HasColumnType("decimal(18, 2)");
+                e.HasOne(d => d.NganhHoc)
+                 .WithMany()
+                 .HasForeignKey(d => d.NganhId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
 
 
 
