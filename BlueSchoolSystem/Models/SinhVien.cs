@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace BlueSchoolSystem.Models
@@ -62,6 +63,7 @@ namespace BlueSchoolSystem.Models
         public ICollection<BangDiem> BangDiems { get; set; } = new List<BangDiem>();
 
         public List<ChiTietDiemDanh> ChiTietDiemDanhs { get; set; } = new();
+
 
     }
 }
