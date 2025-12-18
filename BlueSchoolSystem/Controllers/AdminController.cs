@@ -4246,6 +4246,69 @@ namespace BlueSchoolSystem.Controllers
         #endregion
 
         #region ======= Tạo chương trình đào tạo =======
+        [HttpGet]
+        public async Task<IActionResult> TrainingProgramMap(int? nganhId, int? khoaHocId)
+        {
+            // 1. Load dữ liệu cho Dropdown (luôn phải làm dù có chọn hay chưa)
+            var listNganh = await _context.NganhHocs.OrderBy(n => n.TenNganh).ToListAsync();
+            var listKhoa = await _context.KhoaHocs.OrderByDescending(k => k.NamHoc).ToListAsync();
+
+            // Giữ lại giá trị đã chọn sau khi reload trang
+            ViewBag.NganhList = new SelectList(listNganh, "Id", "TenNganh", nganhId);
+            ViewBag.KhoaHocList = new SelectList(listKhoa, "Id", "NamHoc", khoaHocId);
+
+            // 2. Nếu chưa chọn gì -> Trả về View trống (Model = null)
+            if (nganhId == null || khoaHocId == null)
+            {
+                return View(null);
+            }
+
+            // 3. Nếu đã chọn -> Truy vấn dữ liệu
+            var nganh = listNganh.FirstOrDefault(n => n.Id == nganhId);
+            var khoa = listKhoa.FirstOrDefault(k => k.Id == khoaHocId);
+
+            // Lấy chi tiết CTĐT và Join với bảng Môn Học
+            var rawData = await (from ct in _context.ChiTietChuongTrinhDaoTaos
+                                 join mh in _context.MonHocs on ct.MaMonHoc equals mh.MaMonHoc
+                                 where ct.ChuongTrinhDaoTao.NganhHocId == nganhId &&
+                                       ct.ChuongTrinhDaoTao.KhoaHocId == khoaHocId
+                                 select new
+                                 {
+                                     ct.HocKy,
+                                     ct.MaMonHoc,
+                                     ct.MaMonHocTienQuyet,
+                                     ct.BatBuoc,
+                                     mh.TenMonHoc,
+                                     mh.SoTinChi,
+                                     mh.MoTa
+                                 }).ToListAsync();
+
+            // Chuyển sang ViewModel
+            var model = new TrainingProgramVM
+            {
+                TenNganh = nganh?.TenNganh ?? "N/A",
+                NamHoc = khoa?.NamHoc ?? 0,
+                Semesters = rawData.GroupBy(x => x.HocKy)
+                    .OrderBy(g => g.Key)
+                    .Select(g => new SemesterVM
+                    {
+                        HocKy = g.Key,
+                        TongTinChi = g.Sum(x => x.SoTinChi),
+                        MonHocs = g.Select(m => new SubjectInSemesterVM
+                        {
+                            MaMonHoc = m.MaMonHoc,
+                            TenMonHoc = m.TenMonHoc,
+                            SoTinChi = m.SoTinChi,
+                            BatBuoc = m.BatBuoc,
+                            MaMonTienQuyet = m.MaMonHocTienQuyet,
+                            MoTa = m.MoTa
+                        }).ToList()
+                    }).ToList()
+            };
+
+            return View(model);
+        }
+
         // 1. GET: Hiển thị trang tạo
         [HttpGet]
         public async Task<IActionResult> CreateTrainingProgram()
