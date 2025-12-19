@@ -1352,9 +1352,168 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
+        [HttpPost("auto-attendance/checkin")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ProcessAttendance([FromBody] ESP32CheckInRequest request)
+        {
+            if (request.ScannedNames == null || !request.ScannedNames.Any())
+            {
+                return Ok(new { result = false, message = "Không có thiết bị nào được quét." });
+            }
+
+            // Loại bỏ các tên trùng lặp và tên rỗng
+            var distinctMSSVs = request.ScannedNames
+                                       .Where(x => !string.IsNullOrWhiteSpace(x))
+                                       .Distinct()
+                                       .ToList();
+
+            if (!distinctMSSVs.Any()) return Ok(new { result = false, message = "Danh sách MSSV rỗng." });
+
+            var now = DateTime.Now;
+
+            // --- LOGIC THỜI GIAN THEO YÊU CẦU ---
+            string trangThaiText = "";
+            bool isLate = false;
+
+            // Đặt các mốc thời gian trong ngày hôm nay
+            var t7h45 = DateTime.Today.AddHours(7).AddMinutes(45);
+            var t12h30 = DateTime.Today.AddHours(12).AddMinutes(30);
+            var t12h45 = DateTime.Today.AddHours(12).AddMinutes(45);
+
+            if (now < t7h45)
+            {
+                // Trước 7h45: Ca sáng - Đúng giờ
+                trangThaiText = "Có mặt";
+            }
+            else if (now >= t7h45 && now < t12h30)
+            {
+                // 7h45 - 12h30: Ca sáng - Trễ
+                trangThaiText = "Đi trễ";
+                isLate = true;
+            }
+            else if (now >= t12h30 && now < t12h45)
+            {
+                // 12h30 - 12h45: Ca chiều - Đúng giờ
+                trangThaiText = "Có mặt";
+            }
+            else
+            {
+                // Sau 12h45: Ca chiều - Trễ
+                trangThaiText = "Đi trễ";
+                isLate = true;
+            }
+
+            // Lấy ID của trạng thái từ DB
+            var statusDb = await _context.TrangThais
+                .FirstOrDefaultAsync(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == trangThaiText);
+
+            // Lấy ID trạng thái "Vắng" để check xem SV đã điểm danh chưa
+            var statusVang = await _context.TrangThais
+                .FirstOrDefaultAsync(t => t.LoaiTrangThai == "DiemDanh" && (t.TenTrangThai == "Vắng" || t.TenTrangThai == "Vắng mặt"));
+
+            if (statusDb == null || statusVang == null)
+                return BadRequest("Lỗi cấu hình trạng thái trong Database.");
+
+            int countSuccess = 0;
+
+            foreach (var mssvRaw in distinctMSSVs)
+            {
+                // Clean MSSV (nếu cần trim khoảng trắng)
+                string mssv = mssvRaw.Trim();
+
+                // 1. Tìm Sinh Viên
+                var sv = await _context.SinhViens.FirstOrDefaultAsync(s => s.MSSV == mssv);
+                if (sv == null) continue; // Không tìm thấy SV, bỏ qua (có thể là thiết bị BT lạ)
+
+                // 2. Tìm buổi điểm danh ĐANG MỞ (ExpireAt > Now) và SV có trong lớp đó
+                var buoiDiemDanh = await _context.DiemDanhs
+                    .Include(dd => dd.LopHocPhan)
+                    .Where(dd => dd.Ngay.Date == DateTime.Today
+                                 && dd.ExpireAt > now
+                                 && _context.ChiTietLopHocPhans.Any(ct => ct.LopHocPhanId == dd.LopHocPhanId && ct.SinhVienId == sv.Id))
+                    .OrderByDescending(dd => dd.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                if (buoiDiemDanh == null) continue; // SV này không có lớp nào đang điểm danh
+
+                // 3. Kiểm tra chi tiết điểm danh
+                var chiTiet = await _context.ChiTietDiemDanhs
+                    .FirstOrDefaultAsync(ct => ct.DiemDanhId == buoiDiemDanh.Id && ct.SinhVienId == sv.Id);
+
+                // Nếu chưa có record hoặc trạng thái hiện tại khác "Vắng" (tức là đã điểm danh rồi) -> Bỏ qua
+                if (chiTiet != null && chiTiet.TrangThaiId != statusVang.Id)
+                {
+                    continue;
+                }
+
+                // 4. Cập nhật SQL
+                if (chiTiet == null)
+                {
+                    // Trường hợp hiếm: SV có trong lớp nhưng chưa có record trong bảng ChiTietDiemDanh
+                    chiTiet = new ChiTietDiemDanh
+                    {
+                        DiemDanhId = buoiDiemDanh.Id,
+                        SinhVienId = sv.Id,
+                        TrangThaiId = statusDb.Id,
+                        ThoiGian = now,
+                        GhiChu = $"BLE Auto: {request.DeviceId}"
+                    };
+                    _context.ChiTietDiemDanhs.Add(chiTiet);
+                }
+                else
+                {
+                    // Update từ Vắng -> Có mặt/Đi trễ
+                    chiTiet.TrangThaiId = statusDb.Id;
+                    chiTiet.ThoiGian = now;
+                    chiTiet.GhiChu = $"BLE Auto: {request.DeviceId}";
+                    _context.ChiTietDiemDanhs.Update(chiTiet);
+                }
+
+                await _context.SaveChangesAsync();
+                countSuccess++;
+
+                // 5. Đẩy Firebase để App GV cập nhật realtime
+                await PushStatusToFirebase(
+                    buoiDiemDanh.Id,
+                    sv.MSSV,
+                    $"{sv.HoVaTenDem} {sv.Ten}".Trim(),
+                    statusDb.Id,
+                    trangThaiText,
+                    now
+                );
+            }
+
+            return Ok(new
+            {
+                result = true,
+                processed = countSuccess,
+                serverTime = now.ToString("HH:mm:ss"),
+                statusApplied = trangThaiText
+            });
+        }
+
+        // Helper đẩy Firebase
+        private async Task PushStatusToFirebase(int buoiId, string mssv, string hoTen, int statusId, string statusText, DateTime time)
+        {
+            try
+            {
+                var fb = new FirebaseClient("https://bluenet-e6525-default-rtdb.firebaseio.com");
+                string path = $"attendancesessions/{buoiId}/students/{mssv}";
+
+                var data = new
+                {
+                    status = statusText,
+                    statusId = statusId,
+                    timecheckedin = time.ToString("HH:mm"),
+                    source = "ESP32_BLE",
+                    updatedAt = time.ToString("s")
+                };
+                await fb.Child(path).PatchAsync(data);
+            }
+            catch { }
+        }
     }
 
 
-
-
 }
+
