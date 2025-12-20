@@ -1,0 +1,214 @@
+﻿@model List<BlueSchoolSystem.Models.LopHocPhan>
+
+@{
+    ViewData["Title"] = "Quản lý điểm học phần";
+    var hocKys = ViewBag.HocKyList as List<BlueSchoolSystem.Models.HocKy>;
+    int lockedId = ViewBag.LockedStatusId != null ? (int)ViewBag.LockedStatusId : -1;
+}
+
+<style>
+    /* Làm con trỏ chuột thành hình bàn tay khi di chuột vào hàng để người dùng biết là bấm được */
+    .clickable-row {
+        cursor: pointer;
+    }
+    /* Ngăn chặn sự kiện click lan truyền khi bấm vào các nút hành động (để không bị tick checkbox nhầm) */
+    .action-btn {
+        position: relative;
+        z-index: 10;
+    }
+</style>
+
+<div class="container-fluid mt-4">
+    <div class="card shadow border-0">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+           
+        </div>
+
+        <div class="card-body">
+            <form asp-action="ScoreManagerIndex" method="get" class="row g-3 mb-4 bg-light p-3 rounded border">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Học kỳ:</label>
+                    <select name="hocKyId" class="form-select">
+                        <option value="">-- Tất cả --</option>
+                        @if (hocKys != null)
+                        {
+                            foreach (var hk in hocKys)
+                            {
+                                <option value="@hk.Id" selected="@(ViewBag.CurrentHocKy == hk.Id)">@hk.TenHocKy</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold">Từ khóa (Mã LHP, Tên Môn, GV):</label>
+                    <input type="text" name="keyword" class="form-control"
+                           placeholder="Nhập thông tin cần tìm..." value="@ViewBag.CurrentKeyword">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100 me-2">
+                        <i class="fa fa-search"></i> Tìm kiếm
+                    </button>
+                    <a asp-action="ScoreManagerIndex" class="btn btn-secondary w-50">
+                        <i class="fa fa-sync"></i> Reset
+                    </a>
+                </div>
+            </form>
+
+            <form asp-action="BatchUpdateGradeStatus" method="post" id="batchForm">
+
+                <div class="d-flex justify-content-end mb-2">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-warning" onclick="submitBatch('unlock')">
+                            <i class="fa fa-unlock"></i> Mở khóa bảng điểm
+                        </button>
+                        <button type="button" class="btn btn-dark" onclick="submitBatch('lock')">
+                            <i class="fa fa-lock"></i> Khóa bảng điểm
+                        </button>
+                    </div>
+                    <input type="hidden" name="actionType" id="actionTypeInput" value="" />
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle">
+                        <thead class="table-dark text-center">
+                            <tr>
+                                <th style="width: 40px">
+                                    <input type="checkbox" class="form-check-input" id="selectAll" />
+                                </th>
+                                <th style="width: 50px">#</th>
+                                <th style="width: 150px">Mã LHP</th>
+                                <th>Môn Học</th>
+                                <th style="width: 200px">Giảng Viên</th>
+                                <th style="width: 100px">Sĩ số</th>
+                                <th style="width: 150px">Trạng thái</th>
+                                <th style="width: 100px">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model != null && Model.Any())
+                            {
+                                int stt = 1;
+                                foreach (var item in Model)
+                                {
+                                    var firstGrade = item.BangDiems?.FirstOrDefault();
+                                    bool hasData = item.BangDiems != null && item.BangDiems.Any();
+                                    int trangThaiId = firstGrade?.TrangThaiId ?? -1;
+                                    bool isLocked = (trangThaiId == lockedId);
+
+                                    // Thêm class "clickable-row" để JS nhận diện
+                                    <tr class="clickable-row">
+                                        <td class="text-center">
+                                            <input type="checkbox" name="lhpIds" value="@item.Id" class="form-check-input item-check" />
+                                        </td>
+
+                                        <td class="text-center">@(stt++)</td>
+                                        <td class=" text-center">@item.MaLopHocPhan</td>
+                                        <td>
+                                            <span >@item.MonHoc?.TenMonHoc</span>
+                                            <br />
+                                            <small class="text-muted">@item.MonHoc?.MaMonHoc</small>
+                                        </td>
+                                        <td>
+                                            @(item.GiangVien != null ? $"{item.GiangVien.HoVaTenDem} {item.GiangVien.Ten}" : "Chưa phân công")
+                                        </td>
+                                        <td class="text-center">@item.SiSo</td>
+
+                                        <td class="text-center">
+                                            @if (hasData)
+                                            {
+                                                if (isLocked)
+                                                {
+                                                    <span > Đã khóa</span>
+                                                }
+                                                else
+                                                {
+
+                                                    <span > Cho phép sửa</span>
+                                                }
+                                            }
+                                            else
+                                            {
+
+                                                <span >Chưa khởi tạo</span>
+                                            }
+                                        </td>
+
+                                        <td class="text-center action-cell">
+                                            <a asp-action="Grading" asp-route-id="@item.Id" class="btn btn-sm btn-outline-primary action-btn"
+                                               onclick="event.stopPropagation()">
+                                                <i class="fa fa-list-ol"></i> 
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">Không tìm thấy dữ liệu phù hợp.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // 1. Xử lý "Chọn tất cả"
+        document.getElementById('selectAll').addEventListener('change', function() {
+            var checkboxes = document.querySelectorAll('.item-check');
+            for (var checkbox of checkboxes) {
+                checkbox.checked = this.checked;
+                toggleRowHighlight(checkbox); // Tô màu hàng khi chọn hết
+            }
+        });
+
+        // 2. [MỚI] Xử lý click vào hàng -> Check checkbox
+        var rows = document.querySelectorAll('.clickable-row');
+        rows.forEach(function(row) {
+            row.addEventListener('click', function(e) {
+                // Nếu click vào chính cái checkbox thì không làm gì (để nó tự xử lý)
+                if (e.target.type === 'checkbox') {
+                    toggleRowHighlight(e.target);
+                    return;
+                }
+
+                // Tìm checkbox trong hàng này
+                var checkbox = this.querySelector('.item-check');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked; // Đảo trạng thái
+                    toggleRowHighlight(checkbox);
+                }
+            });
+        });
+
+        // Hàm tô màu nền khi hàng được chọn (cho đẹp và dễ nhìn)
+        function toggleRowHighlight(checkbox) {
+            var row = checkbox.closest('tr');
+            if (checkbox.checked) {
+                row.classList.add('table-active'); // Class của Bootstrap tô màu xám nhẹ
+            } else {
+                row.classList.remove('table-active');
+            }
+        }
+
+        // 3. Xử lý Submit Batch
+        function submitBatch(type) {
+            var checkedCount = document.querySelectorAll('.item-check:checked').length;
+            if (checkedCount === 0) {
+                alert('Vui lòng chọn ít nhất một lớp học phần!');
+                return;
+            }
+
+            var actionName = (type === 'lock') ? "KHÓA" : "MỞ KHÓA";
+            if (confirm(`Bạn có chắc chắn muốn ${actionName} ${checkedCount} lớp đã chọn không?`)) {
+                document.getElementById('actionTypeInput').value = type;
+                document.getElementById('batchForm').submit();
+            }
+        }
+    </script>
+}

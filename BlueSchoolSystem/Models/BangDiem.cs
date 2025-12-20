@@ -11,6 +11,8 @@
 
         public float? DiemChuyenCan { get; set; } // Điểm chuyên cần
         public float? DiemCuoiKy { get; set; } // Điểm cuối kỳ
-        
+        public int TrangThaiId { get; set; } // Trạng thái (ví dụ: Đã hoàn thành, Chưa hoàn thành)
+        public TrangThai? TrangThai { get; set; } // Tham chiếu đến trạng thái
+
     }
 }
