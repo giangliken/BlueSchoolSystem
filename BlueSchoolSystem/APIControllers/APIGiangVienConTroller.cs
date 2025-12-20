@@ -1363,69 +1363,63 @@ namespace BlueSchoolSystem.APIControllers
 
             // Loại bỏ các tên trùng lặp và tên rỗng
             var distinctMSSVs = request.ScannedNames
-                                       .Where(x => !string.IsNullOrWhiteSpace(x))
-                                       .Distinct()
-                                       .ToList();
+                                           .Where(x => !string.IsNullOrWhiteSpace(x))
+                                           .Distinct()
+                                           .ToList();
 
             if (!distinctMSSVs.Any()) return Ok(new { result = false, message = "Danh sách MSSV rỗng." });
 
             var now = DateTime.Now;
+            var timeNow = now.TimeOfDay; // Lấy giờ hiện tại để so sánh (không quan tâm ngày)
 
-            // --- LOGIC THỜI GIAN THEO YÊU CẦU ---
-            string trangThaiText = "";
-            bool isLate = false;
+            // --- LOGIC THỜI GIAN MỚI (UPDATE) ---
+            string trangThaiText = "Vắng mặt"; // Mặc định là Vắng nếu không lọt vào khung giờ nào
 
-            // Đặt các mốc thời gian trong ngày hôm nay
-            var t7h45 = DateTime.Today.AddHours(7).AddMinutes(45);
-            var t12h30 = DateTime.Today.AddHours(12).AddMinutes(30);
-            var t12h45 = DateTime.Today.AddHours(12).AddMinutes(45);
-
-            if (now < t7h45)
+            // Ca Sáng
+            if (timeNow >= new TimeSpan(5, 0, 0) && timeNow <= new TimeSpan(7, 45, 0))
             {
-                // Trước 7h45: Ca sáng - Đúng giờ
                 trangThaiText = "Có mặt";
             }
-            else if (now >= t7h45 && now < t12h30)
+            else if (timeNow > new TimeSpan(7, 45, 0) && timeNow <= new TimeSpan(9, 0, 0))
             {
-                // 7h45 - 12h30: Ca sáng - Trễ
                 trangThaiText = "Đi trễ";
-                isLate = true;
             }
-            else if (now >= t12h30 && now < t12h45)
+            // Ca Chiều
+            else if (timeNow >= new TimeSpan(12, 0, 0) && timeNow <= new TimeSpan(12, 45, 0))
             {
-                // 12h30 - 12h45: Ca chiều - Đúng giờ
                 trangThaiText = "Có mặt";
             }
-            else
+            else if (timeNow > new TimeSpan(12, 45, 0) && timeNow <= new TimeSpan(14, 0, 0))
             {
-                // Sau 12h45: Ca chiều - Trễ
                 trangThaiText = "Đi trễ";
-                isLate = true;
             }
+            // Các khung giờ 09:01-11:59 hoặc sau 14:00 sẽ giữ nguyên mặc định là "Vắng mặt"
 
-            // Lấy ID của trạng thái từ DB
+            // --- KẾT THÚC LOGIC THỜI GIAN ---
+
+            // Lấy ID của trạng thái từ DB (Lưu ý: DB phải có trạng thái tên chính xác: "Có mặt", "Đi trễ", "Vắng mặt")
             var statusDb = await _context.TrangThais
                 .FirstOrDefaultAsync(t => t.LoaiTrangThai == "DiemDanh" && t.TenTrangThai == trangThaiText);
 
-            // Lấy ID trạng thái "Vắng" để check xem SV đã điểm danh chưa
+            // Lấy ID trạng thái "Vắng" (để check điều kiện update)
+            // Lưu ý: Cần đảm bảo tên trong DB thống nhất (Vắng hoặc Vắng mặt)
             var statusVang = await _context.TrangThais
                 .FirstOrDefaultAsync(t => t.LoaiTrangThai == "DiemDanh" && (t.TenTrangThai == "Vắng" || t.TenTrangThai == "Vắng mặt"));
 
             if (statusDb == null || statusVang == null)
-                return BadRequest("Lỗi cấu hình trạng thái trong Database.");
+                return BadRequest($"Lỗi cấu hình trạng thái: Không tìm thấy trạng thái '{trangThaiText}' hoặc 'Vắng' trong DB.");
 
             int countSuccess = 0;
 
             foreach (var mssvRaw in distinctMSSVs)
             {
-                // Clean MSSV (nếu cần trim khoảng trắng)
                 string mssv = mssvRaw.Trim();
 
                 // 1. Tìm Sinh Viên
                 var sv = await _context.SinhViens.FirstOrDefaultAsync(s => s.MSSV == mssv);
-                if (sv == null) continue; // Không tìm thấy SV, bỏ qua (có thể là thiết bị BT lạ)
+                if (sv == null) continue;
 
-                // 2. Tìm buổi điểm danh ĐANG MỞ (ExpireAt > Now) và SV có trong lớp đó
+                // 2. Tìm buổi điểm danh ĐANG MỞ
                 var buoiDiemDanh = await _context.DiemDanhs
                     .Include(dd => dd.LopHocPhan)
                     .Where(dd => dd.Ngay.Date == DateTime.Today
@@ -1434,22 +1428,25 @@ namespace BlueSchoolSystem.APIControllers
                     .OrderByDescending(dd => dd.CreatedAt)
                     .FirstOrDefaultAsync();
 
-                if (buoiDiemDanh == null) continue; // SV này không có lớp nào đang điểm danh
+                if (buoiDiemDanh == null) continue;
 
                 // 3. Kiểm tra chi tiết điểm danh
                 var chiTiet = await _context.ChiTietDiemDanhs
                     .FirstOrDefaultAsync(ct => ct.DiemDanhId == buoiDiemDanh.Id && ct.SinhVienId == sv.Id);
 
-                // Nếu chưa có record hoặc trạng thái hiện tại khác "Vắng" (tức là đã điểm danh rồi) -> Bỏ qua
+                // Nếu đã có record và trạng thái hiện tại KHÁC "Vắng/Vắng mặt" (tức là đã điểm danh rồi) -> Bỏ qua không ghi đè
                 if (chiTiet != null && chiTiet.TrangThaiId != statusVang.Id)
                 {
                     continue;
                 }
 
+                // Logic phụ: Nếu logic thời gian trả về "Vắng mặt" (ví dụ quét lúc 10h sáng)
+                // Ta có thể chọn KHÔNG update gì cả, hoặc Update thời gian quét nhưng vẫn giữ trạng thái Vắng.
+                // Ở đây mình giữ logic: Cứ update theo statusDb tính được.
+
                 // 4. Cập nhật SQL
                 if (chiTiet == null)
                 {
-                    // Trường hợp hiếm: SV có trong lớp nhưng chưa có record trong bảng ChiTietDiemDanh
                     chiTiet = new ChiTietDiemDanh
                     {
                         DiemDanhId = buoiDiemDanh.Id,
@@ -1462,7 +1459,6 @@ namespace BlueSchoolSystem.APIControllers
                 }
                 else
                 {
-                    // Update từ Vắng -> Có mặt/Đi trễ
                     chiTiet.TrangThaiId = statusDb.Id;
                     chiTiet.ThoiGian = now;
                     chiTiet.GhiChu = $"BLE Auto: {request.DeviceId}";
@@ -1472,7 +1468,7 @@ namespace BlueSchoolSystem.APIControllers
                 await _context.SaveChangesAsync();
                 countSuccess++;
 
-                // 5. Đẩy Firebase để App GV cập nhật realtime
+                // 5. Đẩy Firebase
                 await PushStatusToFirebase(
                     buoiDiemDanh.Id,
                     sv.MSSV,
