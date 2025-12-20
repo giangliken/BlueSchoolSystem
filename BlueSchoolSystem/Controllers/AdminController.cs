@@ -63,21 +63,65 @@ namespace BlueSchoolSystem.Controllers
             _lichThiService = lichThiService;
         }
 
-        //Giao diện trang chủ của Admin
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var sinhVienCount = _context.SinhViens.Count();
+            // ====== THỐNG KÊ ======
+            ViewBag.sinhVienCount = _context.SinhViens.Count();
+            ViewBag.khoaVienCount = _context.Khoas.Count();
+            ViewBag.giangVienCount = _context.GiangViens.Count();
 
-            var khoaVienCount = _context.Khoas.Count();
+            ViewBag.Role = "Admin";
 
-            var giangVienCount = _context.GiangViens.Count();
+            // ====== LẤY TOKEN ======
+            var token = HttpContext.Session.GetString("access_token");
 
-            ViewBag.sinhVienCount = sinhVienCount;
-            ViewBag.khoaVienCount = khoaVienCount;
-            ViewBag.giangVienCount = giangVienCount;
+            List<SuKienViewModel> suKiens = new();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                // Token null thì KHÔNG gọi API (tránh lỗi <html>)
+                ViewBag.Error = "Token không tồn tại hoặc đã hết hạn.";
+                ViewBag.SuKiens = suKiens;
+                return View();
+            }
+
+            // ====== GỌI API ======
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            var response = await client.GetAsync("api/sukien");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Không thể lấy danh sách sự kiện.";
+                ViewBag.SuKiens = suKiens;
+                return View();
+            }
+
+            // ====== ĐỌC JSON ======
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            if (contentType != "application/json")
+            {
+                // Tránh lỗi Unexpected character '<'
+                ViewBag.Error = "API trả về dữ liệu không hợp lệ.";
+                ViewBag.SuKiens = suKiens;
+                return View();
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+
+            suKiens = JsonConvert.DeserializeObject<List<SuKienViewModel>>(json)
+                      ?? new List<SuKienViewModel>();
+
+            ViewBag.SuKiens = suKiens;
 
             return View();
         }
+
+
+
 
         //Trang quản lý sinh viên
         public async Task<IActionResult> StudentManager(string? keyword, string? maLop, string? maKhoa, string? nienKhoa)

@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using QRCoder;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using static BlueSchoolSystem.APIControllers.APIGiangVienConTroller;
@@ -20,16 +21,70 @@ namespace BlueSchoolSystem.Controllers
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ApplicationDbContext _context;
         private readonly IActivityLogService _logService;
-        public TeacherController(IHttpClientFactory httpClientFactory, ApplicationDbContext context,IActivityLogService logService)
+        private readonly string? _apiBaseUrl;
+
+        public TeacherController(IHttpClientFactory httpClientFactory, ApplicationDbContext context,IActivityLogService logService, IConfiguration configuration)
         {
             _httpClientFactory = httpClientFactory;
             _context = context;
             _logService = logService;
+            _apiBaseUrl = configuration["ApiSettings:BaseUrl"];
+
         }
 
-        //Trang chính
+        //Giao diện trang chủ
         public async Task<IActionResult> Index()
         {
+            var client = _httpClientFactory.CreateClient();
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+
+            var magv = User.Identity?.Name ??
+                       User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                       User.Identity?.Name;
+
+
+            List<SuKienViewModel> suKiens = new();
+
+            var giangVien = await _context.GiangViens
+                .Include(gv => gv.Khoa)
+                .FirstOrDefaultAsync(gv => gv.MaGiangVien == magv);
+
+
+            if (giangVien == null)
+            {
+                ViewBag.Error = "Không tìm thấy thông tin khoa của sinh viên.";
+                ViewBag.SuKiens = suKiens;
+                return View();
+            }
+
+            string maKhoa = giangVien.Khoa.MaKhoa;
+
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // Gọi đúng endpoint bạn vừa viết: api/sukien/sukienkhoa/{maKhoa}
+            var response = await client.GetAsync($"api/sukienkhoa/{maKhoa}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                suKiens = JsonConvert.DeserializeObject<List<SuKienViewModel>>(json)
+                          ?? new List<SuKienViewModel>();
+            }
+            else
+            {
+                ViewBag.Error = "Không thể tải sự kiện của khoa.";
+            }
+
+
+            ViewBag.Role = "Teacher";
+            ViewBag.TenKhoa = giangVien.Khoa.TenKhoa;
+            ViewBag.SuKiens = suKiens;
+            ViewBag.TenGiangVien = giangVien.HoVaTenDem + " " + giangVien.Ten;
             return View();
         }
 

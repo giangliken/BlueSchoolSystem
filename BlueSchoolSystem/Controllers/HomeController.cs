@@ -5,10 +5,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Json;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace BlueSchoolSystem.Controllers
 {
@@ -19,19 +21,80 @@ namespace BlueSchoolSystem.Controllers
         private readonly ApplicationDbContext _context;
         private readonly LopHocPhanService _lhpService;
         private readonly HocPhiService _hocPhiService;
+        private readonly string? _apiBaseUrl;
 
-        public HomeController(ILogger<HomeController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, LopHocPhanService lhpService, HocPhiService hocPhiService)
+
+        public HomeController(ILogger<HomeController> logger, IHttpClientFactory httpClientFactory, ApplicationDbContext context, LopHocPhanService lhpService, HocPhiService hocPhiService, IConfiguration configuration)
         {
             _logger = logger;
             _httpClientFactory = httpClientFactory;
             _context = context;
             _lhpService = lhpService;
             _hocPhiService = hocPhiService;
+            _apiBaseUrl = configuration["ApiSettings:BaseUrl"];
         }
 
         //Giao diện trang chủ
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
+            var client = _httpClientFactory.CreateClient();
+
+            var token = HttpContext.Session.GetString("access_token");
+            if (!string.IsNullOrEmpty(token))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+
+            var mssv = User.Identity?.Name ??
+                       User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                       User.Identity?.Name;
+
+            if (string.IsNullOrEmpty(mssv))
+            {
+                ViewBag.Error = "Không xác định được MSSV của sinh viên.";
+                return View(new List<ThoiKhoaBieuViewModel>());
+            }
+
+
+            List<SuKienViewModel> suKiens = new();
+
+            var sinhVien = await _context.SinhViens
+                                         .Include(s => s.Lop) 
+                                         .ThenInclude(l => l.Nganh)
+                                         .ThenInclude(n => n.Khoa)
+                                         .FirstOrDefaultAsync(s => s.MSSV == mssv);
+
+            if (sinhVien == null)
+            {
+                ViewBag.Error = "Không tìm thấy thông tin khoa của sinh viên.";
+                ViewBag.SuKiens = suKiens;
+                return View();
+            }
+
+            string maKhoa = sinhVien.Lop?.Nganh?.Khoa?.MaKhoa; 
+
+            client.BaseAddress = new Uri(_apiBaseUrl);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // Gọi đúng endpoint bạn vừa viết: api/sukien/sukienkhoa/{maKhoa}
+            var response = await client.GetAsync($"api/sukienkhoa/{maKhoa}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                suKiens = JsonConvert.DeserializeObject<List<SuKienViewModel>>(json)
+                          ?? new List<SuKienViewModel>();
+            }
+            else
+            {
+                ViewBag.Error = "Không thể tải sự kiện của khoa.";
+            }
+
+            // ====== 4. THỐNG KÊ (Tuỳ chọn cho sinh viên) ======
+            // Sinh viên có thể chỉ cần xem số lượng đơn giản hoặc bỏ qua phần này
+            ViewBag.Role = "SinhVien";
+            ViewBag.TenKhoa = sinhVien.Lop?.Nganh?.Khoa.TenKhoa; // Để hiển thị tên khoa lên View
+            ViewBag.SuKiens = suKiens;
+            ViewBag.TenSinhVien = sinhVien.HoVaTenDem + " " + sinhVien.Ten;
             return View();
         }
 

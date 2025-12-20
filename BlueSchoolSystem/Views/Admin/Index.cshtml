@@ -1,189 +1,217 @@
-﻿<!DOCTYPE html>
+﻿@using System.Text.Json
+@using BlueSchoolSystem.Models.ViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+
+    // CẤU HÌNH QUAN TRỌNG: Chuyển đổi tên biến sang camelCase (chữ thường đầu)
+    // Ví dụ: TenSuKien (C#) -> tenSuKien (JS)
+    var jsonOptions = new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+}
+
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8" />
     <title>Dashboard</title>
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- FullCalendar CSS -->
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
-    <!-- FullCalendar JS -->
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-    <!-- FullCalendar Ngôn ngữ (bao gồm tiếng Việt) -->
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/locales-all.global.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
         .fc .fc-daygrid-day-number,
         .fc .fc-daygrid-day-number:hover,
         .fc .fc-col-header-cell a,
         .fc .fc-col-header-cell a:hover {
             text-decoration: none !important;
+            color: inherit;
         }
 
-        /* Tuỳ chọn: Custom màu header */
         .fc .fc-col-header-cell a {
-            color: #1976d2; 
+            color: #1976d2;
             font-weight: bold;
         }
-    </style>
 
+        /* Tùy chỉnh thanh cuộn cho danh sách sự kiện nếu dài */
+        #eventList {
+            max-height: 450px;
+            overflow-y: auto;
+        }
+    </style>
 </head>
 <body>
-    <div class="row g-4">
-        <!-- Cột trái -->
-        <div class="col-lg-6">
-            <div class="row g-3">
-                <div class="col-4">
-                    <div class="card shadow h-100">
-                        <div class="card-body d-flex align-items-center">
-                            <i class="fa-solid fa-user fa-2x text-info me-3"></i>
-                            <div>
-                                <div class="fw-semibold fs-6">Giảng Viên</div>
-                                <div class="text-muted small">@ViewBag.giangVienCount</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="card shadow h-100">
-                        <div class="card-body d-flex align-items-center">
-                            <i class="fa-solid fa-users fa-2x text-success me-3"></i>
-                            <div>
-                                <div class="fw-semibold fs-6">Sinh Viên</div>
-                                <div class="text-muted small">@ViewBag.sinhVienCount</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="card shadow h-100">
-                        <div class="card-body d-flex align-items-center">
-                            <i class="fa-solid fa-chart-bar fa-2x text-warning me-3"></i>
-                            <div>
-                                <div class="fw-semibold fs-6">Khoa Viện</div>
-                                <div class="text-muted small">@ViewBag.khoaVienCount</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="card shadow h-100 mt-2">
-                        <div class="card-body d-flex align-items-center">
-                            <i class="fa-solid fa-chart-pie fa-2x text-primary me-3"></i>
-                            <div class="flex-grow-1">
-                                <div class="fw-bold fs-5 mb-2">Biểu đồ</div>
-                                <div class="text-muted small mb-3">Thống kê dữ liệu</div>
-                                <canvas id="myChart" height="120"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
+    <script>
+        // Serialize dữ liệu với option camelCase đã khai báo ở trên
+        const suKiens = @Html.Raw(JsonSerializer.Serialize(ViewBag.SuKiens ?? new List<object>(), jsonOptions));
+
+        // Log ra console để kiểm tra (F12)
+        console.log("Danh sách sự kiện:", suKiens);
+    </script>
+
+    <div class="container-fluid p-0">
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger mb-4">
+                @ViewBag.Error
             </div>
-        </div>
-        <!-- Cột phải -->
-        <div class="col-lg-6">
-            <div class="row g-3">
-                <div class="col-12">
-                    <div class="card shadow h-100">
-                        <div class="card-body">
-                            <div id="calendar"></div>
-                        </div>
-                    </div>
+        }
 
-                    
+        <div class="row g-4">
 
+            <div class="col-lg-5">
+                <div class="row g-3">
 
-                </div>
-                <div class="col-12 mb-3">
-                    <div class="card shadow h-100">
-                        <div class="card-body">
-                            <div class="fw-bold fs-5 mb-2">
-                                <i class="fa-solid fa-bolt fa-2x text-warning me-2"></i>
-                                Sự kiện
+                    <div class="col-4">
+                        <div class="card shadow-sm h-100 border-0">
+                            <div class="card-body d-flex align-items-center p-3">
+                                <i class="fa-solid fa-user fa-2x text-info me-3"></i>
+                                <div>
+                                    <div class="fw-bold text-secondary" style="font-size: 0.8rem;">GIẢNG VIÊN</div>
+                                    <div class="fw-bold fs-4">@ViewBag.giangVienCount</div>
+                                </div>
                             </div>
-                            <div class="text-muted small mb-3">Sự kiện sắp tới</div>
-                            <ul class="list-group list-group-flush">
-                                <li class="list-group-item d-flex align-items-start">
-                                    <i class="fa-solid fa-calendar-days text-primary me-3 mt-1"></i>
-                                    <div>
-                                        <div class="fw-semibold">27/08/2025 - Khoa luật</div>
-                                        <div class="text-muted small">Họp ban lãnh đạo khoa luật, 7h30</div>
-                                    </div>
-                                </li>
-                                <li class="list-group-item d-flex align-items-start">
-                                    <i class="fa-solid fa-book text-success me-3 mt-1"></i>
-                                    <div>
-                                        <div class="fw-semibold">30/08/2025 - Khoa CNTT</div>
-                                        <div class="text-muted small">Họp ban lãnh đạo khoa CNTT, 7h30</div>
-                                    </div>
-                                </li>
-                                <li class="list-group-item d-flex align-items-start">
-                                    <i class="fa-solid fa-bullhorn text-danger me-3 mt-1"></i>
-                                    <div>
-                                        <div class="fw-semibold">05/09/2025 - Seminar khoa CNTT</div>
-                                        <div class="text-muted small">Sảnh E1, 8h00</div>
-                                    </div>
-                                </li>
-                            </ul>
                         </div>
                     </div>
-                </div>
 
+                    <div class="col-4">
+                        <div class="card shadow-sm h-100 border-0">
+                            <div class="card-body d-flex align-items-center p-3">
+                                <i class="fa-solid fa-users fa-2x text-success me-3"></i>
+                                <div>
+                                    <div class="fw-bold text-secondary" style="font-size: 0.8rem;">SINH VIÊN</div>
+                                    <div class="fw-bold fs-4">@ViewBag.sinhVienCount</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-4">
+                        <div class="card shadow-sm h-100 border-0">
+                            <div class="card-body d-flex align-items-center p-3">
+                                <i class="fa-solid fa-building-columns fa-2x text-warning me-3"></i>
+                                <div>
+                                    <div class="fw-bold text-secondary" style="font-size: 0.8rem;">KHOA VIỆN</div>
+                                    <div class="fw-bold fs-4">@ViewBag.khoaVienCount</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="card shadow-sm h-100 mt-2 border-0">
+                            <div class="card-header bg-white border-bottom-0 pt-3">
+                                <div class="fw-bold fs-5">
+                                    <i class="fa-solid fa-bolt text-warning me-2"></i>
+                                    Sự kiện sắp tới
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush" id="eventList">
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
+
+            <div class="col-lg-7">
+                <div class="card shadow-sm h-100 border-0">
+                    <div class="card-body">
+                        <div id="calendar"></div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
+
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-          var calendarEl = document.getElementById('calendar');
-          var calendar = new FullCalendar.Calendar(calendarEl, {
+        document.addEventListener('DOMContentLoaded', function () {
+
+            // ===== 1. FULLCALENDAR =====
+            const calendarEl = document.getElementById('calendar');
+
+            // Map dữ liệu: Chú ý tên biến khớp với JSON (camelCase)
+            const events = (suKiens || []).map(e => ({
+                title: e.tenSuKien,
+                start: e.ngayBatDau,
+                end: e.ngayKetThuc,
+                // Có thể thêm màu sắc hoặc url nếu cần
+                // color: '#3788d8'
+            }));
+
+                    const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
-            locale: 'vi', 
-            height: 420,
+            locale: 'vi',
+            height: 600,
+
+            // THÊM DÒNG NÀY ĐỂ TẮT GIỜ
+            displayEventTime: false,
+
             headerToolbar: {
-              left: 'title',
-              center: '',
-              right: 'today prev,next' 
+                left: 'title',
+                right: 'today prev,next'
             },
-            buttonText: {
-            today: 'Hôm nay' 
-        },
-            events: [
-              { title: 'Họp khoa', start: '2025-08-27' },
-              { title: 'Họp khoa', start: '2025-08-30' }
-            ]
-          });
-          calendar.render();
-              // Biểu đồ Chart.js
-        var ctx = document.getElementById('myChart').getContext('2d');
-        var myChart = new Chart(ctx, {
-            type: 'bar', // Có thể đổi 'line', 'pie',...
-            data: {
-                labels: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'],
-                datasets: [{
-                    label: 'Số lượng sinh viên',
-                    data: [12, 19, 3, 5, 2, 3, 10],
-                    borderWidth: 1,
-                    backgroundColor: 'rgba(30, 144, 255, 0.5)',
-                    borderColor: 'rgba(30, 144, 255, 1)'
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { display: false },
-                    title: { display: false }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
+            buttonText: { today: 'Hôm nay' },
+            events: events,
+            eventClick: function(info) {
+                alert('Sự kiện: ' + info.event.title);
             }
         });
+
+            calendar.render();
+
+            // ===== 2. LIST SỰ KIỆN BÊN TRÁI =====
+            const ul = document.getElementById('eventList');
+            const now = new Date();
+            // Reset giờ về 0 để so sánh chính xác ngày
+            now.setHours(0,0,0,0);
+
+            // Lọc sự kiện chưa kết thúc hoặc sắp diễn ra
+            const upcoming = (suKiens || [])
+                .filter(e => {
+                    const eventDate = new Date(e.ngayBatDau);
+                    return eventDate >= now;
+                })
+                .sort((a, b) => new Date(a.ngayBatDau) - new Date(b.ngayBatDau)) // Sắp xếp ngày gần nhất lên đầu
+                .slice(0, 5); // Lấy 5 sự kiện
+
+            if (upcoming.length === 0) {
+                ul.innerHTML = `
+                    <li class="list-group-item text-center text-muted py-4">
+                        Không có sự kiện sắp tới
+                    </li>`;
+            } else {
+                upcoming.forEach(e => {
+                    const dateObj = new Date(e.ngayBatDau);
+                    const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                    ul.innerHTML += `
+                        <li class="list-group-item d-flex align-items-start py-3">
+                            <div class="me-3 text-center bg-light rounded p-2" style="min-width: 60px;">
+                                <div class="fw-bold text-primary" style="font-size: 1.2rem;">${dateObj.getDate()}</div>
+                                <div class="small text-muted">Thg ${dateObj.getMonth() + 1}</div>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-dark">${e.tenSuKien}</div>
+                                <div class="text-muted small mt-1">
+                                    ${e.moTa ? e.moTa : 'Không có mô tả'}
+                                    ${e.diaDiem ? ' - <i class="fa-solid fa-location-dot"></i> ' + e.diaDiem : ''}
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                });
+            }
         });
-
     </script>
-</body>
 
+</body>
 </html>
