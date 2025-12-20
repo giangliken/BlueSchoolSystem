@@ -48,6 +48,8 @@ namespace BlueSchoolSystem.Models
         public DbSet<HocPhi> HocPhis { get; set; }
         public DbSet<ChiTietHocPhi> ChiTietHocPhis { get; set; }
         public DbSet<PhieuThu> PhieuThus { get; set; }
+        public DbSet<SuKien> SuKiens { get; set; } // Bảng sự kiện
+
 
         public DbSet<XinVangDay> XinVangDays { get; set; } // Bảng xin vắng dạy
 
