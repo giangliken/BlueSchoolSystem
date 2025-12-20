@@ -75,11 +75,9 @@
                                 <th style="width: 40px">
                                     <input type="checkbox" class="form-check-input" id="selectAll" />
                                 </th>
-                                <th style="width: 50px">#</th>
                                 <th style="width: 150px">Mã LHP</th>
                                 <th>Môn Học</th>
                                 <th style="width: 200px">Giảng Viên</th>
-                                <th style="width: 100px">Sĩ số</th>
                                 <th style="width: 150px">Trạng thái</th>
                                 <th style="width: 100px">Hành động</th>
                             </tr>
@@ -101,7 +99,7 @@
                                             <input type="checkbox" name="lhpIds" value="@item.Id" class="form-check-input item-check" />
                                         </td>
 
-                                        <td class="text-center">@(stt++)</td>
+
                                         <td class=" text-center">@item.MaLopHocPhan</td>
                                         <td>
                                             <span >@item.MonHoc?.TenMonHoc</span>
@@ -110,8 +108,9 @@
                                         </td>
                                         <td>
                                             @(item.GiangVien != null ? $"{item.GiangVien.HoVaTenDem} {item.GiangVien.Ten}" : "Chưa phân công")
+                                            <br />
+                                            <small class="text-muted">@item.GiangVien?.MaGiangVien</small>
                                         </td>
-                                        <td class="text-center">@item.SiSo</td>
 
                                         <td class="text-center">
                                             @if (hasData)
