@@ -1,0 +1,216 @@
+﻿@model BlueSchoolSystem.Models.ViewModel.ClassGradingVM
+
+@{
+    ViewData["Title"] = $"Nhập điểm: {Model.MaLopHocPhan}";
+    bool isLocked = ViewBag.IsLocked ?? false;
+}
+
+<style>
+    /* Highlight ô đang nhập */
+    .input-score:focus {
+        background-color: #e8f0fe;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    /* Điểm rớt màu đỏ */
+    .score-fail {
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .sticky-header th {
+        position: sticky;
+        top: 0;
+        background-color: #e9ecef;
+        z-index: 10;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+    }
+</style>
+
+<div class="container-fluid mt-4">
+    <div class="card shadow mb-4 border-0">
+        <div class="card-body bg-white rounded">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="text-primary fw-bold mb-1">@Model.TenMonHoc</h4>
+                    <h6 class="text-muted mb-0">
+                        Mã LHP: <span class="text-dark fw-bold">@Model.MaLopHocPhan</span>
+                    </h6>
+                </div>
+                <div>
+                    <a asp-action="ScoreManagerIndex" class="btn btn-outline-secondary">
+                        <i class="fa fa-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow border-0">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="fa fa-list-ol"></i> Danh sách sinh viên & Điểm số</h5>
+        </div>
+        <div class="card-body p-0">
+            @if (TempData["Success"] != null)
+            {
+                <div class="alert alert-success m-3">
+                    <i class="fa fa-check-circle"></i> @TempData["Success"]
+                </div>
+            }
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger m-3">
+                    <i class="fa fa-exclamation-triangle"></i> @TempData["Error"]
+                </div>
+            }
+
+            <form asp-action="UpdateGrades" method="post" id="gradingForm">
+                <input type="hidden" asp-for="LopHocPhanId" />
+                <input type="hidden" asp-for="MaLopHocPhan" />
+
+                <div class="table-responsive" style="max-height: 70vh;">
+                    <table class="table table-bordered table-hover mb-0 align-middle">
+                        <thead class="table-light text-center sticky-header">
+                            <tr>
+                                <th style="width: 50px;">STT</th>
+                                <th style="width: 120px;">MSSV</th>
+                                <th style="min-width: 200px;">Họ và Tên</th>
+                                <th style="width: 150px;" class="bg-warning bg-opacity-10">
+                                    Chuyên cần
+                                </th>
+                                <th style="width: 150px;" class="bg-success bg-opacity-10">
+                                    Cuối kỳ
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Students != null && Model.Students.Any())
+                            {
+                                for (int i = 0; i < Model.Students.Count; i++)
+                                {
+                                    <tr>
+                                        <td class="text-center">@(i + 1)</td>
+                                        <td class="text-center">
+                                            @Model.Students[i].MSSV
+
+                                            @* Hidden fields để Binding *@
+                                            <input type="hidden" asp-for="Students[i].SinhVienId" />
+                                            <input type="hidden" asp-for="Students[i].MSSV" />
+                                            <input type="hidden" asp-for="Students[i].HoTen" />
+                                        </td>
+                                        <td>@Model.Students[i].HoTen</td>
+
+                                        <td class="p-1 bg-warning bg-opacity-10">
+                                            <input asp-for="Students[i].DiemChuyenCan" type="number" step="0.1" min="0" max="10"
+                                                   class="form-control text-center input-score score-cc border-0 bg-transparent fw-bold"
+                                                   placeholder="-"
+                                                   disabled="@(isLocked ? "disabled" : null)" />
+                                        </td>
+
+                                        <td class="p-1 bg-success bg-opacity-10">
+                                            <input asp-for="Students[i].DiemCuoiKy" type="number" step="0.1" min="0" max="10"
+                                                   class="form-control text-center input-score score-ck border-0 bg-transparent fw-bold"
+                                                   placeholder="-"
+                                                   disabled="@(isLocked ? "disabled" : null)" />
+                                        </td>
+
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-5">Chưa có sinh viên nào trong lớp này.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card-footer bg-light p-3 sticky-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        @if (isLocked)
+                        {
+                            <span class="text-danger fw-bold">
+                                <i class="fa fa-lock"></i> Bảng điểm đã KHÓA. Không thể chỉnh sửa.
+                            </span>
+
+                            <button type="button" class="btn btn-secondary px-4 btn-lg disabled">
+                                <i class="fa fa-lock me-2"></i> Đã khóa
+                            </button>
+                        }
+                        else
+                        {
+
+                            <button type="submit" class="btn btn-primary px-4 btn-lg shadow-sm">
+                                <i class="fa fa-save me-2"></i> Lưu Bảng Điểm
+                            </button>
+                        }
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+
+            // Hàm tính điểm
+            function calculateRow(row) {
+                var cc = parseFloat(row.find('.score-cc').val());
+                var ck = parseFloat(row.find('.score-ck').val());
+                var totalCell = row.find('.total-score');
+
+                // Kiểm tra xem cả 2 ô có phải là số hợp lệ không (isNaN kiểm tra false nếu là số)
+                if (!isNaN(cc) && !isNaN(ck)) {
+                    var total = (cc * 0.3) + (ck * 0.7);
+
+                    // Làm tròn 1 chữ số thập phân
+                    total = Math.round(total * 10) / 10;
+
+                    totalCell.text(total);
+
+                    // Đổi màu nếu rớt
+                    if (total < 4.0) {
+                        totalCell.addClass('text-danger');
+                    } else {
+                        totalCell.removeClass('text-danger');
+                        totalCell.addClass('text-success');
+                    }
+                } else {
+                    // Nếu thiếu 1 trong 2 điểm thì chưa tính tổng
+                    totalCell.text('-');
+                    totalCell.removeClass('text-danger text-success');
+                }
+            }
+
+            // Gán sự kiện khi nhập liệu
+            $('.input-score').on('input change', function() {
+                var row = $(this).closest('tr');
+                calculateRow(row);
+            });
+
+            // Chạy 1 lần khi load trang để tô màu các điểm đã có sẵn
+            $('.input-score').each(function() {
+                var row = $(this).closest('tr');
+                calculateRow(row);
+            });
+
+            // Hiệu ứng focus: Tự động bôi đen số khi click vào ô để nhập nhanh hơn
+            $('.input-score').on('focus', function() {
+                $(this).select();
+            });
+
+            // Ngăn chặn submit form khi nhấn Enter (để tránh lỡ tay lưu khi đang nhập)
+            $('#gradingForm').on('keypress', function(e) {
+                if (e.keyCode === 13) {
+                    e.preventDefault();
+                    // Có thể thêm logic: Enter thì nhảy xuống ô dưới
+                    return false;
+                }
+            });
+        });
+    </script>
+}
