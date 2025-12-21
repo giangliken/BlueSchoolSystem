@@ -129,6 +129,13 @@
                             <i class="fa-solid fa-file-alt me-2"></i>Đơn phiếu
                         </a>
                     </li>
+
+                    <li>
+                        <a href="/Admin/ScoreManagerIndex" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/ScoreManagerIndex") ? "active text-white bg-primary" : "text-white")">
+                            <i class="fa-solid fa-clipboard-check me-2"></i> Quản lý điểm
+                        </a>
+
+                    </li>
                     @* <li>
                         <a href="/Admin/StudentManager" class="nav-link @(Context.Request.Path.StartsWithSegments("/Admin/StudentManager") ? "active text-white bg-primary" : "text-white")">
                             <i class="fa-solid fa-users me-2"></i>Tài khoản người dùng

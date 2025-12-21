@@ -46,3 +46,5 @@
 45,Chưa đóng,Sinh viên chưa đóng khoản nào,HocPhi
 46,Đóng một phần,Sinh viên đã đóng một phần nhưng chưa đủ,HocPhi
 47,Đã hoàn thành,Sinh viên đã đóng đủ học phí,HocPhi
+48,Cho phép sửa,Giảng viên được phép sửa bảng điểm,BangDiem
+49,Đã khóa,Giảng viên không được phép sửa bảng điểm,BangDiem

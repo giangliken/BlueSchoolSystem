@@ -48,6 +48,8 @@ namespace BlueSchoolSystem.Models
         public DbSet<HocPhi> HocPhis { get; set; }
         public DbSet<ChiTietHocPhi> ChiTietHocPhis { get; set; }
         public DbSet<PhieuThu> PhieuThus { get; set; }
+        public DbSet<SuKien> SuKiens { get; set; } // Bảng sự kiện
+
 
         public DbSet<XinVangDay> XinVangDays { get; set; } // Bảng xin vắng dạy
 
@@ -262,7 +264,11 @@ namespace BlueSchoolSystem.Models
                  .OnDelete(DeleteBehavior.Restrict);
             });
 
-
+            builder.Entity<BangDiem>()
+                .HasOne(bd => bd.TrangThai)
+                .WithMany()
+                .HasForeignKey(bd => bd.TrangThaiId)
+                .OnDelete(DeleteBehavior.NoAction);
 
 
         }
