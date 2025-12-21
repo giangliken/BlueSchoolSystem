@@ -264,7 +264,11 @@ namespace BlueSchoolSystem.Models
                  .OnDelete(DeleteBehavior.Restrict);
             });
 
-
+            builder.Entity<BangDiem>()
+                .HasOne(bd => bd.TrangThai)
+                .WithMany()
+                .HasForeignKey(bd => bd.TrangThaiId)
+                .OnDelete(DeleteBehavior.NoAction);
 
 
         }
