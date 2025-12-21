@@ -952,5 +952,177 @@ namespace BlueSchoolSystem.Controllers
             }
         }
 
+        #region ======= QUẢN LÝ ĐIỂM (TEACHER) =======
+
+        // Danh sách các lớp học phần mà GV đang dạy để vào chấm điểm
+        [Authorize(Roles = "Teacher")]
+        public async Task<IActionResult> ScoreManagerIndex(int? hocKyId)
+        {
+            // A. Lấy thông tin Giảng viên từ User đang đăng nhập
+            var maGV = User.Identity?.Name ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var giangVien = await _context.GiangViens.FirstOrDefaultAsync(gv => gv.MaGiangVien == maGV);
+
+            if (giangVien == null)
+            {
+                return RedirectToAction("Index"); // Hoặc trang báo lỗi
+            }
+
+            // B. Lấy danh sách lớp học phần do GV này phụ trách
+            var query = _context.LopHocPhans
+                .Include(l => l.MonHoc)
+                .Include(l => l.HocKy)
+                .Include(l => l.BangDiems) // Include bảng điểm để hiển thị trạng thái
+                .Where(l => l.GiangVienId == giangVien.Id) // CHỈ LẤY LỚP CỦA GV NÀY
+                .AsQueryable();
+
+            if (hocKyId.HasValue)
+            {
+                query = query.Where(l => l.HocKyId == hocKyId);
+            }
+
+            // C. Chuẩn bị ViewBags
+            ViewBag.HocKyList = await _context.HocKys.OrderByDescending(h => h.NgayBatDau).ToListAsync();
+
+            // Lấy ID trạng thái "Đã khóa" để View so sánh hiển thị icon khóa
+            var lockedStatus = await _context.TrangThais
+                .FirstOrDefaultAsync(t => t.LoaiTrangThai == "BangDiem" && t.TenTrangThai == "Đã khóa");
+            ViewBag.LockedStatusId = lockedStatus?.Id ?? -1;
+
+            var listLHP = await query.OrderByDescending(l => l.Id).ToListAsync();
+            return View(listLHP);
+        }
+        [HttpGet]
+        [Authorize(Roles = "Teacher")]
+        public async Task<IActionResult> Grading(int id) // id = LopHocPhanId
+        {
+            // A. Kiểm tra quyền truy cập (GV có dạy lớp này không?)
+            var maGV = User.Identity?.Name ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            var lhp = await _context.LopHocPhans
+                .Include(l => l.MonHoc)
+                .Include(l => l.GiangVien)
+                .FirstOrDefaultAsync(l => l.Id == id);
+
+            if (lhp == null) return NotFound();
+
+            if (lhp.GiangVien?.MaGiangVien != maGV)
+            {
+                return Forbid(); // Không phải lớp của mình -> Cấm
+            }
+
+            // B. Lấy trạng thái khóa
+            var lockedStatus = await _context.TrangThais
+                .FirstOrDefaultAsync(t => t.LoaiTrangThai == "BangDiem" && t.TenTrangThai == "Đã khóa");
+            int lockedId = lockedStatus?.Id ?? -1;
+
+            // C. Lấy dữ liệu sinh viên và điểm
+            var enrollments = await _context.ChiTietLopHocPhans
+                .Include(ct => ct.SinhVien)
+                .Where(ct => ct.LopHocPhanId == id)
+                .OrderBy(ct => ct.SinhVien.MSSV)
+                .ToListAsync();
+
+            var existingGrades = await _context.BangDiems
+                .Where(bd => bd.LopHocPhanId == id)
+                .ToListAsync();
+
+            // D. Kiểm tra xem lớp này có đang bị khóa không?
+            var firstGrade = existingGrades.FirstOrDefault();
+            bool isLocked = firstGrade != null && firstGrade.TrangThaiId == lockedId;
+
+            ViewBag.IsLocked = isLocked; // Truyền sang View
+
+            // E. Map sang ViewModel
+            var model = new ClassGradingVM
+            {
+                LopHocPhanId = lhp.Id,
+                MaLopHocPhan = lhp.MaLopHocPhan,
+                TenMonHoc = lhp.MonHoc?.TenMonHoc,
+                TenGiangVien = lhp.GiangVien?.HoVaTenDem + " " + lhp.GiangVien?.Ten,
+                Students = enrollments.Select(e =>
+                {
+                    var grade = existingGrades.FirstOrDefault(g => g.SinhVienId == e.SinhVienId);
+                    return new StudentGradeRowVM
+                    {
+                        SinhVienId = (int)e.SinhVienId,
+                        MSSV = e.SinhVien.MSSV,
+                        HoTen = $"{e.SinhVien.HoVaTenDem} {e.SinhVien.Ten}",
+                        BangDiemId = grade?.Id ?? 0,
+                        DiemChuyenCan = grade?.DiemChuyenCan,
+                        DiemCuoiKy = grade?.DiemCuoiKy
+                    };
+                }).ToList()
+            };
+
+            return View(model);
+        }
+        [HttpPost]
+        [Authorize(Roles = "Teacher")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateGrades(ClassGradingVM model)
+        {
+            // A. Kiểm tra quyền sở hữu lớp
+            var maGV = User.Identity?.Name ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var lhp = await _context.LopHocPhans.Include(l => l.GiangVien).FirstOrDefaultAsync(l => l.Id == model.LopHocPhanId);
+
+            if (lhp == null || lhp.GiangVien?.MaGiangVien != maGV)
+            {
+                return Forbid();
+            }
+
+            // B. Kiểm tra trạng thái khóa (Quan trọng: Server-side check)
+            var lockedStatus = await _context.TrangThais
+                .FirstOrDefaultAsync(t => t.LoaiTrangThai == "BangDiem" && t.TenTrangThai == "Đã khóa");
+            int lockedId = lockedStatus?.Id ?? -1;
+
+            var checkGrade = await _context.BangDiems.FirstOrDefaultAsync(b => b.LopHocPhanId == model.LopHocPhanId);
+            if (checkGrade != null && checkGrade.TrangThaiId == lockedId)
+            {
+                TempData["Error"] = "Bảng điểm đã bị KHÓA. Không thể cập nhật.";
+                return RedirectToAction("Grading", new { id = model.LopHocPhanId });
+            }
+
+            // C. Tìm ID trạng thái "Cho phép sửa" để gán mặc định cho bản ghi mới
+            var openStatus = await _context.TrangThais
+                .FirstOrDefaultAsync(t => t.LoaiTrangThai == "BangDiem" && t.TenTrangThai == "Cho phép sửa");
+            int openId = openStatus?.Id ?? 48;
+
+            // D. Lưu dữ liệu
+            foreach (var item in model.Students)
+            {
+                var bangDiem = await _context.BangDiems
+                    .FirstOrDefaultAsync(bd => bd.LopHocPhanId == model.LopHocPhanId && bd.SinhVienId == item.SinhVienId);
+
+                if (bangDiem == null)
+                {
+                    if (item.DiemChuyenCan.HasValue || item.DiemCuoiKy.HasValue)
+                    {
+                        bangDiem = new BangDiem
+                        {
+                            LopHocPhanId = model.LopHocPhanId,
+                            SinhVienId = item.SinhVienId,
+                            DiemChuyenCan = item.DiemChuyenCan,
+                            DiemCuoiKy = item.DiemCuoiKy,
+                            TrangThaiId = openId
+                        };
+                        _context.BangDiems.Add(bangDiem);
+                    }
+                }
+                else
+                {
+                    bangDiem.DiemChuyenCan = item.DiemChuyenCan;
+                    bangDiem.DiemCuoiKy = item.DiemCuoiKy;
+                    _context.BangDiems.Update(bangDiem);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "Cập nhật bảng điểm thành công!";
+            return RedirectToAction("Grading", new { id = model.LopHocPhanId });
+        }
+
+        #endregion
+
+
     }
 }

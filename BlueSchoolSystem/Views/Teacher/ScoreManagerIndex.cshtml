@@ -1,0 +1,158 @@
+﻿@model List<BlueSchoolSystem.Models.LopHocPhan>
+
+@{
+    ViewData["Title"] = "Quản lý điểm giảng dạy";
+    var hocKys = ViewBag.HocKyList as List<BlueSchoolSystem.Models.HocKy>;
+    int lockedId = ViewBag.LockedStatusId != null ? (int)ViewBag.LockedStatusId : -1;
+}
+
+<style>
+    /* Hiệu ứng khi di chuột vào hàng */
+    .teacher-row {
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+    }
+
+        .teacher-row:hover {
+            background-color: #f8f9fa !important; /* Màu nền xám nhạt */
+            transform: translateX(5px); /* Hiệu ứng trượt nhẹ sang phải */
+            border-left: 5px solid #0d6efd; /* Viền xanh bên trái */
+        }
+
+            .teacher-row:hover .row-arrow {
+                color: #0d6efd; /* Mũi tên đổi màu xanh */
+            }
+
+    .row-arrow {
+        color: #dee2e6;
+        font-size: 1.2rem;
+    }
+
+    .table-header-dark th {
+        background-color: #000 !important; /* nền đen */
+        color: #fff !important; /* chữ trắng */
+        font-weight: 600;
+        border-color: #333;
+    }
+</style>
+
+<div class="container-fluid mt-4">
+    <h6 class="mb-3">Giảng viên/Nhập điểm</h6>
+    <div class="card shadow-sm border-0">
+
+
+        <div class="card-body">
+            <form asp-action="ScoreManagerIndex" method="get" class="row g-3 mb-4 bg-light p-3 rounded border mx-1">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small text-muted text-uppercase">Học kỳ</label>
+                    <select name="hocKyId" class="form-select" onchange="this.form.submit()">
+                        <option value="">-- Tất cả --</option>
+                        @if (hocKys != null)
+                        {
+                            foreach (var hk in hocKys)
+                            {
+                                <option value="@hk.Id" selected="@(ViewBag.CurrentHocKy == hk.Id)">@hk.TenHocKy</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold small text-muted text-uppercase">Tìm kiếm</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="fa fa-search text-secondary"></i></span>
+                        <input type="text" name="keyword" class="form-control"
+                               placeholder="Nhập mã lớp hoặc tên môn học..."
+                               value="@ViewBag.CurrentKeyword">
+                    </div>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100 me-2 fw-bold">
+                       Tìm
+                    </button>
+                    <a asp-action="ScoreManagerIndex" class="btn btn-outline-secondary w-50">
+                        <i class="fa fa-sync-alt"></i>
+                    </a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-header-dark small text-uppercase">
+                        <tr>
+                            <th class="text-center" style="width: 50px">#</th>
+                            <th style="width: 150px">Mã LHP</th>
+                            <th>Môn Học</th>
+                            <th class="text-center" style="width: 150px">Trạng thái</th>
+                            <th style="width: 50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            int stt = 1;
+                            foreach (var item in Model)
+                            {
+                                var firstGrade = item.BangDiems?.FirstOrDefault();
+                                bool hasData = item.BangDiems != null && item.BangDiems.Any();
+                                int trangThaiId = firstGrade?.TrangThaiId ?? -1;
+                                bool isLocked = (trangThaiId == lockedId);
+
+                                // Tạo URL chi tiết
+                                string detailUrl = Url.Action("Grading", new { id = item.Id });
+
+                                <tr class="teacher-row" onclick="window.location.href='@detailUrl'" title="Bấm để nhập điểm">
+                                    <td class="text-center text-muted">@(stt++)</td>
+
+                                    <td class="">@item.MaLopHocPhan</td>
+
+                                    <td>
+                                        <div class=" text-dark">@item.MonHoc?.TenMonHoc</div>
+                                        <div class="small text-muted">Mã môn: @item.MonHoc?.MaMonHoc</div>
+                                    </td>
+
+
+                                    <td class="text-center">
+                                        @if (hasData)
+                                        {
+                                            if (isLocked)
+                                            {
+                                                <span>
+                                                    Đã khóa sổ
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span>
+                                                     Đang nhập điểm
+                                                </span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span>
+                                                Chưa nhập
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <td class="text-center">
+                                        <i class="fa fa-chevron-right row-arrow"></i>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/7486/7486831.png" width="64" style="opacity: 0.5" class="mb-3" />
+                                    <p class="mb-0">Không tìm thấy lớp học phần nào.</p>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
