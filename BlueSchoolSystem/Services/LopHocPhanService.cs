@@ -10,6 +10,12 @@ using System.Security.Claims;
 namespace BlueSchoolSystem.Services
 {
     // Không cần dùng Interface, trực tiếp tạo class Service
+    public class EnrollmentStats
+    {
+        public int ClassesCreated { get; set; } = 0;
+        public int SuccessCount { get; set; } = 0;
+        public int SchedulesCreated { get; set; } = 0;
+    }
     public class LopHocPhanService
     {
         private readonly ApplicationDbContext _context;
@@ -455,11 +461,30 @@ namespace BlueSchoolSystem.Services
 
         // Trong class LopHocPhanService
 
-        public async Task<(int classesCreated, int successCount, int schedulesCreated,int examsCreated)> RunAutoEnrollmentJobAsync(AutoEnrollmentApiPayload dto)
+        // =========================================================================================
+        // HÀM CHÍNH: CHẠY TỰ ĐỘNG ĐĂNG KÝ
+        // =========================================================================================
+        public async Task<(int classesCreated, int successCount, int schedulesCreated, int examsCreated)> RunAutoEnrollmentJobAsync(AutoEnrollmentApiPayload dto)
         {
-            // 1. XÁC ĐỊNH KHÓA HỌC VÀ SINH VIÊN MỤC TIÊU
-            var khoaHoc = await _context.KhoaHocs.FirstOrDefaultAsync(kh => kh.NamHoc == dto.KhoaNhapHoc);
-            if (khoaHoc == null) throw new InvalidOperationException($"Không tìm thấy Khóa học ({dto.KhoaNhapHoc}).");
+            const int MAX_LHP_SIZE = 60;
+            const int THRESHOLD_SEPARATE_CLASS = (int)(MAX_LHP_SIZE * 2.0 / 3.0); // 40 students
+
+            var trangThaiChoMoId = _context.TrangThais.FirstOrDefault(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Đang mở")?.Id ?? 1;
+            var hocKy = await _context.HocKys.FindAsync(dto.HocKyId);
+            var allPhongIds = await GetAllPhongHocIdsAsync();
+
+            if (hocKy == null) throw new InvalidOperationException("Học kỳ không tồn tại.");
+            if (!allPhongIds.Any()) throw new Exception("Chưa có dữ liệu Phòng học.");
+
+            var stats = new EnrollmentStats();
+            var allCreatedLhps = new List<LopHocPhan>();
+            int examsCreatedTotal = 0;
+
+            var newRegistrations = new List<DangKyHocPhan>();
+            var newDetails = new List<ChiTietLopHocPhan>();
+
+            // Map to track class busy schedules: Key = LopId, Value = List<LichHocDTO>
+            var classBusySchedules = new Dictionary<int, List<LichHocDTO>>();
 
             var targetStudents = await _context.SinhViens
                 .Include(sv => sv.Lop)
@@ -469,37 +494,8 @@ namespace BlueSchoolSystem.Services
                 .OrderBy(sv => sv.LopId)
                 .ToListAsync();
 
-            if (!targetStudents.Any()) throw new InvalidOperationException($"Không tìm thấy sinh viên mục tiêu để đăng ký.");
+            if (!targetStudents.Any()) throw new InvalidOperationException("Không tìm thấy sinh viên mục tiêu.");
 
-            // 2. THIẾT LẬP CƠ BẢN
-            const int MAX_LHP_SIZE = 60;
-            const int MAX_STUDENTS_PER_CLASS_IN_LHP = 50;
-            var trangThaiChoMoId = _context.TrangThais.FirstOrDefault(t => t.LoaiTrangThai == "LopHocPhan" && t.TenTrangThai == "Đang mở")?.Id ?? 1;
-            var hocKy = await _context.HocKys.FindAsync(dto.HocKyId);
-
-            // Lấy danh sách TẤT CẢ Phòng học một lần để dùng cho Random
-            var allPhongIds = await GetAllPhongHocIdsAsync();
-            if (!allPhongIds.Any()) throw new Exception("Chưa có dữ liệu Phòng học.");
-
-            // Các biến đếm kết quả
-            int successCount = 0;
-            int classesCreated = 0;
-            int schedulesCreatedTotal = 0;
-            int examsCreatedTotal = 0;
-            var createdLhpsBySubject = new Dictionary<string, List<LopHocPhan>>();
-            var allCreatedLhps = new List<LopHocPhan>();
-
-            // Lấy tham số lịch học từ DTO
-            int inputTietBatDau = dto.TietBatDau;
-            int inputTietKetThuc = dto.TietKetThuc;
-            int inputPhongHocId = dto.DefaultPhongHocId;
-            var availableDays = dto.CacNgayTrongTuan.ToList();
-
-            // Chuẩn bị danh sách để Batch Insert
-            var newRegistrations = new List<DangKyHocPhan>();
-            var newDetails = new List<ChiTietLopHocPhan>();
-
-            // 3. VÒNG LẶP XỬ LÝ TỪNG MÔN HỌC
             foreach (var maMonHoc in dto.MandatorySubjectCodes)
             {
                 var monHoc = await _context.MonHocs.FirstOrDefaultAsync(m => m.MaMonHoc == maMonHoc);
@@ -510,229 +506,135 @@ namespace BlueSchoolSystem.Services
                 int maxAllowedSessions = isThucHanh ? 6 : 9;
                 string? maMonTienQuyet = chiTietCtdt?.MaMonHocTienQuyet;
 
-                // Tìm GV
                 var gvCandidates = await GetGiangVienByMonHocAsync(monHoc.Id);
-                // (Chúng ta sẽ random GV lại ở bên dưới cho mỗi lớp, ở đây chỉ check tồn tại)
-                if (!gvCandidates.Any()) continue;
+                if (!gvCandidates.Any())
+                {
+                    _logger.LogWarning($"Bỏ qua môn {maMonHoc} vì không tìm thấy giảng viên phụ trách.");
+                    continue;
+                }
 
-                if (!createdLhpsBySubject.ContainsKey(maMonHoc)) createdLhpsBySubject[maMonHoc] = new List<LopHocPhan>();
-
-                // Lọc sinh viên cần học
-                var studentsToEnroll = new List<SinhVien>();
+                var validStudents = new List<SinhVien>();
                 foreach (var sv in targetStudents)
                 {
-
                     bool isCompleted = await HasStudentCompletedSubjectAsync(sv.Id, maMonHoc);
+                    bool isRegistered = await _context.DangKyHocPhans
+                        .AnyAsync(dk => dk.SinhVienId == sv.Id && dk.LopHocPhan.HocKyId == dto.HocKyId && dk.LopHocPhan.MonHoc.MaMonHoc == maMonHoc)
+                        || newRegistrations.Any(r => r.SinhVienId == sv.Id && allCreatedLhps.Any(l => l.Id == r.LopHocPhanId && l.MonHocId == monHoc.Id));
 
-
-                    bool isAlreadyEnrolledThisSemester = await _context.DangKyHocPhans
-                        .Include(dk => dk.LopHocPhan).ThenInclude(l => l.MonHoc)
-                        .AnyAsync(dk => dk.SinhVienId == sv.Id &&
-                                        dk.LopHocPhan.HocKyId == dto.HocKyId &&
-                                        dk.LopHocPhan.MonHoc.MaMonHoc == maMonHoc);
-
-                    // Chỉ thêm vào danh sách nếu CHƯA học xong VÀ CHƯA đăng ký trong kỳ này
-                    if (!isCompleted && !isAlreadyEnrolledThisSemester)
+                    if (!isCompleted && !isRegistered)
                     {
-                        studentsToEnroll.Add(sv);
+                        if (await CheckDieuKienTienQuyetAsync(sv.Id, dto.HocKyId, maMonTienQuyet))
+                        {
+                            validStudents.Add(sv);
+                        }
                     }
                 }
 
-                if (!studentsToEnroll.Any()) continue;
+                if (!validStudents.Any()) continue;
 
-                // Xáo trộn danh sách ngày để đảm bảo random assignment mỗi lần tạo lớp mới
-                // Lưu ý: Việc xáo trộn này nên thực hiện mỗi khi cần tìm slot mới, nhưng để đơn giản ta làm ở đây
-                // Logic bên dưới sẽ xáo trộn lại mỗi khi cần tìm slot.
+                var studentGroupsByClass = validStudents
+                    .GroupBy(s => s.LopId)
+                    .Select(g => new { LopId = g.Key, Students = g.ToList() })
+                    .ToList();
 
-                // Lặp qua tất cả sinh viên cần đăng ký, cố gắng phân bổ
-                foreach (var sv in studentsToEnroll)
+                var pendingGroups = new List<List<SinhVien>>();
+
+                foreach (var group in studentGroupsByClass)
                 {
-                    bool duDieuKien = await CheckDieuKienTienQuyetAsync(sv.Id, dto.HocKyId, maMonTienQuyet);
-                    // Kiểm tra Tiên Quyết
-                    if (!duDieuKien)
+                    var studentsInClass = group.Students;
+                    int count = studentsInClass.Count;
+                    int? currentLopId = group.LopId;
+
+                    if (currentLopId.HasValue && !classBusySchedules.ContainsKey(currentLopId.Value))
                     {
-                       continue;
+                        classBusySchedules[currentLopId.Value] = new List<LichHocDTO>();
                     }
+                    var currentBusySchedule = currentLopId.HasValue ? classBusySchedules[currentLopId.Value] : new List<LichHocDTO>();
 
-                    LopHocPhan selectedLhp = null;
-
-                    // A. Tìm LHP đã có còn chỗ (Ưu tiên cùng lớp hành chính)
-                    foreach (var existingLhp in createdLhpsBySubject[maMonHoc])
+                    if (count > THRESHOLD_SEPARATE_CLASS)
                     {
-                        int currentSiSo = _context.DangKyHocPhans.Count(dk => dk.LopHocPhanId == existingLhp.Id);
-                        if (currentSiSo >= MAX_LHP_SIZE) continue;
+                        int fullClasses = count / MAX_LHP_SIZE;
+                        int remainder = count % MAX_LHP_SIZE;
+                        int currentIndex = 0;
 
-                        int studentsFromSameClass = _context.DangKyHocPhans
-                            .Include(dk => dk.SinhVien)
-                            .Count(dk => dk.LopHocPhanId == existingLhp.Id && dk.SinhVien.LopId == sv.LopId);
-
-                        if (studentsFromSameClass < MAX_STUDENTS_PER_CLASS_IN_LHP)
+                        for (int i = 0; i < fullClasses; i++)
                         {
-                            selectedLhp = existingLhp;
-                            break;
+                            var batch = studentsInClass.GetRange(currentIndex, MAX_LHP_SIZE);
+                            await CreateLhpAndEnrollAsync(batch, monHoc, hocKy, gvCandidates, allPhongIds, isThucHanh, maxAllowedSessions,
+                                trangThaiChoMoId, dto, newRegistrations, newDetails, allCreatedLhps, stats, currentBusySchedule);
+                            currentIndex += MAX_LHP_SIZE;
                         }
-                    }
 
-                    // B. Tạo LHP Mới nếu không tìm thấy lớp trống
-                    if (selectedLhp == null)
-                    {
-                        int finalDayOfWeek = 0;
-                        int finalTietBd = 0;
-                        int finalTietKt = 0;
-                        int finalPhongId = 0;
-                        int? finalGiangVienId = null;
-                        bool foundValidSlot = false;
-
-                        // Xáo trộn danh sách ngày để thử ngẫu nhiên
-                        var daysToSearch = dto.CacNgayTrongTuan.OrderBy(x => Guid.NewGuid()).ToList();
-
-                        // --- VÒNG LẶP TÌM KIẾM SLOT ---
-                        // Thử từng ngày một
-                        foreach (var day in daysToSearch)
+                        if (remainder > 0)
                         {
-                            // TẠI MỖI NGÀY, THỬ RANDOM CẤU HÌNH (TIẾT/PHÒNG/GV) MỚI
-                            // Thử tối đa 10 lần random cho mỗi ngày để tìm slot trống
-                            for (int attempt = 0; attempt < 10; attempt++)
+                            var remainingStudents = studentsInClass.GetRange(currentIndex, remainder);
+                            if (remainder > THRESHOLD_SEPARATE_CLASS)
                             {
-                                // 1. Random Tiết
-                                var sched = GetRandomScheduleSettings();
-                                int tryTietBd = sched.tietBatDau;
-                                int tryTietKt = sched.tietKetThuc;
-
-                                // 2. Random Phòng
-                                int tryPhongId = allPhongIds[_random.Next(allPhongIds.Count)];
-
-                                // 3. Random GV
-                                int? tryGvId = GetRandomGiangVienId(gvCandidates);
-                                if (tryGvId == null) break;
-
-                                // 4. Tạo lịch giả định
-                                var schedulesToTest = GenerateWeeklySchedule(
-                                    hocKy.NgayBatDau, hocKy.NgayKetThuc,
-                                    day, tryTietBd, tryTietKt,
-                                    tryPhongId, isThucHanh).Take(maxAllowedSessions).ToList();
-
-                                // 5. Kiểm tra trùng
-                                var conflicts = await CheckLichTrungAsync(schedulesToTest, tryGvId.Value, 0);
-
-                                if (!conflicts.Any())
-                                {
-                                    // TÌM THẤY! Lưu lại thông số
-                                    finalDayOfWeek = day;
-                                    finalTietBd = tryTietBd;
-                                    finalTietKt = tryTietKt;
-                                    finalPhongId = tryPhongId;
-                                    finalGiangVienId = tryGvId;
-                                    foundValidSlot = true;
-                                    break; // Thoát vòng lặp attempt
-                                }
+                                await CreateLhpAndEnrollAsync(remainingStudents, monHoc, hocKy, gvCandidates, allPhongIds, isThucHanh, maxAllowedSessions,
+                                    trangThaiChoMoId, dto, newRegistrations, newDetails, allCreatedLhps, stats, currentBusySchedule);
                             }
-                            if (foundValidSlot) break; // Thoát vòng lặp ngày
-                        }
-
-                        if (!foundValidSlot)
-                        {
-                            _logger.LogWarning($"[AUTO] Không tìm được lịch cho môn {maMonHoc} sau nhiều lần thử.");
-                            continue; // Bỏ qua SV này
-                        }
-
-                        // --- TẠO LỚP VỚI THÔNG SỐ ĐÃ TÌM ĐƯỢC ---
-                        var maLopHocPhan = await GenerateAutoMaLHPAsync(dto.HocKyId, monHoc.Id);
-                        selectedLhp = new LopHocPhan
-                        {
-                            HocKyId = dto.HocKyId,
-                            MonHocId = monHoc.Id,
-                            GiangVienId = finalGiangVienId, // GV Random được chọn
-                            TrangThaiId = trangThaiChoMoId,
-                            MaLopHocPhan = maLopHocPhan,
-                            TenLopHocPhan = $"{monHoc.TenMonHoc}",
-                            SiSo = MAX_LHP_SIZE,
-                            NgayBatDau = hocKy.NgayBatDau,
-                            NgayKetThuc = hocKy.NgayKetThuc
-                        };
-
-                        _context.LopHocPhans.Add(selectedLhp);
-                        await _context.SaveChangesAsync();
-                        createdLhpsBySubject[maMonHoc].Add(selectedLhp);
-                        allCreatedLhps.Add(selectedLhp);
-                        classesCreated++;
-
-                        // --- LƯU LỊCH HỌC ---
-                        if (dto.ShouldAutoCreateSchedule)
-                        {
-                            var finalSchedules = GenerateWeeklySchedule(
-                                    hocKy.NgayBatDau, hocKy.NgayKetThuc,
-                                    finalDayOfWeek, finalTietBd, finalTietKt,
-                                    finalPhongId, isThucHanh).Take(maxAllowedSessions).ToList();
-
-                            foreach (var lich in finalSchedules)
+                            else
                             {
-                                _context.LichHocs.Add(new LichHoc
-                                {
-                                    LopHocPhanId = selectedLhp.Id,
-                                    Ngay = lich.Ngay.Date,
-                                    GioBatDau = lich.GioBatDau,
-                                    GioKetThuc = lich.GioKetThuc,
-                                    PhongHocId = lich.PhongHocId
-                                });
-                                schedulesCreatedTotal++;
+                                pendingGroups.Add(remainingStudents);
                             }
-                            await _context.SaveChangesAsync();
                         }
-                    } // Kết thúc khối IF (selectedLhp == null)
-
-                    // C. Đăng ký sinh viên vào LHP đã chọn/tạo
-                    var alreadyRegistered = await _context.DangKyHocPhans
-                        .AnyAsync(dk => dk.SinhVienId == sv.Id && dk.LopHocPhanId == selectedLhp.Id);
-
-                    if (!alreadyRegistered)
-                    {
-                        var dkMoi = new DangKyHocPhan
-                        {
-                            SinhVienId = sv.Id,
-                            LopHocPhanId = selectedLhp.Id,
-                            NgayDangKy = DateTime.Now,
-                            LoaiDangKy = "BatBuocAuto"
-                        };
-                        newRegistrations.Add(dkMoi); // Add vào List tạm
-
-                        newDetails.Add(new ChiTietLopHocPhan
-                        {
-                            LopHocPhanId = selectedLhp.Id,
-                            SinhVienId = sv.Id
-                        });
-
-                        successCount++;
                     }
+                    else
+                    {
+                        pendingGroups.Add(studentsInClass);
+                    }
+                }
+
+                var currentBatch = new List<SinhVien>();
+                var batchBusySchedules = new List<LichHocDTO>();
+
+                foreach (var group in pendingGroups)
+                {
+                    if (currentBatch.Count + group.Count <= MAX_LHP_SIZE)
+                    {
+                        currentBatch.AddRange(group);
+                        int? lopId = group.FirstOrDefault()?.LopId;
+                        if (lopId.HasValue && classBusySchedules.ContainsKey(lopId.Value))
+                        {
+                            batchBusySchedules.AddRange(classBusySchedules[lopId.Value]);
+                        }
+                    }
+                    else
+                    {
+                        if (currentBatch.Any())
+                        {
+                            await CreateLhpAndEnrollAsync(currentBatch, monHoc, hocKy, gvCandidates, allPhongIds, isThucHanh, maxAllowedSessions,
+                                trangThaiChoMoId, dto, newRegistrations, newDetails, allCreatedLhps, stats, batchBusySchedules);
+                        }
+                        currentBatch = new List<SinhVien>(group);
+                        batchBusySchedules = new List<LichHocDTO>();
+                        int? lopId = group.FirstOrDefault()?.LopId;
+                        if (lopId.HasValue && classBusySchedules.ContainsKey(lopId.Value))
+                        {
+                            batchBusySchedules.AddRange(classBusySchedules[lopId.Value]);
+                        }
+                    }
+                }
+
+                if (currentBatch.Any())
+                {
+                    await CreateLhpAndEnrollAsync(currentBatch, monHoc, hocKy, gvCandidates, allPhongIds, isThucHanh, maxAllowedSessions,
+                        trangThaiChoMoId, dto, newRegistrations, newDetails, allCreatedLhps, stats, batchBusySchedules);
                 }
             }
 
-            // 4. LƯU VÀO DB MỘT LẦN DUY NHẤT (Batch Insert)
             if (newRegistrations.Any())
             {
                 _context.DangKyHocPhans.AddRange(newRegistrations);
                 _context.ChiTietLopHocPhans.AddRange(newDetails);
-
-                await _context.SaveChangesAsync(); // Lúc này EF sẽ tự điền ID vào newRegistrations
+                await _context.SaveChangesAsync();
             }
 
-
-            // 5. TÍNH TIỀN HÀNG LOẠT (Sau khi đã có ID)
             foreach (var dk in newRegistrations)
             {
-                try
-                {
-                    // Gọi hàm tính tiền với ID thật vừa được sinh ra
-                    // Lưu ý: Nếu user "System" không tồn tại trong bảng User, hãy đảm bảo hàm LogAsync xử lý được case này (hoặc truyền null)
-                    await _hocPhiService.GhiNoHocPhiAsync(dk.Id);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Lỗi tính phí SV {dk.SinhVienId}: {ex.Message}");
-                }
+                try { await _hocPhiService.GhiNoHocPhiAsync(dk.Id); } catch { }
             }
 
-            //6 thêm lịch thi tự động cho tất cả LHP đã tạo
             foreach (var lhp in allCreatedLhps.DistinctBy(l => l.Id))
             {
                 try
@@ -740,28 +642,147 @@ namespace BlueSchoolSystem.Services
                     var classIds = await _context.ChiTietLopHocPhans
                         .Where(ct => ct.LopHocPhanId == lhp.Id && ct.SinhVien.LopId.HasValue)
                         .Select(ct => ct.SinhVien.LopId.Value)
-                        .Distinct()
-                        .ToListAsync();
+                        .Distinct().ToListAsync();
 
                     if (!classIds.Any()) continue;
-
                     var examResult = await _lichThiService.AutoScheduleExamAsync(lhp.Id, classIds);
-
-                    if (examResult.Success)
-                    {
-                        examsCreatedTotal++;
-                    }
-                    else
-                    {
-                        _logger.LogWarning($"[AUTO-EXAM] Không xếp được lịch thi cho {lhp.MaLopHocPhan}: {examResult.Message}");
-                    }
+                    if (examResult.Success) examsCreatedTotal++;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"[AUTO-EXAM] Exception khi xếp lịch thi cho {lhp.MaLopHocPhan}");
+                    _logger.LogError(ex, $"Lỗi tạo lịch thi cho LHP {lhp.Id}");
                 }
             }
-            return (classesCreated, successCount, schedulesCreatedTotal, examsCreatedTotal);
+
+            return (stats.ClassesCreated, stats.SuccessCount, stats.SchedulesCreated, examsCreatedTotal);
+        }
+
+
+        private async Task CreateLhpAndEnrollAsync(
+            List<SinhVien> students,
+            MonHoc monHoc,
+            HocKy hocKy,
+            List<GiangVien> gvCandidates,
+            List<int> allPhongIds,
+            bool isThucHanh,
+            int maxAllowedSessions,
+            int trangThaiId,
+            AutoEnrollmentApiPayload dto,
+            List<DangKyHocPhan> regList,
+            List<ChiTietLopHocPhan> detailList,
+            List<LopHocPhan> createdLhps,
+            EnrollmentStats stats,
+            List<LichHocDTO> existingClassSchedules)
+        {
+            int finalDay = 0, finalTietBd = 0, finalTietKt = 0, finalPhongId = 0;
+            int? finalGvId = null;
+            bool foundSlot = false;
+            List<LichHocDTO> finalSchedulesToSave = new List<LichHocDTO>();
+
+            for (int i = 0; i < 100; i++)
+            {
+                var sched = GetRandomScheduleSettings();
+                if (!dto.CacNgayTrongTuan.Contains(sched.dayOfWeek)) continue;
+
+                int tryPhong = allPhongIds[_random.Next(allPhongIds.Count)];
+                int? tryGv = GetRandomGiangVienId(gvCandidates);
+                if (tryGv == null) break;
+
+                var testSchedules = GenerateWeeklySchedule(hocKy.NgayBatDau, hocKy.NgayKetThuc, sched.dayOfWeek,
+                    sched.tietBatDau, sched.tietKetThuc, tryPhong, isThucHanh).Take(maxAllowedSessions).ToList();
+
+                var conflicts = await CheckLichTrungAsync(testSchedules, tryGv.Value);
+                if (conflicts.Any()) continue;
+
+                bool studentConflict = false;
+                foreach (var ts in testSchedules)
+                {
+                    bool clash = existingClassSchedules.Any(ex =>
+                        ex.Ngay.Date == ts.Ngay.Date &&
+                        (ts.GioBatDau < ex.GioKetThuc && ts.GioKetThuc > ex.GioBatDau)
+                    );
+
+                    if (clash)
+                    {
+                        studentConflict = true;
+                        break;
+                    }
+                }
+
+                if (!studentConflict)
+                {
+                    finalDay = sched.dayOfWeek;
+                    finalTietBd = sched.tietBatDau;
+                    finalTietKt = sched.tietKetThuc;
+                    finalPhongId = tryPhong;
+                    finalGvId = tryGv;
+                    finalSchedulesToSave = testSchedules;
+                    foundSlot = true;
+                    break;
+                }
+            }
+
+            if (!foundSlot)
+            {
+                _logger.LogWarning($"[AUTO-FAIL] Không tìm được lịch cho môn {monHoc.MaMonHoc} (Lớp {students.FirstOrDefault()?.Lop?.MaLop}) sau 100 lần thử.");
+                return;
+            }
+
+            var maLhp = await GenerateAutoMaLHPAsync(dto.HocKyId, monHoc.Id);
+            var newLhp = new LopHocPhan
+            {
+                HocKyId = dto.HocKyId,
+                MonHocId = monHoc.Id,
+                GiangVienId = finalGvId,
+                TrangThaiId = trangThaiId,
+                MaLopHocPhan = maLhp,
+                TenLopHocPhan = monHoc.TenMonHoc,
+                SiSo = 60,
+                NgayBatDau = hocKy.NgayBatDau,
+                NgayKetThuc = hocKy.NgayKetThuc
+            };
+
+            _context.LopHocPhans.Add(newLhp);
+            await _context.SaveChangesAsync();
+            createdLhps.Add(newLhp);
+            stats.ClassesCreated++;
+
+            if (dto.ShouldAutoCreateSchedule)
+            {
+                foreach (var lich in finalSchedulesToSave)
+                {
+                    lich.LopHocPhanId = newLhp.Id;
+                    _context.LichHocs.Add(new LichHoc
+                    {
+                        LopHocPhanId = newLhp.Id,
+                        Ngay = lich.Ngay,
+                        GioBatDau = lich.GioBatDau,
+                        GioKetThuc = lich.GioKetThuc,
+                        PhongHocId = lich.PhongHocId
+                    });
+                    stats.SchedulesCreated++;
+                    existingClassSchedules.Add(lich);
+                }
+                await _context.SaveChangesAsync();
+            }
+
+            foreach (var sv in students)
+            {
+                regList.Add(new DangKyHocPhan
+                {
+                    SinhVienId = sv.Id,
+                    LopHocPhanId = newLhp.Id,
+                    NgayDangKy = DateTime.Now,
+                    LoaiDangKy = "BatBuocAuto"
+                });
+
+                detailList.Add(new ChiTietLopHocPhan
+                {
+                    LopHocPhanId = newLhp.Id,
+                    SinhVienId = sv.Id
+                });
+                stats.SuccessCount++;
+            }
         }
 
 
