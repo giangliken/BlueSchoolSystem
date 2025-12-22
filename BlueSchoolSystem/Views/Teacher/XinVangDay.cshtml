@@ -199,60 +199,66 @@
     <script>
         $('#LopHocPhanId').on('change', async function () {
 
-            console.log("🔥 EVENT change fired");
-
-            const selectedText = $("#LopHocPhanId option:selected").text();
-            console.log("Selected text:", selectedText);
-
-            const maLopHocPhan = selectedText.split(" - ")[0]?.trim();
-            console.log("maLopHocPhan:", maLopHocPhan);
-
-            const tokenData = parseJwt(jwtToken);
-            console.log("Token decoded:", tokenData);
-
-            if (!tokenData) {
-                console.error("❌ Token NULL — Session không có token");
-                return;
-            }
-
-            const maGV = tokenData.username;
-            console.log("Mã GV:", maGV);
-
-            const res = await fetch(`/api/lichgiangday/${maGV}`, {
-                headers: { "Authorization": `Bearer ${jwtToken}` }
-            });
-
-            console.log("API status:", res.status);
-
-            const data = await res.json();
-            console.log("API result:", data);
-
             const lichHocSelect = $("#LichHocId");
             lichHocSelect.empty();
             lichHocSelect.append(`<option value="">-- Chọn buổi học --</option>`);
 
-            if (data?.data?.length > 0) {
+            const selectedText = $("#LopHocPhanId option:selected").text();
+            if (!selectedText || selectedText.startsWith("--")) return;
 
-                        data.data.forEach(item => {
-            const ngay = formatDateVN(item.ngay); // chuyển sang DD/MM/YYYY
-            const thu = getThuVN(item.ngay);
+            const maLopHocPhan = selectedText.split(" - ")[0].trim();
+            console.log("📘 Mã LHP:", maLopHocPhan);
 
-            const gioBD = item.gioBatDau ?? "";
-            const gioKT = item.gioKetThuc ?? "";
-
-            const text = `${thu} ${ngay} (${gioBD} - ${gioKT})  `;
-
-            lichHocSelect.append(`
-                <option value="${item.id}">
-                    ${text}
-                </option>
-            `);
-        });
-
+            if (!jwtToken) {
+                console.error("❌ Không có JWT token");
+                return;
             }
 
-            lichHocSelect.trigger("change");
+            try {
+                const res = await fetch(
+                    `/api/lichgiangday/lophocphan/${maLopHocPhan}`,
+                    {
+                        headers: {
+                            "Authorization": `Bearer ${jwtToken}`
+                        }
+                    }
+                );
+
+                console.log("API status:", res.status);
+
+                if (!res.ok) {
+                    console.error("❌ API lỗi");
+                    return;
+                }
+
+                const data = await res.json();
+                console.log("API result:", data);
+
+                if (data?.data?.length > 0) {
+                    data.data.forEach(item => {
+                        const ngay = formatDateVN(item.ngay);
+                        const thu = getThuVN(item.ngay);
+
+                        const gioBD = item.gioBatDau ?? "";
+                        const gioKT = item.gioKetThuc ?? "";
+
+                        const text = `${thu} ${ngay} (${gioBD} - ${gioKT})`;
+
+                        lichHocSelect.append(`
+                            <option value="${item.id}">
+                                ${text}
+                            </option>
+                        `);
+                    });
+                }
+
+                lichHocSelect.trigger("change");
+
+            } catch (err) {
+                console.error("🔥 Fetch error:", err);
+            }
         });
     </script>
+
 }
 

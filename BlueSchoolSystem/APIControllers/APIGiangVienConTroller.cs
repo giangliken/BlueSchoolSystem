@@ -389,6 +389,137 @@ namespace BlueSchoolSystem.APIControllers
         }
 
 
+        // Lấy danh sách lịch giảng dạy theo mã lớp học phần
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme,
+            Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
+        [HttpGet("lichgiangday/lophocphan/{maLopHocPhan}")]
+        public async Task<IActionResult> GetLichGiangDayByMaLopHocPhan(string maLopHocPhan)
+        {
+            // 🔹 Lấy user hiện tại
+            var userId = User.FindFirst("userId")?.Value;
+            var isAdmin = User.IsInRole(SD.Role_Admin);
+
+            // 🔹 Nếu là giảng viên → chỉ xem lớp mình dạy
+            if (!isAdmin)
+            {
+                var gv = await _context.GiangViens
+                    .FirstOrDefaultAsync(x => x.UserId == userId);
+
+                if (gv == null)
+                {
+                    return Unauthorized(new
+                    {
+                        result = false,
+                        code = 401,
+                        message = "Không xác định được giảng viên"
+                    });
+                }
+
+                var isOwner = await _context.LopHocPhans.AnyAsync(x =>
+                    x.MaLopHocPhan == maLopHocPhan &&
+                    x.GiangVienId == gv.Id);
+
+                if (!isOwner)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        result = false,
+                        code = 403,
+                        message = "Bạn không có quyền xem lịch lớp học phần này"
+                    });
+                }
+            }
+
+            // 🔹 Query lịch học
+            var lichData = await (
+                from lhp in _context.LopHocPhans
+                join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
+                join lh in _context.LichHocs on lhp.Id equals lh.LopHocPhanId
+                join ph in _context.PhongHocs on lh.PhongHocId equals ph.Id into gph
+                from ph in gph.DefaultIfEmpty()
+                where lhp.MaLopHocPhan == maLopHocPhan
+                orderby lh.Ngay, lh.GioBatDau
+                select new
+                {
+                    lh.Id,
+                    lhp.MaLopHocPhan,
+                    MaMonHoc = mh.MaMonHoc,
+                    TenMonHoc = mh.TenMonHoc,
+                    MaPhongHoc = ph != null ? ph.MaPhongHoc : "Chưa có phòng",
+                    lh.Ngay,
+                    lh.GioBatDau,
+                    lh.GioKetThuc,
+                    lhp.NgayBatDau,
+                    lhp.NgayKetThuc,
+                    SoLuongSinhVien = _context.ChiTietLopHocPhans
+                        .Count(ct => ct.LopHocPhanId == lhp.Id)
+                }
+            ).ToListAsync();
+
+            if (!lichData.Any())
+            {
+                return NotFound(new
+                {
+                    result = false,
+                    code = 404,
+                    message = "Không tìm thấy lịch giảng dạy cho lớp học phần này"
+                });
+            }
+
+            // 🔹 Hàm đổi giờ → tiết
+            int ToTiet(TimeSpan gio)
+            {
+                if (gio <= TimeSpan.Parse("6:45")) return 1;
+                if (gio <= TimeSpan.Parse("07:30")) return 2;
+                if (gio <= TimeSpan.Parse("08:15")) return 3;
+                if (gio <= TimeSpan.Parse("09:20")) return 4;
+                if (gio <= TimeSpan.Parse("10:05")) return 5;
+                if (gio <= TimeSpan.Parse("10:50")) return 6;
+                if (gio <= TimeSpan.Parse("12:30")) return 7;
+                if (gio <= TimeSpan.Parse("13:10")) return 8;
+                if (gio <= TimeSpan.Parse("14:00")) return 9;
+                if (gio <= TimeSpan.Parse("15:05")) return 10;
+                if (gio <= TimeSpan.Parse("15:50")) return 11;
+                if (gio <= TimeSpan.Parse("16:35")) return 12;
+                if (gio <= TimeSpan.Parse("18:00")) return 13;
+                if (gio <= TimeSpan.Parse("18:45")) return 14;
+                return 15;
+            }
+
+            var lichGiangDay = lichData.Select(item =>
+            {
+                int tietBatDau = ToTiet(item.GioBatDau);
+                int tietKetThuc = ToTiet(item.GioKetThuc);
+
+                return new
+                {
+                    item.Id,
+                    item.MaLopHocPhan,
+                    item.MaMonHoc,
+                    item.TenMonHoc,
+                    item.MaPhongHoc,
+                    item.Ngay,
+                    GioBatDau = item.GioBatDau.ToString(@"hh\:mm"),
+                    GioKetThuc = item.GioKetThuc.ToString(@"hh\:mm"),
+                    item.NgayBatDau,
+                    item.NgayKetThuc,
+                    TietBatDau = tietBatDau,
+                    SoTiet = tietKetThuc - tietBatDau,
+                    item.SoLuongSinhVien
+                };
+            }).ToList();
+
+            return Ok(new
+            {
+                result = true,
+                code = 200,
+                message = "Lấy lịch giảng dạy theo lớp học phần thành công",
+                soluong = lichGiangDay.Count,
+                data = lichGiangDay
+            });
+        }
+
+
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = SD.Role_Teacher + "," + SD.Role_Admin)]
         [HttpGet("lophocphan")]
         public async Task<IActionResult> LayLopHP()
@@ -1262,15 +1393,14 @@ namespace BlueSchoolSystem.APIControllers
             if (giangVien == null)
                 return NotFound(new { result = false, message = "Không tìm thấy thông tin giảng viên" });
 
-            var today = DateTime.Today;
+            var now = DateTime.Now;
 
             var query =
                 from lhp in _context.LopHocPhans
                 join mh in _context.MonHocs on lhp.MonHocId equals mh.Id
                 join hk in _context.HocKys on lhp.HocKyId equals hk.Id
                 where lhp.GiangVienId == giangVien.Id
-                      && hk.NgayBatDau <= today
-                      && hk.NgayKetThuc >= today
+                      && hk.NgayKetThuc >= now
                 select new
                 {
                     lhp.Id,
