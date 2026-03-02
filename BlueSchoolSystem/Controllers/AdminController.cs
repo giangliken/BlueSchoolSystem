@@ -298,7 +298,7 @@ namespace BlueSchoolSystem.Controllers
                 Student = model
             };
 
-            var apiUrl = "https://localhost:5001/api/taomoisinhvien";
+            var apiUrl = $"{_apiBaseUrl}api/taomoisinhvien";
 
             var httpClient = new HttpClient();
 
@@ -410,7 +410,7 @@ namespace BlueSchoolSystem.Controllers
             }
 
             // Gửi từng sinh viên qua API
-            var apiUrl = "https://localhost:5001/api/taomoisinhvien";
+            var apiUrl = $"{_apiBaseUrl}api/taomoisinhvien";
             var httpClient = new HttpClient();
             var token = HttpContext.Session.GetString("access_token");
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -1004,7 +1004,7 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> FacultyManager(string maKhoa, string searchString)
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             ViewBag.AccessToken = token;
@@ -1248,7 +1248,7 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> ClassManager(string? maKhoa, string? maNganh, string? keyword, string? khoaHoc)
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
@@ -1331,7 +1331,7 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> AddClass(CreateClassRequest request)
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
@@ -1409,7 +1409,7 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> DeleteClass(string maLop)
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
@@ -1725,7 +1725,7 @@ namespace BlueSchoolSystem.Controllers
         private async Task<List<ActivityLog>> GetLogsFromApi()
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
@@ -4142,7 +4142,7 @@ namespace BlueSchoolSystem.Controllers
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                client.BaseAddress = new Uri("https://localhost:5001/");
+                client.BaseAddress = new Uri(_apiBaseUrl);
                 var token = HttpContext.Session.GetString("access_token");
                 if (!string.IsNullOrEmpty(token))
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

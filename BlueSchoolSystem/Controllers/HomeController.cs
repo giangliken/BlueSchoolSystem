@@ -115,7 +115,7 @@ namespace BlueSchoolSystem.Controllers
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                client.BaseAddress = new Uri("https://localhost:5001/");
+                client.BaseAddress = new Uri(_apiBaseUrl);
 
                 // 🔹 Gắn token từ session vào header Authorization
                 var token = HttpContext.Session.GetString("access_token");
@@ -194,7 +194,7 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> LichThi(string hocKy)
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
@@ -291,7 +291,7 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> XemDiem(string hocKy)
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
@@ -400,7 +400,7 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> LopHocPhan(string hocKy)
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
@@ -460,7 +460,7 @@ namespace BlueSchoolSystem.Controllers
             ViewBag.MaLopHocPhan = maLopHocPhan;
 
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             // Lấy access token từ session
             var token = HttpContext.Session.GetString("access_token");

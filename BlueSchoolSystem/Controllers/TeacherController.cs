@@ -100,7 +100,7 @@ namespace BlueSchoolSystem.Controllers
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                client.BaseAddress = new Uri("https://localhost:5001/");
+                client.BaseAddress = new Uri(_apiBaseUrl);
 
                 // 🔥 Lấy token từ session
                 var token = HttpContext.Session.GetString("access_token");
@@ -182,7 +182,7 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> LopPhuTrach()
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
@@ -217,7 +217,7 @@ namespace BlueSchoolSystem.Controllers
             }
 
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             var token = HttpContext.Session.GetString("access_token");
             if (!string.IsNullOrEmpty(token))
@@ -267,7 +267,7 @@ namespace BlueSchoolSystem.Controllers
         public async Task<IActionResult> LopHocPhan(int? selectedHocKyId)
         {
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
 
             // Lấy access_token từ session
             var token = HttpContext.Session.GetString("access_token");
@@ -329,7 +329,7 @@ namespace BlueSchoolSystem.Controllers
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             // 1️⃣ Lấy chi tiết lớp học phần
-            var responseLHP = await client.GetAsync($"https://localhost:5001/api/chitietlophocphan/{maLopHocPhan}");
+            var responseLHP = await client.GetAsync($"{_apiBaseUrl}api/chitietlophocphan/{maLopHocPhan}");
             if (!responseLHP.IsSuccessStatusCode)
             {
                 ViewBag.Error = "Không lấy được thông tin lớp học phần.";
@@ -343,7 +343,7 @@ namespace BlueSchoolSystem.Controllers
             var listSV = lopHocPhan.DanhSachSinhVien ?? new List<SinhVienViewModel>();
 
             // 3️⃣ Lấy danh sách buổi điểm danh
-            var responseAttendance = await client.GetAsync($"https://localhost:5001/api/lophocphan/ma/{maLopHocPhan}/buoidiemdanh");
+            var responseAttendance = await client.GetAsync($"{_apiBaseUrl}api/lophocphan/ma/{maLopHocPhan}/buoidiemdanh");
             var listAttendance = new List<AttendanceSessionViewModel>();
             if (responseAttendance.IsSuccessStatusCode)
             {
@@ -467,7 +467,7 @@ namespace BlueSchoolSystem.Controllers
             if (!string.IsNullOrEmpty(token))
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.GetAsync($"https://localhost:5001/api/lophocphan/{id}/buoidiemdanh");
+            var response = await client.GetAsync($"{_apiBaseUrl}api/lophocphan/{id}/buoidiemdanh");
             if (!response.IsSuccessStatusCode)
             {
                 ViewBag.Error = "Không lấy được danh sách buổi điểm danh.";
@@ -503,7 +503,7 @@ namespace BlueSchoolSystem.Controllers
             var json = JsonConvert.SerializeObject(postData);
             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await client.PostAsync($"https://localhost:5001/api/lophocphan/{LopHocPhanId}/buoidiemdanh/tao", content);
+            var response = await client.PostAsync($"{_apiBaseUrl}api/lophocphan/{LopHocPhanId}/buoidiemdanh/tao", content);
 
             var body = await response.Content.ReadAsStringAsync();
 
@@ -560,7 +560,7 @@ namespace BlueSchoolSystem.Controllers
             if (!string.IsNullOrEmpty(token))
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.GetAsync($"https://localhost:5001/api/buoidiemdanh/{id}/chitiet");
+            var response = await client.GetAsync($"{_apiBaseUrl}api/buoidiemdanh/{id}/chitiet");
             if (!response.IsSuccessStatusCode)
             {
                 ViewBag.Error = "Không lấy được chi tiết buổi điểm danh.";
@@ -576,7 +576,7 @@ namespace BlueSchoolSystem.Controllers
             ViewBag.MaLopHocPhan = session.MaLopHocPhan;
 
             // 2. Gọi API lấy trạng thái điểm danh
-            var trangThaiRes = await client.GetAsync("https://localhost:5001/api/trangthai/loai/DiemDanh");
+            var trangThaiRes = await client.GetAsync($"{_apiBaseUrl}api/trangthai/loai/DiemDanh");
             if (trangThaiRes.IsSuccessStatusCode)
             {
                 var trangThaiBody = await trangThaiRes.Content.ReadAsStringAsync();
@@ -645,7 +645,7 @@ namespace BlueSchoolSystem.Controllers
             };
             var json = JsonConvert.SerializeObject(postData);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync($"https://localhost:5001/api/diemdanh/capnhattrangthai", content);
+            var response = await client.PostAsync($"{_apiBaseUrl}api/diemdanh/capnhattrangthai", content);
 
             if (response.IsSuccessStatusCode)
                 TempData["Success"] = "Đã cập nhật trạng thái!";
@@ -668,7 +668,7 @@ namespace BlueSchoolSystem.Controllers
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             // Gọi API tạo lại mã code mới, ví dụ POST hoặc PUT (tuỳ API bạn)
-            var response = await client.PostAsync($"https://localhost:5001/api/buoidiemdanh/{id}/regeneratecode", null);
+            var response = await client.PostAsync($"{_apiBaseUrl}api/buoidiemdanh/{id}/regeneratecode", null);
 
 
             var buoi = await _context.DiemDanhs
@@ -710,7 +710,7 @@ namespace BlueSchoolSystem.Controllers
 
             // Chuẩn bị HttpClient
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:5001/");
+            client.BaseAddress = new Uri(_apiBaseUrl);
             if (!string.IsNullOrEmpty(token))
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
@@ -739,7 +739,7 @@ namespace BlueSchoolSystem.Controllers
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                client.BaseAddress = new Uri("https://localhost:5001/");
+                client.BaseAddress = new Uri(_apiBaseUrl);
 
                 var token = HttpContext.Session.GetString("access_token");
                 if (!string.IsNullOrEmpty(token))
@@ -780,7 +780,7 @@ namespace BlueSchoolSystem.Controllers
             {
                 // Lấy lại danh sách lớp học phần
                 var client = _httpClientFactory.CreateClient();
-                client.BaseAddress = new Uri("https://localhost:5001/");
+                client.BaseAddress = new Uri(_apiBaseUrl);
                 var token = HttpContext.Session.GetString("access_token");
                 if (!string.IsNullOrEmpty(token))
                     client.DefaultRequestHeaders.Authorization =
@@ -927,7 +927,7 @@ namespace BlueSchoolSystem.Controllers
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                client.BaseAddress = new Uri("https://localhost:5001/");
+                client.BaseAddress = new Uri(_apiBaseUrl);
                 var token = HttpContext.Session.GetString("access_token");
                 if (!string.IsNullOrEmpty(token))
                     client.DefaultRequestHeaders.Authorization =
