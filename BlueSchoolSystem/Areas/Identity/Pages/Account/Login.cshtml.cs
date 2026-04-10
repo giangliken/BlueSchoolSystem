@@ -23,12 +23,14 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ILogger<LoginModel> _logger;
         private readonly IActivityLogService _activityLogService;
+        private readonly IConfiguration _configuration;
 
-        public LoginModel(SignInManager<ApplicationUser> signInManager, ILogger<LoginModel> logger, IActivityLogService activityLogService)
+        public LoginModel(SignInManager<ApplicationUser> signInManager, ILogger<LoginModel> logger, IActivityLogService activityLogService, IConfiguration configuration)
         {
             _signInManager = signInManager;
             _logger = logger;
             _activityLogService = activityLogService;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -136,8 +138,9 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
                         Description = $"Người dùng {Input.UserName} đã đăng nhập vào hệ thống"
 
                     };
+                    var apiBaseUrl = _configuration["ApiSettings:BaseUrl"];
                     var httpClient = new HttpClient();
-                    var Logresponse = await httpClient.PostAsJsonAsync("https://localhost:5001/api/ghilog", log);
+                    var Logresponse = await httpClient.PostAsJsonAsync($"{apiBaseUrl}api/ghilog", log);
                     // response.IsSuccessStatusCode == true nếu ghi log thành công
 
                     //Gọi API lấy token
@@ -150,7 +153,7 @@ namespace BlueSchoolSystem.Areas.Identity.Pages.Account
 
                     var content = new StringContent(System.Text.Json.JsonSerializer.Serialize(loginData), System.Text.Encoding.UTF8, "application/json");
 
-                    var response = await client.PostAsync("https://localhost:5001/api/login", content);
+                    var response = await client.PostAsync($"{apiBaseUrl}api/login", content);
                     if (response.IsSuccessStatusCode)
                     {
                         var responseContent = await response.Content.ReadAsStringAsync();

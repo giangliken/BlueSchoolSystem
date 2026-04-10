@@ -486,7 +486,7 @@
                     const diemDanhId = @Model.Id; // Id buổi điểm danh, chính là DiemDanhId bên API
 
                     if (sinhVienId > 0) {
-                        fetch("https://localhost:5001/api/buoidiemdanh/capnhat-trangthai", {
+                        fetch("/api/buoidiemdanh/capnhat-trangthai", {
                             method: "POST",
                             headers: {
                                 "Content-Type": "application/json"

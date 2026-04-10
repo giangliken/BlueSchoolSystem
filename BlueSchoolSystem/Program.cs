@@ -163,7 +163,8 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    await Seeder.SeedAsync(services); // Gọi hàm seed
+    if (!app.Environment.IsEnvironment("Testing"))
+        await Seeder.SeedAsync(services); // Gọi hàm seed
 }
 
 // Configure the HTTP request pipeline.
@@ -186,7 +187,8 @@ app.UseSession();
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseRateLimiter();
+if (!app.Environment.IsEnvironment("Testing"))
+    app.UseRateLimiter();
 
 app.MapControllers();
 
@@ -198,3 +200,5 @@ app.MapControllerRoute(
     .WithStaticAssets();
 
 app.Run();
+
+public partial class Program { }
